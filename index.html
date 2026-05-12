@@ -1,0 +1,1777 @@
+<!-- SanusBio v1.0.1 | 2026-05-02 -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SanusBio</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --sidebar-w: 230px;
+            --brand: #0f3460;
+            --brand-light: #16213e;
+        }
+
+        body {
+            background: #f0f2f5;
+            font-size: .92rem;
+        }
+
+        #loginWrap {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--brand) 0%, #1a5276 100%);
+        }
+
+        #loginCard {
+            width: 360px;
+            border-radius: 14px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+        }
+
+        #app {
+            display: none;
+            min-height: 100vh;
+        }
+
+        #sidebar {
+            width: var(--sidebar-w);
+            min-height: 100vh;
+            background: var(--brand);
+            flex-shrink: 0;
+        }
+
+        #sidebar .brand {
+            padding: 1.2rem 1rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #fff;
+            border-bottom: 1px solid rgba(255, 255, 255, .1);
+        }
+
+        #sidebar .nav-link {
+            color: rgba(255, 255, 255, .7);
+            padding: .55rem 1rem;
+            border-radius: 8px;
+            margin: 2px 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all .15s;
+        }
+
+        #sidebar .nav-link:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, .12);
+        }
+
+        #sidebar .nav-link.active {
+            color: #fff;
+            background: rgba(255, 255, 255, .18);
+        }
+
+        #sidebar .user-block {
+            padding: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, .1);
+            margin-top: auto;
+        }
+
+        .main {
+            flex: 1;
+            padding: 1.8rem;
+            overflow-y: auto;
+            min-width: 0;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.show {
+            display: block;
+        }
+
+        .stat-card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, .07);
+        }
+
+        .stat-card .icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+        }
+
+        .ferret-card {
+            cursor: pointer;
+            transition: transform .15s, box-shadow .15s;
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, .07);
+        }
+
+        .ferret-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, .12);
+        }
+
+        .ferret-avatar {
+            height: 130px;
+            object-fit: cover;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .ferret-placeholder {
+            height: 100px;
+            background: linear-gradient(135deg, #e3eaf2, #c8d6e5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .role-badge {
+            font-size: .7rem;
+            padding: .25em .55em;
+        }
+
+        .role-admin {
+            background: #dc3545;
+        }
+
+        .role-research {
+            background: #0d6efd;
+        }
+
+        .role-maternity {
+            background: #198754;
+        }
+
+        .role-caretaker {
+            background: #6c757d;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .dot-active {
+            background: #198754;
+        }
+
+        .dot-dead {
+            background: #dc3545;
+        }
+
+        .page-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .page-header h4 {
+            margin: 0;
+            font-weight: 700;
+        }
+
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, .06);
+        }
+
+        .table th {
+            font-weight: 600;
+            font-size: .82rem;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: #6c757d;
+            background: #f8f9fa;
+        }
+
+        .badge-pill {
+            border-radius: 20px;
+        }
+
+        .action-type {
+            font-size: .75rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ─── LOGIN ──────────────────────────────────────────────────────────────── -->
+    <div id="loginWrap">
+        <div id="loginCard" class="card">
+            <div class="card-body p-4">
+                <div class="text-center mb-4">
+                    <div style="font-size:2.5rem">🐾</div>
+                    <h5 class="fw-bold mb-0">SanusBio</h5>
+                    <small class="text-muted">Ferret Research Management</small>
+                </div>
+                <div id="loginErr" class="alert alert-danger py-2 d-none small"></div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Username</label>
+                    <input id="iUser" type="text" class="form-control" placeholder="Enter username"
+                        autocomplete="username">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Password</label>
+                    <input id="iPass" type="password" class="form-control" placeholder="Enter password"
+                        autocomplete="current-password">
+                </div>
+                <button class="btn btn-primary w-100 fw-semibold" onclick="doLogin()">Sign In</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── APP SHELL ──────────────────────────────────────────────────────────── -->
+    <div id="app" style="display:flex">
+        <div id="sidebar" class="d-flex flex-column">
+            <div class="brand">🐾 SanusBio</div>
+            <nav class="nav flex-column pt-2 px-1 gap-1" id="navLinks">
+                <a class="nav-link" href="#" data-page="dashboard"><i class="bi bi-speedometer2"></i>Dashboard</a>
+                <a class="nav-link" href="#" data-page="ferrets"><i class="bi bi-grid-3x3-gap"></i>Ferrets</a>
+                <a class="nav-link" href="#" data-page="locations"><i class="bi bi-geo-alt"></i>Locations</a>
+                <a class="nav-link" href="#" data-page="assignments"><i
+                        class="bi bi-clipboard-check"></i>Assignments</a>
+                <a class="nav-link admin-only" href="#" data-page="users"><i class="bi bi-people"></i>Users</a>
+                <a class="nav-link admin-only" href="#" data-page="activity"><i class="bi bi-journal-text"></i>Activity
+                    Log</a>
+            </nav>
+            <div class="user-block">
+                <div id="userInfo" class="mb-2"></div>
+                <button class="btn btn-sm btn-outline-light w-100" onclick="doLogout()"><i
+                        class="bi bi-box-arrow-right me-1"></i>Sign Out</button>
+            </div>
+        </div>
+
+        <div class="main">
+
+            <!-- Dashboard -->
+            <div id="page-dashboard" class="page">
+                <div class="page-header">
+                    <h4><i class="bi bi-speedometer2 me-2"></i>Dashboard</h4>
+                </div>
+                <div id="statCards" class="row g-3 mb-4"></div>
+                <div class="card" id="dashActivityCard">
+                    <div class="card-header bg-white fw-semibold py-3">Recent Activity</div>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>User</th>
+                                    <th>Action</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashActivity"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ferrets -->
+            <div id="page-ferrets" class="page">
+                <div class="page-header">
+                    <h4><i class="bi bi-grid-3x3-gap me-2"></i>Ferrets</h4>
+                    <input id="ferretSearch" type="search" class="form-control" style="max-width:240px"
+                        placeholder="Search ferrets…">
+                    <select id="ferretSort" class="form-select" style="max-width:160px" onchange="renderFerretGrid()">
+                        <option value="name">Sort: Name</option>
+                        <option value="age">Sort: Age</option>
+                        <option value="sex">Sort: Sex</option>
+                        <option value="room">Sort: Room</option>
+                    </select>
+                    <div class="ms-auto d-flex gap-2">
+                        <button id="btnAddLocation" class="btn btn-outline-secondary d-none"
+                            onclick="new bootstrap.Modal(document.getElementById('addrModal')).show()"><i
+                                class="bi bi-geo-alt me-1"></i>Add Location</button>
+                        <button id="btnAddSupplier" class="btn btn-outline-secondary d-none"
+                            onclick="new bootstrap.Modal(document.getElementById('supplierModal')).show()"><i
+                                class="bi bi-truck me-1"></i>Add Supplier</button>
+                        <button id="btnAddFerret" class="btn btn-primary d-none" onclick="openFerretModal()"><i
+                                class="bi bi-plus-lg me-1"></i>Add Ferret</button>
+                    </div>
+                </div>
+                <div id="ferretGrid" class="row g-3"></div>
+            </div>
+
+            <!-- Ferret Detail -->
+            <div id="page-ferret-detail" class="page">
+                <button class="btn btn-outline-secondary btn-sm mb-3" onclick="nav('ferrets')"><i
+                        class="bi bi-arrow-left me-1"></i>Back</button>
+                <div id="ferretDetail"></div>
+            </div>
+
+            <!-- Locations -->
+            <div id="page-locations" class="page">
+                <div class="page-header">
+                    <h4><i class="bi bi-geo-alt me-2"></i>Locations</h4>
+                    <button id="btnAddLocationMain" class="btn btn-outline-secondary ms-auto d-none"
+                        onclick="new bootstrap.Modal(document.getElementById('addrModal')).show()"><i
+                            class="bi bi-plus-lg me-1"></i>Add Location</button>
+                </div>
+                <div id="locationAccordion" class="accordion"></div>
+            </div>
+
+            <!-- Assignments -->
+            <div id="page-assignments" class="page">
+                <div class="page-header">
+                    <h4><i class="bi bi-clipboard-check me-2"></i>Assignments</h4>
+                    <button id="btnAddAssign" class="btn btn-primary ms-auto d-none" onclick="openAssignModal()"><i
+                            class="bi bi-plus-lg me-1"></i>Create</button>
+                </div>
+                <div class="card">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Assigned To</th>
+                                    <th>Description</th>
+                                    <th>Due</th>
+                                    <th>Status</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="assignTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users -->
+            <div id="page-users" class="page admin-only">
+                <div class="page-header">
+                    <h4><i class="bi bi-people me-2"></i>User Management</h4>
+                    <button class="btn btn-primary ms-auto" onclick="openUserModal()"><i
+                            class="bi bi-plus-lg me-1"></i>Add User</button>
+                </div>
+                <div class="card">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Full Name</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Last Login</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="userTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Log -->
+            <div id="page-activity" class="page admin-only">
+                <div class="page-header">
+                    <h4><i class="bi bi-journal-text me-2"></i>Activity Log</h4>
+                </div>
+                <div class="card">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>User</th>
+                                    <th>Action</th>
+                                    <th>Table</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="actTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /main -->
+    </div><!-- /app -->
+
+
+    <!-- ─── MODALS ─────────────────────────────────────────────────────────────── -->
+
+    <!-- Ferret Modal -->
+    <div class="modal fade" id="ferretModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Ferret</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2">
+                        <div class="col-md-6"><label class="form-label">Ferret Name <span
+                                    class="text-danger">*</span></label><input id="fName" class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">Animal ID</label><input id="fAnimalId"
+                                class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">Birth Date <span
+                                    class="text-danger">*</span></label><input id="fBirthDate" type="date"
+                                class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">Weight (g)</label><input id="fWeight"
+                                type="number" class="form-control" value="0"></div>
+                        <div class="col-md-6"><label class="form-label">Sex</label>
+                            <select id="fSex" class="form-select">
+                                <option value="">— Unknown —</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6"><label class="form-label">Spayed / Neutered</label>
+                            <select id="fSpayed" class="form-select">
+                                <option value="n">No</option>
+                                <option value="y">Yes</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6" id="fSpayDateRow" style="display:none"><label class="form-label">Procedure
+                                Date</label><input id="fSpayDate" type="date" class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">Mother Name</label><input id="fMother"
+                                class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">Father Name</label><input id="fFather"
+                                class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">Next Rabies Vaccine</label><input id="fVaccine"
+                                type="date" class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">Acquired By</label><input id="fAcqBy"
+                                class="form-control"></div>
+                        <div class="col-12"><label class="form-label">Description</label><input id="fDesc"
+                                class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">Location (optional)</label><select id="fAddrId"
+                                class="form-select">
+                                <option value="">— Unassigned —</option>
+                            </select></div>
+                        <div class="col-md-6"><label class="form-label">Supplier (optional)</label><select
+                                id="fSupplierId" class="form-select">
+                                <option value="">— Unknown —</option>
+                            </select></div>
+                        <div class="col-12"><label class="form-label">Photo URL</label><input id="fPhoto"
+                                class="form-control" placeholder="https://…"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitFerret()">Save Ferret</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Health Event Modal -->
+    <div class="modal fade" id="healthModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Record Health Event</h5><button class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="heFerretId">
+                    <div class="mb-2"><label class="form-label">Event Type</label>
+                        <select id="heType" class="form-select" onchange="toggleWeightRow()">
+                            <option value="weight">Weight Check</option>
+                            <option value="bath">Bath</option>
+                            <option value="nail_trim">Nail Trim</option>
+                        </select>
+                    </div>
+                    <div id="heWeightRow" class="mb-2"><label class="form-label">Weight (g)</label><input id="heWeight"
+                            type="number" step="0.01" min="0" max="9999.99" class="form-control"
+                            placeholder="e.g. 850.5"></div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-7"><label class="form-label">Date</label><input id="heDate" type="date"
+                                class="form-control"></div>
+                        <div class="col-5"><label class="form-label">Time</label><input id="heTime" type="time"
+                                class="form-control"></div>
+                    </div>
+                    <div class="mb-2"><label class="form-label">Notes</label><textarea id="heNotes" class="form-control"
+                            rows="2"></textarea></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitHealthEvent()">Record</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vaccination Modal -->
+    <div class="modal fade" id="vaccModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Record Vaccination</h5><button class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="vFerretId">
+                    <div class="mb-2"><label class="form-label">Vaccine Type</label>
+                        <select id="vType" class="form-select" onchange="toggleRabiesDue()">
+                            <option value="rabies">Rabies</option>
+                            <option value="distemper">Distemper</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-2"><label class="form-label">Vaccination Date</label><input id="vDate" type="date"
+                            class="form-control"></div>
+                    <div class="mb-2"><label class="form-label">Expiration Date</label><input id="vExpiry" type="date"
+                            class="form-control"></div>
+                    <div class="mb-2" id="vNextRabiesRow"><label class="form-label">Next Rabies Vaccine
+                            Due</label><input id="vNextRabies" type="date" class="form-control"></div>
+                    <div class="mb-2"><label class="form-label">Notes</label><textarea id="vNotes" class="form-control"
+                            rows="2"></textarea></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitVaccination()">Record</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Litter Modal -->
+    <div class="modal fade" id="litterModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Litter Record</h5><button class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="litFerretId">
+                    <div class="row g-2">
+                        <div class="col-6"><label class="form-label">Litter Date</label><input id="litDate" type="date"
+                                class="form-control"></div>
+                        <div class="col-6"><label class="form-label">Litter ID</label><input id="litId"
+                                class="form-control" placeholder="e.g. LT-001"></div>
+                        <div class="col-6"><label class="form-label">Kit Count</label><input id="litKits" type="number"
+                                class="form-control" min="0"></div>
+                        <div class="col-6"><label class="form-label">Stillborn</label><input id="litStillborn"
+                                type="number" class="form-control" min="0" value="0"></div>
+                        <div class="col-6"><label class="form-label">Father</label><input id="litFather"
+                                class="form-control"></div>
+                        <div class="col-6"><label class="form-label">Mother</label><input id="litMother"
+                                class="form-control"></div>
+                        <div class="col-12"><label class="form-label">Anomalies / Notes</label><textarea id="litNotes"
+                                class="form-control" rows="2"></textarea></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitLitter()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Move Location Modal -->
+    <div class="modal fade" id="moveModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Change Location</h5><button class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="moveFerretId">
+                    <label class="form-label">Select New Location</label>
+                    <select id="moveAddrId" class="form-select"></select>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitMove()">Move Ferret</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Medical Info Modal -->
+    <div class="modal fade" id="medModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Update Medical Info</h5><button class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="medFerretId">
+                    <input type="hidden" id="medInfoId">
+                    <h6 class="fw-semibold mb-2">Spay / Castration</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6"><label class="form-label">Status</label>
+                            <select id="medSpayed" class="form-select">
+                                <option value="n">No</option>
+                                <option value="y">Yes</option>
+                            </select>
+                        </div>
+                        <div class="col-6"><label class="form-label">Spay / Castration Date</label><input
+                                id="medSpayDate" type="date" class="form-control"></div>
+                    </div>
+                    <h6 class="fw-semibold mb-2">Last Exam</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6"><label class="form-label">Exam Date</label><input id="medExamDate"
+                                type="date" class="form-control"></div>
+                        <div class="col-6"><label class="form-label">Performed By</label><input id="medPerformedBy"
+                                class="form-control"></div>
+                        <div class="col-12"><label class="form-label">Exam Notes</label><textarea id="medExamLog"
+                                class="form-control" rows="2"></textarea></div>
+                    </div>
+                    <h6 class="fw-semibold mb-2">Orders / Treatments</h6>
+                    <div class="row g-2">
+                        <div class="col-12"><label class="form-label">Orders</label><input id="medOrders"
+                                class="form-control"></div>
+                        <div class="col-12"><label class="form-label">Treatments</label><input id="medTreatments"
+                                class="form-control"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitMedicalInfo()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Procedure Modal -->
+    <div class="modal fade" id="procedureModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Log Medical Procedure</h5><button class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="procFerretId">
+                    <div class="row g-2">
+                        <div class="col-md-8"><label class="form-label">Procedure Name <span
+                                    class="text-danger">*</span></label>
+                            <input id="procName" class="form-control"
+                                placeholder="e.g. Adrenalectomy, Biopsy, Suture removal">
+                        </div>
+                        <div class="col-md-4"><label class="form-label">Date <span class="text-danger">*</span></label>
+                            <input id="procDate" type="date" class="form-control">
+                        </div>
+                        <div class="col-12"><label class="form-label">Performed By</label>
+                            <input id="procPerformedBy" class="form-control"
+                                placeholder="Veterinarian or technician name">
+                        </div>
+                        <div class="col-12"><label class="form-label">Notes / Details</label>
+                            <textarea id="procNotes" class="form-control" rows="3"
+                                placeholder="Describe findings, techniques used, complications, follow-up care…"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitProcedure()">Save Procedure</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assignment Modal -->
+    <div class="modal fade" id="assignModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create Assignment</h5><button class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2"><label class="form-label">Assign To</label><select id="aAssignTo"
+                            class="form-select"></select></div>
+                    <div class="mb-2"><label class="form-label">Type</label>
+                        <select id="aType" class="form-select">
+                            <option value="cleaning">Cleaning</option>
+                            <option value="feeding">Feeding</option>
+                            <option value="health_check">Health Check</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-2"><label class="form-label">Description</label><textarea id="aDesc"
+                            class="form-control" rows="3"></textarea></div>
+                    <div class="mb-2"><label class="form-label">Due Date</label><input id="aDue" type="date"
+                            class="form-control"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitAssign()">Create Assignment</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Modal -->
+    <div class="modal fade" id="userModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="userModalTitle">Add User</h5><button class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2">
+                        <div class="col-6"><label class="form-label">Username <span
+                                    class="text-danger">*</span></label><input id="uUsername" class="form-control">
+                        </div>
+                        <div class="col-6"><label class="form-label">Full Name</label><input id="uFullName"
+                                class="form-control"></div>
+                        <div class="col-12"><label class="form-label">Email <span
+                                    class="text-danger">*</span></label><input id="uEmail" type="email"
+                                class="form-control"></div>
+                        <div class="col-6"><label class="form-label">Role <span class="text-danger">*</span></label>
+                            <select id="uRole" class="form-select">
+                                <option value="admin">Admin</option>
+                                <option value="research">Research</option>
+                                <option value="maternity">Maternity</option>
+                                <option value="caretaker" selected>Caretaker</option>
+                            </select>
+                        </div>
+                        <div class="col-6" id="uActiveWrap" style="display:none"><label
+                                class="form-label">Status</label>
+                            <select id="uActive" class="form-select">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="col-12"><label class="form-label">Password <span id="uPassReq"
+                                    class="text-danger">*</span></label>
+                            <input id="uPassword" type="password" class="form-control" placeholder="Min 8 characters">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitUser()">Save User</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Address/Supplier quick modals -->
+    <div class="modal fade" id="addrModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Location</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2"><label class="form-label">Room ID <span class="text-danger">*</span></label><input
+                            id="adRoom" type="number" class="form-control"></div>
+                    <div class="mb-2"><label class="form-label">Cage Address</label><input id="adCage"
+                            class="form-control" maxlength="5" placeholder="e.g. A1"></div>
+                    <div class="mb-2"><label class="form-label">Lighting</label><input id="adLight"
+                            class="form-control"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitAddress()">Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="supplierModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Supplier</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2"><label class="form-label">Supplier Name <span
+                                class="text-danger">*</span></label><input id="supName" class="form-control"></div>
+                    <div class="mb-2"><label class="form-label">Contact Info</label><input id="supContact"
+                            class="form-control"></div>
+                    <div class="mb-2"><label class="form-label">Address</label><input id="supAddr" class="form-control">
+                    </div>
+                    <div class="mb-2"><label class="form-label">Phone</label><input id="supPhone" type="number"
+                            class="form-control"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitSupplier()">Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // ─────────────────────────────────────────────────────────────────────────────
+        // State
+        // ─────────────────────────────────────────────────────────────────────────────
+        let TOKEN = localStorage.getItem('sb_token');
+        let USER = JSON.parse(localStorage.getItem('sb_user') || 'null');
+        let _editUserId = null;
+        let _currentFerretId = null;
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // API Helper
+        // ─────────────────────────────────────────────────────────────────────────────
+        async function api(path, opts = {}) {
+            const res = await fetch('/api' + path, {
+                ...opts,
+                headers: { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+                body: opts.body != null ? JSON.stringify(opts.body) : undefined
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            return data;
+        }
+
+        function roleIs(...r) { return r.includes(USER?.role); }
+        function canWrite() { return roleIs('admin', 'research', 'maternity', 'caretaker'); }
+        function canUpdate() { return roleIs('admin', 'research', 'maternity'); }
+        function canDelete() { return roleIs('admin', 'research'); }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Auth
+        // ─────────────────────────────────────────────────────────────────────────────
+        async function doLogin() {
+            const username = document.getElementById('iUser').value.trim();
+            const password = document.getElementById('iPass').value;
+            const errEl = document.getElementById('loginErr');
+            errEl.classList.add('d-none');
+            try {
+                const data = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                }).then(r => r.json().then(d => { if (!r.ok) throw new Error(d.error); return d; }));
+                TOKEN = data.token;
+                USER = data.user;
+                localStorage.setItem('sb_token', TOKEN);
+                localStorage.setItem('sb_user', JSON.stringify(USER));
+                initApp();
+            } catch (err) {
+                errEl.textContent = err.message;
+                errEl.classList.remove('d-none');
+            }
+        }
+
+        function doLogout() {
+            localStorage.removeItem('sb_token');
+            localStorage.removeItem('sb_user');
+            location.reload();
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Init
+        // ─────────────────────────────────────────────────────────────────────────────
+        function initApp() {
+            if (!TOKEN || !USER) {
+                document.getElementById('loginWrap').style.display = 'flex';
+                document.getElementById('app').style.display = 'none';
+                return;
+            }
+            document.getElementById('loginWrap').style.display = 'none';
+            document.getElementById('app').style.display = 'flex';
+
+            const roleColors = { admin: 'danger', research: 'primary', maternity: 'success', caretaker: 'secondary' };
+            document.getElementById('userInfo').innerHTML =
+                `<div class="text-white fw-semibold small">${USER.full_name || USER.username}</div>
+             <span class="badge role-${USER.role} role-badge">${USER.role}</span>`;
+
+            if (USER.role !== 'admin') {
+                document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+            }
+
+            // Nav click handler
+            document.getElementById('navLinks').querySelectorAll('.nav-link').forEach(link => {
+                link.addEventListener('click', e => { e.preventDefault(); nav(link.dataset.page); });
+            });
+
+            nav('dashboard');
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Navigation
+        // ─────────────────────────────────────────────────────────────────────────────
+        function nav(page) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('show'));
+            document.querySelectorAll('#navLinks .nav-link').forEach(l => l.classList.remove('active'));
+            const p = document.getElementById('page-' + page);
+            if (p) p.classList.add('show');
+            const link = document.querySelector(`#navLinks [data-page="${page}"]`);
+            if (link) link.classList.add('active');
+            const loaders = { dashboard: loadDashboard, ferrets: loadFerrets, locations: loadLocations, assignments: loadAssignments, users: loadUsers, activity: loadActivity };
+            if (loaders[page]) loaders[page]();
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Dashboard
+        // ─────────────────────────────────────────────────────────────────────────────
+        async function loadDashboard() {
+            try {
+                const d = await api('/dashboard');
+                document.getElementById('statCards').innerHTML = [
+                    { label: 'Active Ferrets', val: d.total, icon: 'bi-emoji-smile', color: 'primary' },
+                    { label: 'Overdue Tasks', val: d.overdue, icon: 'bi-exclamation-circle', color: 'danger' },
+                    { label: 'Vaccines Due 30d', val: d.vacc_due, icon: 'bi-syringe', color: 'warning' }
+                ].map(s => `
+              <div class="col-md-4 col-6">
+        <div class="card stat-card p-3 d-flex flex-row align-items-center gap-3">
+          <div class="icon bg-${s.color} bg-opacity-10 text-${s.color}"><i class="bi ${s.icon}"></i></div>
+          <div><div class="fs-3 fw-bold">${s.val}</div><div class="text-muted small">${s.label}</div></div>
+        </div>
+              </div>`).join('');
+
+                const activityCard = document.getElementById('dashActivityCard');
+                if (roleIs('admin')) {
+                    activityCard.style.display = '';
+                    document.getElementById('dashActivity').innerHTML = d.recent_activity.map(a => `
+        <tr>
+          <td class="text-muted small">${fmtDT(a.created_at)}</td>
+          <td><strong>${a.username}</strong></td>
+          <td><span class="badge bg-secondary action-type">${a.action}</span></td>
+          <td class="small">${a.details || ''}</td>
+        </tr>`).join('') || '<tr><td colspan="4" class="text-muted text-center py-3">No activity yet</td></tr>';
+                } else {
+                    activityCard.style.display = 'none';
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Ferrets
+        // ─────────────────────────────────────────────────────────────────────────────
+        let _searchTimer;
+        let _ferretData = [];
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('ferretSearch')?.addEventListener('input', e => {
+                clearTimeout(_searchTimer);
+                _searchTimer = setTimeout(() => loadFerrets(e.target.value), 300);
+            });
+        });
+
+        async function loadFerrets(search = '') {
+            if (canUpdate()) document.getElementById('btnAddFerret').classList.remove('d-none');
+            if (roleIs('admin')) {
+                document.getElementById('btnAddLocation').classList.remove('d-none');
+                document.getElementById('btnAddSupplier').classList.remove('d-none');
+            }
+            try {
+                _ferretData = await api('/ferrets' + (search ? `?search=${encodeURIComponent(search)}` : ''));
+                renderFerretGrid();
+            } catch (err) { console.error(err); }
+        }
+
+        function renderFerretGrid() {
+            const grid = document.getElementById('ferretGrid');
+            if (!_ferretData.length) { grid.innerHTML = '<div class="col"><p class="text-muted mt-2">No ferrets found.</p></div>'; return; }
+            const sortBy = document.getElementById('ferretSort')?.value || 'name';
+            const sorted = [..._ferretData].sort((a, b) => {
+                if (sortBy === 'age') return new Date(a.birth_date || 0) - new Date(b.birth_date || 0);
+                if (sortBy === 'sex') return (a.sex || 'zzz').localeCompare(b.sex || 'zzz');
+                if (sortBy === 'room') return (a.room_id || 0) - (b.room_id || 0);
+                return (a.name || '').localeCompare(b.name || '');
+            });
+            const sexIcon = s => s === 'male' ? '<span class="badge bg-primary badge-pill small">♂ M</span>'
+                : s === 'female' ? '<span class="badge bg-danger badge-pill small">♀ F</span>' : '';
+            grid.innerHTML = sorted.map(f => {
+                const vaccDue = f.next_rabies_vaccine_due &&
+                    new Date(f.next_rabies_vaccine_due) <= new Date(Date.now() + 30 * 864e5) && f.dead !== '1';
+                return `
+        <div class="col-md-4 col-lg-3">
+          <div class="card ferret-card" onclick="loadFerretDetail(${f.id})">
+            ${f.photo_url
+                        ? `<img src="${f.photo_url}" class="ferret-avatar w-100">`
+                        : `<div class="ferret-placeholder">🐾</div>`}
+            <div class="card-body p-2">
+              <div class="d-flex align-items-start justify-content-between">
+                <h6 class="mb-0 fw-semibold">${f.name}</h6>
+                <span class="status-dot mt-1 ${f.dead === '1' ? 'dot-dead' : 'dot-active'}"></span>
+              </div>
+              <div class="text-muted small">ID: ${f.animal_id || '—'}</div>
+              <div class="small">Room ${f.room_id || '?'} · Cage ${f.cage_address || '?'}</div>
+              <div class="mt-1 d-flex flex-wrap gap-1">
+                ${sexIcon(f.sex)}
+                ${f.dead === '1' ? `<span class="badge bg-danger badge-pill small">Deceased</span>` : ''}
+                ${vaccDue ? `<span class="badge bg-warning text-dark badge-pill small">Vaccine Due</span>` : ''}
+              </div>
+            </div>
+          </div>
+        </div>`;
+            }).join('');
+        }
+
+        async function loadFerretDetail(id) {
+            _currentFerretId = id;
+            document.querySelector('#page-ferret-detail').classList.remove('show');
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('show'));
+            document.querySelectorAll('#navLinks .nav-link').forEach(l => l.classList.remove('active'));
+            document.getElementById('page-ferret-detail').classList.add('show');
+
+            const el = document.getElementById('ferretDetail');
+            el.innerHTML = '<div class="text-center py-5 text-muted"><div class="spinner-border" role="status"></div></div>';
+            try {
+                const [f, health, vacc, litters, history] = await Promise.all([
+                    api(`/ferrets/${id}`),
+                    api(`/ferrets/${id}/health`),
+                    api(`/ferrets/${id}/vaccinations`),
+                    api(`/ferrets/${id}/litters`),
+                    api(`/ferrets/${id}/history`)
+                ]);
+                const isAdmin = roleIs('admin');
+                const isMat = roleIs('admin', 'maternity');
+                el.innerHTML = `
+              <div class="row g-3 mb-3">
+        <div class="col-md-3">
+          ${f.photo_url
+                        ? `<img src="${f.photo_url}" class="img-fluid rounded-3 shadow-sm w-100" style="max-height:220px;object-fit:cover">`
+                        : `<div class="bg-light rounded-3 d-flex align-items-center justify-content-center" style="height:160px;font-size:3.5rem">🐾</div>`}
+        </div>
+        <div class="col-md-9">
+          <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+            <h3 class="mb-0 fw-bold">${f.ferret_name}</h3>
+            ${f.dead === '1'
+                        ? `<span class="badge bg-danger">Deceased</span>`
+                        : `<span class="badge bg-success">Active</span>`}
+            ${canUpdate() ? `<button class="btn btn-sm btn-outline-secondary ms-auto" onclick="toggleDead(${id},'${f.dead}')">
+                ${f.dead === '1' ? 'Mark Active' : 'Mark Deceased'}</button>` : ''}
+            ${isAdmin ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteFerret(${id})">Delete</button>` : ''}
+          </div>
+          <div class="text-muted mb-2">Animal ID: ${f.animal_id || '—'}</div>
+          <div class="row g-2 small">
+            <div class="col-6 col-md-4"><span class="text-muted">Birth Date</span><br><strong>${fmtDate(f.birth_date)}</strong></div>
+            <div class="col-6 col-md-4"><span class="text-muted">Sex</span><br><strong>${f.sex ? f.sex.charAt(0).toUpperCase() + f.sex.slice(1) : '—'}</strong></div>
+            <div class="col-6 col-md-4"><span class="text-muted">Weight</span><br><strong>${f.weight ? f.weight + ' g' : '—'}</strong></div>
+            <div class="col-6 col-md-4">
+              <span class="text-muted">Location</span><br>
+              <strong>Room ${f.room_id || '?'} · ${f.cage_address || '?'}</strong>
+              <button class="btn btn-link btn-sm p-0 ms-1" onclick="openMoveModal(${id})" title="Change location"><i class="bi bi-arrow-left-right"></i></button>
+            </div>
+            <div class="col-6 col-md-4"><span class="text-muted">Supplier</span><br><strong>${f.supplier_name || '—'}</strong></div>
+            <div class="col-6 col-md-4"><span class="text-muted">Mother</span><br><strong>${f.mother_name || '—'}</strong></div>
+            <div class="col-6 col-md-4"><span class="text-muted">Father</span><br><strong>${f.father_name || '—'}</strong></div>
+            <div class="col-6 col-md-4"><span class="text-muted">Next Rabies Vacc.</span><br><strong>${fmtDate(f.next_rabies_vaccine_due)}</strong></div>
+            <div class="col-6 col-md-4"><span class="text-muted">Spayed/Castrated</span><br><strong>${f.castrated_or_spayed === 'y' ? 'Yes' : 'No'}</strong></div>
+            <div class="col-6 col-md-4"><span class="text-muted">Last Exam</span><br><strong>${fmtDate(f.last_exam_date)}</strong></div>
+            ${f.treatments ? `<div class="col-12"><span class="text-muted">Treatments</span><br><strong>${f.treatments}</strong></div>` : ''}
+            ${f.orders ? `<div class="col-12"><span class="text-muted">Orders</span><br><strong>${f.orders}</strong></div>` : ''}
+          </div>
+        </div>
+              </div>
+
+              <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tHealth">Health Events</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tVacc">Vaccinations</button></li>
+        ${isMat ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tLitter">Litter Logs</button></li>` : ''}
+        ${canUpdate() ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMed">Medical Info</button></li>` : ''}
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tHistory"><i class="bi bi-clock-history me-1"></i>History</button></li>
+              </ul>
+              <div class="tab-content">
+
+        <div id="tHealth" class="tab-pane active">
+          <div class="d-flex mb-2">
+            ${canWrite() ? `<button class="btn btn-sm btn-primary ms-auto" onclick="openHealthModal(${id})"><i class="bi bi-plus-lg me-1"></i>Record Event</button>` : ''}
+          </div>
+          ${health.filter(h => h.event_type === 'weight' && h.weight).length > 1 ? `
+          <div class="card mb-3 p-3">
+            <div class="fw-semibold small mb-2 text-muted">Weight Over Time (g)</div>
+            <canvas id="weightChart" height="90"></canvas>
+          </div>` : ''}
+          <table class="table table-sm">
+            <thead><tr><th>Date</th><th>Time</th><th>Type</th><th>Weight</th><th>Notes</th><th>Recorded By</th></tr></thead>
+            <tbody>${health.length ? health.map(h => `
+              <tr>
+                <td>${fmtDate(h.event_date)}</td>
+                <td class="text-muted">${fmtTime(h.created_at)}</td>
+                <td><span class="badge bg-info text-dark">${h.event_type.replace('_', ' ')}</span></td>
+                <td>${h.weight ? h.weight + ' g' : '—'}</td>
+                <td>${h.notes || '—'}</td>
+                <td class="text-muted">${h.recorded_by || '—'}</td>
+              </tr>`).join('') : '<tr><td colspan="6" class="text-muted text-center py-3">No health events</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+
+        <div id="tVacc" class="tab-pane">
+          <div class="d-flex mb-2">
+            ${isMat ? `<button class="btn btn-sm btn-primary ms-auto" onclick="openVaccModal(${id})"><i class="bi bi-plus-lg me-1"></i>Record Vaccination</button>` : ''}
+          </div>
+          <table class="table table-sm">
+            <thead><tr><th>Date</th><th>Type</th><th>Expires</th><th>Notes</th><th>By</th></tr></thead>
+            <tbody>${vacc.length ? vacc.map(v => `
+              <tr>
+                <td>${fmtDate(v.vaccination_date)}</td>
+                <td>${v.vaccine_type}</td>
+                <td>${fmtDate(v.expiration_date)}</td>
+                <td>${v.notes || '—'}</td>
+                <td class="text-muted">${v.recorded_by || '—'}</td>
+              </tr>`).join('') : '<tr><td colspan="5" class="text-muted text-center py-3">No vaccinations</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+
+        ${isMat ? `
+        <div id="tLitter" class="tab-pane">
+          <div class="d-flex mb-2">
+            <button class="btn btn-sm btn-primary ms-auto" onclick="openLitterModal(${id})"><i class="bi bi-plus-lg me-1"></i>Add Litter</button>
+          </div>
+          <table class="table table-sm">
+            <thead><tr><th>Date</th><th>Litter ID</th><th>Kits</th><th>Stillborn</th><th>Father</th><th>Notes</th></tr></thead>
+            <tbody>${litters.length ? litters.map(l => `
+              <tr>
+                <td>${fmtDate(l.litter_date)}</td>
+                <td>${l.litter_id || '—'}</td>
+                <td>${l.kit_count ?? '—'}</td>
+                <td>${l.stillborn ?? '—'}</td>
+                <td>${l.father || '—'}</td>
+                <td class="small">${l.anomalies_and_notes || '—'}</td>
+              </tr>`).join('') : '<tr><td colspan="6" class="text-muted text-center py-3">No litter records</td></tr>'}
+            </tbody>
+          </table>
+        </div>` : ''}
+
+        ${canUpdate() ? `
+        <div id="tMed" class="tab-pane">
+          <div class="d-flex gap-2 mb-3">
+            <button class="btn btn-sm btn-outline-primary ms-auto" onclick="openMedModal(${id}, ${f.medical_info_id})">
+              <i class="bi bi-pencil me-1"></i>Edit Medical Info
+            </button>
+            <button class="btn btn-sm btn-primary" onclick="openProcedureModal(${id})">
+              <i class="bi bi-plus-lg me-1"></i>Log Procedure
+            </button>
+          </div>
+
+          <h6 class="fw-semibold text-muted small text-uppercase mb-2">Spay / Castration</h6>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4"><span class="text-muted small d-block">Status</span><strong>${f.castrated_or_spayed === 'y' ? '<span class=\'badge bg-success\'>Yes</span>' : '<span class=\'badge bg-secondary\'>No</span>'}</strong></div>
+            <div class="col-md-4"><span class="text-muted small d-block">Spay / Castration Date</span><strong>${fmtDate(f.castration_or_spay_date)}</strong></div>
+          </div>
+
+          <h6 class="fw-semibold text-muted small text-uppercase mb-2">Last Exam</h6>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4"><span class="text-muted small d-block">Exam Date</span><strong>${fmtDate(f.last_exam_date)}</strong></div>
+            <div class="col-md-4"><span class="text-muted small d-block">Performed By</span><strong>${f.performed_by || '—'}</strong></div>
+            <div class="col-md-4"><span class="text-muted small d-block">Treatments</span><strong>${f.treatments || '—'}</strong></div>
+            <div class="col-md-4"><span class="text-muted small d-block">Orders</span><strong>${f.orders || '—'}</strong></div>
+            ${f.exam_log ? `<div class="col-12"><span class="text-muted small d-block">Exam Notes</span><div class="border rounded p-2 bg-light small" style="white-space:pre-wrap">${f.exam_log}</div></div>` : ''}
+          </div>
+
+          <h6 class="fw-semibold text-muted small text-uppercase mb-2">Surgical Procedure Log</h6>
+          ${f.surgical_procedure_log
+                            ? `<div class="border rounded p-3 bg-light small" style="white-space:pre-wrap;line-height:1.7">${f.surgical_procedure_log}</div>`
+                            : `<p class="text-muted small">No procedures logged yet.</p>`}
+        </div>` : ''}
+
+        <div id="tHistory" class="tab-pane">
+          ${history.length ? `
+          <div class="timeline mt-2">
+            ${history.map(e => {
+                                const catMap = {
+                                    health: { color: 'info', icon: 'bi-heart-pulse' },
+                                    move: { color: 'primary', icon: 'bi-geo-alt' },
+                                    mating: { color: 'success', icon: 'bi-gender-ambiguous' }
+                                };
+                                const cat = catMap[e.event_category] || { color: 'secondary', icon: 'bi-circle' };
+                                const subtypeLabel = e.subtype === 'location_change' ? 'Room Move'
+                                    : e.subtype === 'mating' ? 'Mating'
+                                        : e.subtype ? e.subtype.replace('_', ' ') : e.event_category;
+                                return `
+              <div class="d-flex gap-3 mb-3">
+                <div class="d-flex flex-column align-items-center" style="min-width:36px">
+                  <div class="rounded-circle bg-${cat.color} bg-opacity-15 text-${cat.color} d-flex align-items-center justify-content-center" style="width:36px;height:36px;flex-shrink:0">
+                    <i class="bi ${cat.icon}"></i>
+                  </div>
+                  <div class="border-start flex-grow-1 mt-1" style="min-height:16px;opacity:.2"></div>
+                </div>
+                <div class="flex-grow-1 pb-2">
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="badge bg-${cat.color} bg-opacity-75 small text-capitalize">${subtypeLabel}</span>
+                    <span class="text-muted small">${fmtDate(e.event_date)}</span>
+                    ${e.actor ? `<span class="text-muted small ms-auto"><i class="bi bi-person me-1"></i>${e.actor}</span>` : ''}
+                  </div>
+                  ${e.weight ? `<div class="small mt-1">Weight: <strong>${e.weight} g</strong></div>` : ''}
+                  ${e.notes ? `<div class="small text-muted mt-1" style="white-space:pre-wrap">${e.notes}</div>` : ''}
+                </div>
+              </div>`;
+                            }).join('')}
+          </div>` : '<p class="text-muted small mt-2">No history recorded yet.</p>'}
+        </div>
+
+              </div>`;
+            } catch (err) {
+                el.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+            }
+            // Render weight chart if canvas present
+            const canvas = document.getElementById('weightChart');
+            if (canvas) {
+                const weightData = (await api(`/ferrets/${id}/health`))
+                    .filter(h => h.event_type === 'weight' && h.weight)
+                    .sort((a, b) => new Date(a.event_date) - new Date(b.event_date));
+                new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels: weightData.map(h => fmtDate(h.event_date)),
+                        datasets: [{
+                            label: 'Weight (g)', data: weightData.map(h => h.weight),
+                            borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,.08)',
+                            tension: .3, fill: true, pointRadius: 4
+                        }]
+                    },
+                    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false } } }
+                });
+            }
+        }
+
+        // ─── Ferret Actions ────────────────────────────────────────────────────────
+        async function toggleDead(id, current) {
+            try { await api(`/ferrets/${id}`, { method: 'PUT', body: { dead: current === '1' ? '0' : '1' } }); loadFerretDetail(id); }
+            catch (err) { alert(err.message); }
+        }
+
+        async function deleteFerret(id) {
+            if (!confirm('Permanently delete this ferret and all related records?')) return;
+            try { await api(`/ferrets/${id}`, { method: 'DELETE' }); nav('ferrets'); }
+            catch (err) { alert(err.message); }
+        }
+
+        // ─── Add Ferret Modal ──────────────────────────────────────────────────────
+        async function openFerretModal() {
+            try {
+                const [addresses, suppliers] = await Promise.all([api('/addresses'), api('/suppliers')]);
+                document.getElementById('fAddrId').innerHTML =
+                    '<option value="">— Unassigned —</option>' +
+                    addresses.map(a => `<option value="${a.address_id}">Room ${a.room_id} · ${a.cage_address || '?'}</option>`).join('');
+                document.getElementById('fSupplierId').innerHTML =
+                    '<option value="">— Unknown —</option>' +
+                    suppliers.map(s => `<option value="${s.supplier_id}">${s.supplier_name}</option>`).join('');
+                document.getElementById('fBirthDate').value = today();
+                document.getElementById('fName').value = '';
+                document.getElementById('fAnimalId').value = '';
+                document.getElementById('fWeight').value = '0';
+                document.getElementById('fDesc').value = '';
+                document.getElementById('fMother').value = '';
+                document.getElementById('fFather').value = '';
+                document.getElementById('fVaccine').value = '';
+                document.getElementById('fAcqBy').value = '';
+                document.getElementById('fPhoto').value = '';
+                document.getElementById('fSex').value = '';
+                document.getElementById('fSpayed').value = 'n';
+                document.getElementById('fSpayDate').value = '';
+                document.getElementById('fSpayDateRow').style.display = 'none';
+                // Show spay date when spayed = yes
+                document.getElementById('fSpayed').onchange = function () {
+                    document.getElementById('fSpayDateRow').style.display = this.value === 'y' ? '' : 'none';
+                };
+                new bootstrap.Modal(document.getElementById('ferretModal')).show();
+            } catch (err) { alert(err.message); }
+        }
+
+        async function submitFerret() {
+            const name = document.getElementById('fName').value.trim();
+            const bd = document.getElementById('fBirthDate').value;
+            if (!name || !bd) return alert('Name and birth date are required.');
+            const spayedVal = document.getElementById('fSpayed').value;
+            const spayedDate = document.getElementById('fSpayDate').value || null;
+            const sexVal = document.getElementById('fSex').value || null;
+            try {
+                await api('/ferrets', {
+                    method: 'POST', body: {
+                        ferret_name: name,
+                        animal_id: document.getElementById('fAnimalId').value || null,
+                        birth_date: bd,
+                        weight: parseInt(document.getElementById('fWeight').value) || 0,
+                        description: document.getElementById('fDesc').value || null,
+                        address_id: document.getElementById('fAddrId').value || null,
+                        supplier_id: document.getElementById('fSupplierId').value || null,
+                        mother_name: document.getElementById('fMother').value || null,
+                        father_name: document.getElementById('fFather').value || null,
+                        next_rabies_vaccine_due: document.getElementById('fVaccine').value || null,
+                        acquisition_by: document.getElementById('fAcqBy').value || null,
+                        photo_url: document.getElementById('fPhoto').value || null,
+                        sex: sexVal,
+                        castrated_or_spayed: spayedVal,
+                        castration_or_spay_date: spayedDate
+                    }
+                });
+                bootstrap.Modal.getInstance(document.getElementById('ferretModal')).hide();
+                loadFerrets();
+            } catch (err) { alert(err.message); }
+        }
+
+        // ─── Health Event Modal ────────────────────────────────────────────────────
+        function openHealthModal(ferretId) {
+            document.getElementById('heFerretId').value = ferretId;
+            document.getElementById('heDate').value = today();
+            document.getElementById('heTime').value = nowTime();
+            document.getElementById('heWeight').value = '';
+            document.getElementById('heNotes').value = '';
+            document.getElementById('heType').value = 'weight';
+            toggleWeightRow();
+            new bootstrap.Modal(document.getElementById('healthModal')).show();
+        }
+
+        function toggleWeightRow() {
+            document.getElementById('heWeightRow').style.display =
+                document.getElementById('heType').value === 'weight' ? '' : 'none';
+        }
+
+        async function submitHealthEvent() {
+            const ferret_id = document.getElementById('heFerretId').value;
+            const wt = parseFloat(document.getElementById('heWeight').value);
+            if (isNaN(wt) && document.getElementById('heType').value === 'weight') {
+                return alert('Please enter a valid weight.');
+            }
+            try {
+                await api('/health-events', {
+                    method: 'POST', body: {
+                        ferret_id: parseInt(ferret_id),
+                        event_type: document.getElementById('heType').value,
+                        weight: document.getElementById('heType').value === 'weight' ? wt : null,
+                        event_date: document.getElementById('heDate').value,
+                        event_time: document.getElementById('heTime').value,
+                        notes: document.getElementById('heNotes').value
+                    }
+                });
+                bootstrap.Modal.getInstance(document.getElementById('healthModal')).hide();
+                loadFerretDetail(ferret_id);
+            } catch (err) { alert(err.message); }
+        }
+
+        // ─── Vaccination Modal ─────────────────────────────────────────────────────
+        // ─── Litter Modal ──────────────────────────────────────────────────────────
+        function openLitterModal(ferretId) {
+            document.getElementById('litFerretId').value = ferretId;
+            document.getElementById('litDate').value = today();
+            document.getElementById('litId').value = '';
+            document.getElementById('litKits').value = '';
+            document.getElementById('litStillborn').value = 0;
+            document.getElementById('litFather').value = '';
+            document.getElementById('litMother').value = '';
+            document.getElementById('litNotes').value = '';
+            new bootstrap.Modal(document.getElementById('litterModal')).show();
+        }
+
+        async function submitLitter() {
+            const ferretId = document.getElementById('litFerretId').value;
+            try {
+                await api('/litters', {
+                    method: 'POST', body: {
+                        Ferret_QR005_id: parseInt(ferretId),
+                        litter_id: document.getElementById('litId').value || null,
+                        litter_date: document.getElementById('litDate').value,
+                        kit_count: parseInt(document.getElementById('litKits').value) || null,
+                        stillborn: parseInt(document.getElementById('litStillborn').value) || null,
+                        father: document.getElementById('litFather').value || null,
+                        mother: document.getElementById('litMother').value || null,
+                        anomalies_and_notes: document.getElementById('litNotes').value || null
+                    }
+                });
+                bootstrap.Modal.getInstance(document.getElementById('litterModal')).hide();
+                loadFerretDetail(ferretId);
+            } catch (err) { alert(err.message); }
+        }
+
+        // ─── Assignments ───────────────────────────────────────────────────────────
+        async function loadAssignments() {
+            if (roleIs('admin')) document.getElementById('btnAddAssign').classList.remove('d-none');
+            try {
+                const data = await api('/assignments');
+                const tbody = document.getElementById('assignTable');
+                if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-4">No assignments</td></tr>'; return; }
+                tbody.innerHTML = data.map(a => {
+                    const overdue = !a.completed && a.due_date && new Date(a.due_date) < new Date();
+                    const canComplete = !a.completed && (roleIs('admin') || a.assigned_to === USER.user_id);
+                    return `<tr class="${a.completed ? 'text-muted' : ''}">
+        <td><span class="badge bg-secondary">${a.assignment_type}</span></td>
+        <td>${a.assigned_full_name || a.assigned_username}</td>
+        <td>${a.description || '—'}</td>
+        <td class="${overdue ? 'text-danger fw-bold' : ''}">${a.due_date || '—'}</td>
+        <td>${a.completed
+                            ? `<span class="badge bg-success">Completed</span>`
+                            : `<span class="badge bg-warning text-dark">Pending</span>`}</td>
+        <td>${canComplete ? `<button class="btn btn-sm btn-outline-success" onclick="completeAssign(${a.assignment_id})"><i class="bi bi-check2"></i></button>` : ''}</td>
+              </tr>`;
+                }).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        async function completeAssign(id) {
+            try { await api(`/assignments/${id}/complete`, { method: 'PUT' }); loadAssignments(); }
+            catch (err) { alert(err.message); }
+        }
+
+        async function openAssignModal() {
+            try {
+                const users = await api('/users');
+                document.getElementById('aAssignTo').innerHTML = users
+                    .filter(u => u.active)
+                    .map(u => `<option value="${u.user_id}">${u.full_name || u.username} (${u.role})</option>`)
+                    .join('');
+                document.getElementById('aDue').value = today();
+                document.getElementById('aDesc').value = '';
+                new bootstrap.Modal(document.getElementById('assignModal')).show();
+            } catch (err) { alert(err.message); }
+        }
+
+        async function submitAssign() {
+            try {
+                await api('/assignments', {
+                    method: 'POST', body: {
+                        assigned_to: parseInt(document.getElementById('aAssignTo').value),
+                        assignment_type: document.getElementById('aType').value,
+                        description: document.getElementById('aDesc').value,
+                        due_date: document.getElementById('aDue').value
+                    }
+                });
+                bootstrap.Modal.getInstance(document.getElementById('assignModal')).hide();
+                loadAssignments();
+            } catch (err) { alert(err.message); }
+        }
+
+        // ─── Users ─────────────────────────────────────────────────────────────────
+        async function loadUsers() {
+            try {
+                const data = await api('/users');
+                const roleColors = { admin: 'danger', research: 'primary', maternity: 'success', caretaker: 'secondary' };
+                document.getElementById('userTable').innerHTML = data.map(u => `
+              <tr>
+        <td><strong>${u.username}</strong></td>
+        <td>${u.full_name || '—'}</td>
+        <td>${u.email}</td>
+        <td><span class="badge bg-${roleColors[u.role]} role-badge">${u.role}</span></td>
+        <td>${u.active
+                        ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>'
+                        : '<span class="badge bg-secondary-subtle text-secondary border">Inactive</span>'}</td>
+        <td class="text-muted small">${u.last_login ? fmtDT(u.last_login) : 'Never'}</td>
+        <td><button class="btn btn-sm btn-outline-primary" onclick="openEditUser(${u.user_id})"><i class="bi bi-pencil"></i></button></td>
+              </tr>`).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        function openUserModal() {
+            _editUserId = null;
+            document.getElementById('userModalTitle').textContent = 'Add User';
+            document.getElementById('uUsername').value = '';
+            document.getElementById('uUsername').disabled = false;
+            document.getElementById('uFullName').value = '';
+            document.getElementById('uEmail').value = '';
+            document.getElementById('uRole').value = 'caretaker';
+            document.getElementById('uPassword').value = '';
+            document.getElementById('uPassword').placeholder = 'Required — min 8 characters';
+            document.getElementById('uPassReq').style.display = '';
+            document.getElementById('uActiveWrap').style.display = 'none';
+            new bootstrap.Modal(document.getElementById('userModal')).show();
+        }
+
+        async function openEditUser(id) {
+            _editUserId = id;
+            try {
+                const users = await api('/users');
+                const u = users.find(x => x.user_id === id);
+                if (!u) return;
+                document.getElementById('userModalTitle').textContent = `Edit: ${u.username}`;
+                document.getElementById('uUsername').value = u.username;
+                document.getElementById('uUsername').disabled = true;
+                document.getElementById('uFullName').value = u.full_name || '';
+                document.getElementById('uEmail').value = u.email;
+                document.getElementById('uRole').value = u.role;
+                document.getElementById('uPassword').value = '';
+                document.getElementById('uPassword').placeholder = 'Leave blank to keep current';
+                document.getElementById('uPassReq').style.display = 'none';
+                document.getElementById('uActive').value = u.active ? '1' : '0';
+                document.getElementById('uActiveWrap').style.display = '';
+                new bootstrap.Modal(document.getElementById('userModal')).show();
+            } catch (err) { alert(err.message); }
+        }
+
+        async function submitUser() {
+            const body = {
+                email: document.getElementById('uEmail').value,
+                role: document.getElementById('uRole').value,
+                full_name: document.getElementById('uFullName').value
+            };
+            const pw = document.getElementById('uPassword').value;
+            if (pw) body.password = pw;
+
+            try {
+                if (_editUserId) {
+                    body.active = parseInt(document.getElementById('uActive').value);
+                    await api(`/users/${_editUserId}`, { method: 'PUT', body });
+                } else {
+                    if (!pw) return alert('Password is required for new users');
+                    body.username = document.getElementById('uUsername').value;
+                    await api('/users', { method: 'POST', body });
+                }
+                document.getElementById('uUsername').disabled = false;
+                bootstrap.Modal.getInstance(document.getElementById('userModal')).hide();
+                loadUsers();
+            } catch (err) { alert(err.message); }
+        }
+
+        // ─── Activity Log ──────────────────────────────────────────────────────────
+        async function loadActivity() {
+            try {
+                const data = await api('/activity-log');
+                document.getElementById('actTable').innerHTML = data.map(a => `
+              <tr>
+        <td class="text-muted small">${fmtDT(a.created_at)}</td>
+        <td><strong>${a.username}</strong></td>
+        <td><span class="badge bg-secondary action-type">${a.action}</span></td>
+        <td class="text-muted small">${a.table_name || '—'}</td>
+        <td class="small">${a.details || '—'}</td>
+              </tr>`).join('') || '<tr><td colspan="5" class="text-muted text-center py-4">No activity</td></tr>';
+            } catch (err) { console.error(err); }
+        }
+
+        // ─── Address / Supplier quick-add (admin) ──────────────────────────────────
+        async function submitAddress() {
+            const room = document.getElementById('adRoom').value;
+            if (!room) return alert('Room ID is required');
+            try {
+                await api('/addresses', {
+                    method: 'POST', body: {
+                        room_id: parseInt(room),
+                        cage_address: document.getElementById('adCage').value || null,
+                        room_lighting: document.getElementById('adLight').value || null
+                    }
+                });
+                bootstrap.Modal.getInstance(document.getElementById('addrModal')).hide();
+                alert('Location added!');
+            } catch (err) { alert(err.message); }
+        }
+
+        async function submitSupplier() {
+            const name = document.getElementById('supName').value.trim();
+            if (!name) return alert('Supplier name is required');
+            try {
+                await api('/suppliers', {
+                    method: 'POST', body: {
+                        supplier_name: name,
+                        contact_info: document.getElementById('supContact').value || null,
+                        supplier_address: document.getElementById('supAddr').value || null,
+                        supplier_phone_number: document.getElementById('supPhone').value || null
+                    }
+                });
+                bootstrap.Modal.getInstance(document.getElementById('supplierModal')).hide();
+                alert('Supplier added!');
+            } catch (err) { alert(err.message); }
+        }
+
+        // ─── Locations ─────────────────────────────────────────────────────────────
+        async function loadLocations() {
+            if (roleIs('admin', 'research')) document.getElementById('btnAddLocationMain').classList.remove('d-none');
+            try {
+                const addresses = await api('/addresses');
+                const accordion = document.getElementById('locationAccordion');
+                if (!addresses.length) {
+                    accordion.innerHTML = '<div class="text-muted mt-2">No locations yet. Add one using the button above.</div>';
+                    return;
+                }
+                accordion.innerHTML = addresses.map((a, i) => `
+              <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button ${i === 0 ? '' : 'collapsed'}" type="button"
+            data-bs-toggle="collapse" data-bs-target="#loc${a.address_id}">
+            Room ${a.room_id} · Cage ${a.cage_address || '—'}
+            ${a.room_lighting ? `<span class="text-muted small ms-2">(${a.room_lighting})</span>` : ''}
+          </button>
+        </h2>
+        <div id="loc${a.address_id}" class="accordion-collapse collapse ${i === 0 ? 'show' : ''}">
+          <div class="accordion-body p-2">
+            <div id="locFerrets${a.address_id}" class="text-muted small">Loading…</div>
+          </div>
+        </div>
+              </div>`).join('');
+
+                // Load ferrets for each location
+                for (const a of addresses) {
+                    try {
+                        const ferrets = await api(`/addresses/${a.address_id}/ferrets`);
+                        const el = document.getElementById(`locFerrets${a.address_id}`);
+                        if (!ferrets.length) {
+                            el.innerHTML = '<em>No active ferrets in this location.</em>';
+                        } else {
+                            el.innerHTML = `<table class="table table-sm mb-0">
+            <thead><tr><th>Name</th><th>ID</th><th>Sex</th><th>Weight</th></tr></thead>
+            <tbody>${ferrets.map(f => `
+              <tr style="cursor:pointer" onclick="loadFerretDetail(${f.id})">
+                <td><strong>${f.name}</strong></td>
+                <td class="text-muted">${f.animal_id || '—'}</td>
+                <td>${f.sex ? f.sex.charAt(0).toUpperCase() + f.sex.slice(1) : '—'}</td>
+                <td>${f.weight ? f.weight + ' g' : '—'}</td>
+              </tr>`).join('')}
+            </tbody></table>`;
+                        }
+                    } catch { /* skip */ }
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        // ─── Move Ferret Location ──────────────────────────────────────────────────
+        async function openMoveModal(ferretId) {
+            document.getElementById('moveFerretId').value = ferretId;
+            try {
+                const addresses = await api('/addresses');
+                document.getElementById('moveAddrId').innerHTML = addresses.map(a =>
+                    `<option value="${a.address_id}">Room ${a.room_id} · Cage ${a.cage_address || '?'}</option>`
+                ).join('');
+                new bootstrap.Modal(document.getElementById('moveModal')).show();
+            } catch (err) { alert(err.message); }
+        }
+
+        async function submitMove() {
+            const ferretId = document.getElementById('moveFerretId').value;
+            const address_id = document.getElementById('moveAddrId').value;
+            try {
+                await api(`/ferrets/${ferretId}/location`, { method: 'PUT', body: { address_id: parseInt(address_id) } });
+                bootstrap.Modal.getInstance(document.getElementById('moveModal')).hide();
+                loadFerretDetail(ferretId);
+            } catch (err) { alert(err.message); }
+        }
+
+        // ─── Vaccination helpers ───────────────────────────────────────────────────
+        function toggleRabiesDue() {
+            document.getElementById('vNextRabiesRow').style.display =
+                document.getElementById('vType').value === 'rabies' ? '' : 'none';
+        }
+
+        function openVaccModal(ferretId) {
+            document.getElementById('vFerretId').value = ferretId;
+            document.getElementById('vDate').value = today();
+            document.getElementById('vExpiry').value = '';
+            document.getElementById('vNextRabies').value = '';
+            document.getElementById('vNotes').value = '';
+            document.getElementById('vType').value = 'rabies';
+            toggleRabiesDue();
+            new bootstrap.Modal(document.getElementById('vaccModal')).show();
+        }
+
+        async function submitVaccination() {
+            const ferret_id = document.getElementById('vFerretId').value;
+            try {
+                await api('/vaccinations', {
+                    method: 'POST', body: {
+                        ferret_id: parseInt(ferret_id),
+                        vaccine_type: document.getElementById('vType').value,
+                        vaccination_date: document.getElementById('vDate').value,
+                        expiration_date: document.getElementById('vExpiry').value || null,
+                        next_rabies_due: document.getElementById('vNextRabies').value || null,
+                        notes: document.getElementById('vNotes').value
+                    }
+                });
+                bootstrap.Modal.getInstance(document.getElementById('vaccModal')).hide();
+                loadFerretDetail(ferret_id);
+            } catch (err) { alert(err.message); }
+        }
+        function today() { return new Date().toISOString().split('T')[0]; }
+        function nowTime() { return new Date().toTimeString().slice(0, 5); }
+
+        function fmtDate(d) {
+            if (!d) return '—';
+            // Handle both "2026-04-28" and full ISO strings
+            const s = d.toString().split('T')[0];
+            const [y, m, dy] = s.split('-');
+            return `${m}-${dy}-${y}`;
+        }
+
+        function fmtTime(dt) {
+            if (!dt) return '—';
+            const d = new Date(dt);
+            let h = d.getHours(), min = d.getMinutes();
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12 || 12;
+            return `${h}:${min.toString().padStart(2, '0')} ${ampm}`;
+        }
+
+        function fmtDT(dt) {
+            if (!dt) return '—';
+            return `${fmtDate(dt)} ${fmtTime(dt)}`;
+        }
+
+        // ─── Medical Info ──────────────────────────────────────────────────────────
+        function openMedModal(ferretId, medInfoId) {
+            document.getElementById('medFerretId').value = ferretId;
+            document.getElementById('medInfoId').value = medInfoId;
+            // Pre-fill from displayed data
+            const rows = document.querySelectorAll('#tMed .row .col-md-4');
+            // Just open blank — server will merge with existing
+            document.getElementById('medSpayed').value = 'n';
+            document.getElementById('medSpayDate').value = '';
+            document.getElementById('medExamDate').value = today();
+            document.getElementById('medPerformedBy').value = '';
+            document.getElementById('medExamLog').value = '';
+            document.getElementById('medOrders').value = '';
+            document.getElementById('medTreatments').value = '';
+            new bootstrap.Modal(document.getElementById('medModal')).show();
+        }
+
+        async function submitMedicalInfo() {
+            const ferretId = document.getElementById('medFerretId').value;
+            try {
+                await api(`/ferrets/${ferretId}/medical`, {
+                    method: 'PUT', body: {
+                        castrated_or_spayed: document.getElementById('medSpayed').value,
+                        castration_or_spay_date: document.getElementById('medSpayDate').value || null,
+                        last_exam_date: document.getElementById('medExamDate').value || null,
+                        performed_by: document.getElementById('medPerformedBy').value || null,
+                        exam_log: document.getElementById('medExamLog').value || null,
+                        orders: document.getElementById('medOrders').value || null,
+                        treatments: document.getElementById('medTreatments').value || null
+                    }
+                });
+                bootstrap.Modal.getInstance(document.getElementById('medModal')).hide();
+                loadFerretDetail(ferretId);
+            } catch (err) { alert(err.message); }
+        }
+
+        function openProcedureModal(ferretId) {
+            document.getElementById('procFerretId').value = ferretId;
+            document.getElementById('procName').value = '';
+            document.getElementById('procDate').value = today();
+            document.getElementById('procPerformedBy').value = '';
+            document.getElementById('procNotes').value = '';
+            new bootstrap.Modal(document.getElementById('procedureModal')).show();
+        }
+
+        async function submitProcedure() {
+            const ferretId = document.getElementById('procFerretId').value;
+            const name = document.getElementById('procName').value.trim();
+            const date = document.getElementById('procDate').value;
+            if (!name || !date) return alert('Procedure name and date are required.');
+            try {
+                await api(`/ferrets/${ferretId}/procedure`, {
+                    method: 'POST', body: {
+                        procedure_name: name,
+                        procedure_date: date,
+                        performed_by: document.getElementById('procPerformedBy').value || null,
+                        notes: document.getElementById('procNotes').value || null
+                    }
+                });
+                bootstrap.Modal.getInstance(document.getElementById('procedureModal')).hide();
+                loadFerretDetail(ferretId);
+            } catch (err) { alert(err.message); }
+        }
+
+        // ─── Boot ──────────────────────────────────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('iPass')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+            initApp();
+        });
+    </script>
+</body>
+
+</html>
