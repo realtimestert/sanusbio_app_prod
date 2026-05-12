@@ -1,1 +1,13 @@
 .env
+.env.*
+*.key
+*.pem
+*.crt
+*.p12
+*.db
+*.sqlite
+*.sql
+*.dump
+backups/
+node_modules/
+dist/
