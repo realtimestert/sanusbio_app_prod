@@ -1,6 +1,6 @@
 {
   "name": "sanusbio",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "SanusBio Ferret Research Management System",
   "main": "server.js",
   "scripts": {
@@ -12,6 +12,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
     "mysql2": "^3.9.7"
   }
 }

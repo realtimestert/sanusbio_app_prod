@@ -36,6 +36,9 @@ services:
       DB_NAME: sanusbio
     ports:
       - "4000:4000"
+    volumes:
+      - uploads_data:/app/uploads
 
 volumes:
   db_data:
+  uploads_data:
