@@ -32,7 +32,7 @@
     .ferret-placeholder { height:100px; background:linear-gradient(135deg,#e3eaf2,#c8d6e5); display:flex; align-items:center; justify-content:center; font-size:2.5rem; border-radius:12px 12px 0 0; }
     .role-badge { font-size:.7rem; padding:.25em .55em; }
     .role-admin { background:#dc3545; } .role-research { background:#0d6efd; }
-    .role-maternity { background:#198754; } .role-caretaker { background:#6c757d; }
+    .role-maternity { background:#198754; } .role-caretaker { background:#6c757d; } .role-cleaner { background:#0d9488; }
     .status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
     .dot-active { background:#198754; } .dot-dead { background:#dc3545; }
     .page-header { display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap; }
@@ -82,6 +82,7 @@
       <a class="nav-link" href="#" data-page="assignments"><i class="bi bi-clipboard-check"></i>Assignments</a>
       <a class="nav-link admin-only" href="#" data-page="users"><i class="bi bi-people"></i>Users</a>
       <a class="nav-link admin-only" href="#" data-page="activity"><i class="bi bi-journal-text"></i>Activity Log</a>
+      <a class="nav-link admin-research-only" href="#" data-page="cleaning-reports"><i class="bi bi-check2-square"></i>Cleaning Reports</a>
     </nav>
     <div class="user-block">
       <div id="userInfo" class="mb-2"></div>
@@ -213,8 +214,181 @@
       </div>
     </div>
 
+    <!-- Cleaning Reports -->
+    <div id="page-cleaning-reports" class="page">
+      <div class="page-header">
+        <h4><i class="bi bi-check2-square me-2"></i>Cleaning Reports</h4>
+        <div class="ms-auto d-flex gap-2 align-items-center">
+          <label class="form-label mb-0 text-muted small">Filter by Room:</label>
+          <select id="crRoomFilter" class="form-select form-select-sm" style="max-width:130px" onchange="loadCleaningReports()">
+            <option value="">All Rooms</option>
+          </select>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead><tr><th>Date &amp; Time</th><th>Cleaner</th><th>Rooms</th><th>Cage</th><th>Trays</th><th>Floors</th><th>Food/Water</th><th>Issues</th><th></th></tr></thead>
+            <tbody id="crTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /main -->
 </div><!-- /app -->
+
+<!-- ─── CLEANER KIOSK ──────────────────────────────────────────────────────── -->
+<div id="cleanerKiosk" style="display:none; min-height:100vh; background:#f0f2f5;">
+  <div style="background:var(--brand); padding:1rem 1.5rem; display:flex; align-items:center; justify-content:space-between;">
+    <div style="color:#fff; font-size:1.1rem; font-weight:700;">🐾 SanusBio &mdash; Room Cleaning Report</div>
+    <div style="display:flex; align-items:center; gap:1rem;">
+      <div id="kioskUserInfo" style="color:rgba(255,255,255,.8); font-size:.9rem;"></div>
+      <button class="btn btn-sm btn-outline-light" onclick="doLogout()"><i class="bi bi-box-arrow-right me-1"></i>Sign Out</button>
+    </div>
+  </div>
+  <div style="max-width:680px; margin:0 auto; padding:1.5rem;">
+    <div id="kioskSuccess" class="d-none">
+      <div class="card text-center p-5 shadow-sm" style="border-radius:16px;">
+        <div style="font-size:4rem; margin-bottom:1rem;">✅</div>
+        <h3 class="fw-bold text-success mb-2">Report Submitted!</h3>
+        <p class="text-muted mb-4">Your cleaning report has been recorded successfully.</p>
+        <button class="btn btn-primary btn-lg px-5" onclick="resetKioskForm()">
+          <i class="bi bi-plus-lg me-2"></i>Submit Another Report
+        </button>
+      </div>
+    </div>
+    <div id="kioskForm">
+      <div class="card shadow-sm mb-3" style="border-radius:14px;">
+        <div class="card-body p-4">
+
+          <!-- Room Selection -->
+          <div class="mb-4">
+            <label class="fw-bold fs-6 d-block mb-1">
+              <span class="text-danger me-1">●</span>What room(s) did you clean?
+            </label>
+            <p class="text-muted small mb-2">Select all rooms you cleaned during this session.</p>
+            <div id="kioskRoomList" class="d-flex flex-wrap gap-2"></div>
+          </div>
+
+          <hr class="my-3">
+
+          <!-- Inside Cage Cleaning -->
+          <div class="mb-4">
+            <div class="d-flex align-items-start gap-3 p-3 rounded-3" id="kioskCageBox" style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;" onclick="toggleKioskCheck('kioskCage','kioskCageBox')">
+              <div style="margin-top:2px;">
+                <div id="kioskCageCheck" style="width:28px;height:28px;border-radius:6px;border:2px solid #adb5bd;background:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;"></div>
+              </div>
+              <div>
+                <div class="fw-bold"><span class="text-danger me-1">●</span>Inside Cage Cleaning</div>
+                <div class="text-muted small mt-1">Check to confirm that you scraped or vacuumed inside the cages.</div>
+              </div>
+            </div>
+            <input type="checkbox" id="kioskCage" style="display:none">
+          </div>
+
+          <!-- Tray Cleaning -->
+          <div class="mb-4">
+            <div class="d-flex align-items-start gap-3 p-3 rounded-3" id="kioskTrayBox" style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;" onclick="toggleKioskCheck('kioskTray','kioskTrayBox')">
+              <div style="margin-top:2px;">
+                <div id="kioskTrayCheck" style="width:28px;height:28px;border-radius:6px;border:2px solid #adb5bd;background:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;"></div>
+              </div>
+              <div>
+                <div class="fw-bold"><span class="text-danger me-1">●</span>Tray Cleaning</div>
+                <div class="text-muted small mt-1">Check to confirm that you scraped or vacuumed the trays under the cages.</div>
+              </div>
+            </div>
+            <input type="checkbox" id="kioskTray" style="display:none">
+          </div>
+
+          <!-- Sweeping, Scraping, and Mopping -->
+          <div class="mb-4">
+            <div class="d-flex align-items-start gap-3 p-3 rounded-3" id="kioskFloorBox" style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;" onclick="toggleKioskCheck('kioskFloor','kioskFloorBox')">
+              <div style="margin-top:2px;">
+                <div id="kioskFloorCheck" style="width:28px;height:28px;border-radius:6px;border:2px solid #adb5bd;background:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;"></div>
+              </div>
+              <div>
+                <div class="fw-bold"><span class="text-danger me-1">●</span>Sweeping, Scraping, and Mopping</div>
+                <div class="text-muted small mt-1">Check to confirm that you swept, scraped, and mopped the floors.</div>
+              </div>
+            </div>
+            <input type="checkbox" id="kioskFloor" style="display:none">
+          </div>
+
+          <!-- Food and Water Check -->
+          <div class="mb-4">
+            <div class="d-flex align-items-start gap-3 p-3 rounded-3" id="kioskFoodBox" style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;" onclick="toggleKioskCheck('kioskFood','kioskFoodBox')">
+              <div style="margin-top:2px;">
+                <div id="kioskFoodCheck" style="width:28px;height:28px;border-radius:6px;border:2px solid #adb5bd;background:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;"></div>
+              </div>
+              <div>
+                <div class="fw-bold"><span class="text-danger me-1">●</span>Food and Water Check</div>
+                <div class="text-muted small mt-1">Check to confirm that you checked that every animal had access to food and water.</div>
+              </div>
+            </div>
+            <input type="checkbox" id="kioskFood" style="display:none">
+          </div>
+
+          <hr class="my-3">
+
+          <!-- Issues -->
+          <div class="mb-4">
+            <label class="fw-bold fs-6 d-block mb-1">Were there any issues when cleaning the room?</label>
+            <p class="text-muted small mb-2">Such as animal fighting, broken cage, animals escaped the room, or other. If so, please describe what happened below.</p>
+            <div class="d-flex gap-2 mb-2 flex-wrap">
+              <button type="button" class="btn btn-outline-secondary btn-sm issue-tag" onclick="toggleIssueTag(this, 'Animal fighting')">🐾 Animal Fighting</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm issue-tag" onclick="toggleIssueTag(this, 'Broken cage')">🔧 Broken Cage</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm issue-tag" onclick="toggleIssueTag(this, 'Animal escaped room')">🚨 Animal Escaped</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm issue-tag" onclick="toggleIssueTag(this, 'Other')">📝 Other</button>
+            </div>
+            <div class="position-relative">
+              <textarea id="kioskIssues" class="form-control" rows="3" placeholder="Type your answer or tap the microphone to speak…" style="padding-right:3rem; font-size:1rem;"></textarea>
+              <button type="button" id="kioskMicBtn" onclick="toggleSpeechInput()" title="Tap to speak"
+                style="position:absolute;right:10px;bottom:10px;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#6c757d;padding:4px;">
+                🎤
+              </button>
+            </div>
+            <div id="kioskMicStatus" class="text-muted small mt-1" style="display:none;"><span class="spinner-grow spinner-grow-sm text-danger me-1"></span>Listening… tap mic to stop.</div>
+          </div>
+
+          <hr class="my-3">
+
+          <!-- Signature -->
+          <div class="mb-2">
+            <label class="fw-bold fs-6 d-block mb-1">
+              <span class="text-danger me-1">●</span>Signature
+            </label>
+            <p class="text-muted small mb-2">Sign below to confirm that everything marked above was completed.</p>
+            <div style="border:2px solid #dee2e6; border-radius:10px; background:#fff; position:relative;">
+              <canvas id="sigCanvas" style="width:100%;height:180px;display:block;border-radius:8px;touch-action:none;"></canvas>
+              <button type="button" onclick="clearSignature()" style="position:absolute;top:8px;right:10px;background:none;border:none;color:#adb5bd;font-size:.8rem;cursor:pointer;">
+                <i class="bi bi-x-circle me-1"></i>Clear
+              </button>
+              <div id="sigPlaceholder" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#adb5bd;pointer-events:none;font-size:.95rem;">✍️ Sign here</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div id="kioskError" class="alert alert-danger d-none mb-3"></div>
+
+      <button class="btn btn-success w-100 py-3 fw-bold fs-5 shadow-sm" onclick="submitKioskReport()" style="border-radius:12px;">
+        <i class="bi bi-check2-circle me-2"></i>Submit Cleaning Report
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Cleaning Report Detail Modal -->
+<div class="modal fade" id="crDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Cleaning Report Detail</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body" id="crDetailBody"></div>
+    </div>
+  </div>
+</div>
 
 
 <!-- ─── MODALS ──────────────────────────────────────────────────────────────── -->
@@ -474,7 +648,7 @@
           <div class="col-6"><label class="form-label">Role <span class="text-danger">*</span></label>
             <select id="uRole" class="form-select">
               <option value="admin">Admin</option><option value="research">Research</option>
-              <option value="maternity">Maternity</option><option value="caretaker" selected>Caretaker</option>
+              <option value="maternity">Maternity</option><option value="caretaker" selected>Caretaker</option><option value="cleaner">Cleaner</option>
             </select></div>
           <div class="col-6" id="uActiveWrap" style="display:none"><label class="form-label">Status</label>
             <select id="uActive" class="form-select"><option value="1">Active</option><option value="0">Inactive</option></select></div>
@@ -613,14 +787,28 @@ function initApp() {
   if (!TOKEN || !USER) {
     document.getElementById('loginWrap').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
+    document.getElementById('cleanerKiosk').style.display = 'none';
     return;
   }
+
+  // Cleaner role → kiosk mode only
+  if (USER.role === 'cleaner') {
+    document.getElementById('loginWrap').style.display = 'none';
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('cleanerKiosk').style.display = 'block';
+    document.getElementById('kioskUserInfo').textContent = USER.full_name || USER.username;
+    initKiosk();
+    return;
+  }
+
   document.getElementById('loginWrap').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
+  document.getElementById('cleanerKiosk').style.display = 'none';
   document.getElementById('userInfo').innerHTML =
     `<div class="text-white fw-semibold small">${USER.full_name || USER.username}</div>
      <span class="badge role-${USER.role} role-badge">${USER.role}</span>`;
   if (USER.role !== 'admin') document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+  if (!['admin','research'].includes(USER.role)) document.querySelectorAll('.admin-research-only').forEach(el => el.style.display = 'none');
   document.getElementById('navLinks').querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', e => { e.preventDefault(); nav(link.dataset.page); });
   });
@@ -637,7 +825,7 @@ function nav(page) {
   if (link) link.classList.add('active');
   const loaders = { dashboard: loadDashboard, ferrets: loadFerrets, litters: loadLitters,
     locations: loadLocations, suppliers: loadSuppliers, assignments: loadAssignments,
-    users: loadUsers, activity: loadActivity };
+    users: loadUsers, activity: loadActivity, 'cleaning-reports': loadCleaningReports };
   if (loaders[page]) loaders[page]();
 }
 
@@ -1480,7 +1668,7 @@ async function submitAssign() {
 async function loadUsers() {
   try {
     const data = await api('/users');
-    const roleColors = { admin:'danger', research:'primary', maternity:'success', caretaker:'secondary' };
+    const roleColors = { admin:'danger', research:'primary', maternity:'success', caretaker:'secondary', cleaner:'teal' };
     document.getElementById('userTable').innerHTML = data.map(u => `
       <tr>
         <td><strong>${u.username}</strong></td>
@@ -1647,6 +1835,311 @@ function fmtTime(dt) {
   return `${h}:${min.toString().padStart(2,'0')} ${ampm}`;
 }
 function fmtDT(dt) { if (!dt) return '—'; return `${fmtDate(dt)} ${fmtTime(dt)}`; }
+
+// ─── Kiosk (Cleaner Role) ─────────────────────────────────────────────────────
+let _sigCanvas, _sigCtx, _sigDrawing = false, _sigHasData = false;
+let _speechRecognition = null, _speechActive = false;
+let _selectedRooms = new Set();
+let _issueTagsSelected = new Set();
+
+async function initKiosk() {
+  resetKioskForm();
+  try {
+    const rooms = await api('/rooms');
+    const container = document.getElementById('kioskRoomList');
+    if (!rooms.length) {
+      container.innerHTML = '<span class="text-muted small">No rooms configured yet.</span>';
+      return;
+    }
+    container.innerHTML = rooms.map(r => `
+      <button type="button" class="btn btn-outline-secondary px-4 py-2 fw-semibold room-btn"
+        data-room="${r}" onclick="toggleRoom(this, ${r})" style="border-radius:10px; font-size:1rem;">
+        Room ${r}
+      </button>`).join('');
+  } catch (err) { console.error(err); }
+  initSignaturePad();
+}
+
+function toggleRoom(btn, roomId) {
+  if (_selectedRooms.has(roomId)) {
+    _selectedRooms.delete(roomId);
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-outline-secondary');
+  } else {
+    _selectedRooms.add(roomId);
+    btn.classList.remove('btn-outline-secondary');
+    btn.classList.add('btn-primary');
+  }
+}
+
+function toggleKioskCheck(checkId, boxId) {
+  const cb = document.getElementById(checkId);
+  const box = document.getElementById(boxId);
+  const checkEl = document.getElementById(checkId + 'Check');
+  cb.checked = !cb.checked;
+  if (cb.checked) {
+    box.style.borderColor = '#198754';
+    box.style.background = '#f0fff4';
+    checkEl.style.background = '#198754';
+    checkEl.style.borderColor = '#198754';
+    checkEl.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="white"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
+  } else {
+    box.style.borderColor = '#dee2e6';
+    box.style.background = '#f8f9fa';
+    checkEl.style.background = '#fff';
+    checkEl.style.borderColor = '#adb5bd';
+    checkEl.innerHTML = '';
+  }
+}
+
+function toggleIssueTag(btn, tag) {
+  if (_issueTagsSelected.has(tag)) {
+    _issueTagsSelected.delete(tag);
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-outline-secondary');
+  } else {
+    _issueTagsSelected.add(tag);
+    btn.classList.remove('btn-outline-secondary');
+    btn.classList.add('btn-primary');
+  }
+  // Prepend selected tags to textarea if it's empty or only has tags
+  const textarea = document.getElementById('kioskIssues');
+  const tagText = _issueTagsSelected.size ? [..._issueTagsSelected].join(', ') + ': ' : '';
+  const current = textarea.value;
+  // Replace any existing tag prefix
+  const withoutPrefix = current.replace(/^[^:]+: /, '');
+  textarea.value = tagText + (withoutPrefix && !_issueTagsSelected.size ? withoutPrefix : (withoutPrefix && _issueTagsSelected.size ? withoutPrefix : ''));
+}
+
+// ─── Speech Input ─────────────────────────────────────────────────────────────
+function toggleSpeechInput() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('Speech recognition is not supported in this browser. Please type your answer.');
+    return;
+  }
+  if (_speechActive) {
+    _speechRecognition && _speechRecognition.stop();
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  _speechRecognition = new SR();
+  _speechRecognition.continuous = true;
+  _speechRecognition.interimResults = true;
+  _speechRecognition.lang = 'en-US';
+  const textarea = document.getElementById('kioskIssues');
+  const micBtn   = document.getElementById('kioskMicBtn');
+  const micStatus = document.getElementById('kioskMicStatus');
+  const baseText = textarea.value;
+  _speechActive = true;
+  micBtn.style.color = '#dc3545';
+  micStatus.style.display = 'block';
+  _speechRecognition.onresult = e => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    textarea.value = baseText + final + interim;
+  };
+  _speechRecognition.onend = () => {
+    _speechActive = false;
+    micBtn.style.color = '#6c757d';
+    micStatus.style.display = 'none';
+  };
+  _speechRecognition.onerror = () => {
+    _speechActive = false;
+    micBtn.style.color = '#6c757d';
+    micStatus.style.display = 'none';
+  };
+  _speechRecognition.start();
+}
+
+// ─── Signature Pad ────────────────────────────────────────────────────────────
+function initSignaturePad() {
+  _sigCanvas = document.getElementById('sigCanvas');
+  if (!_sigCanvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = _sigCanvas.getBoundingClientRect();
+  _sigCanvas.width  = (rect.width  || 640) * dpr;
+  _sigCanvas.height = (rect.height || 180) * dpr;
+  _sigCtx = _sigCanvas.getContext('2d');
+  _sigCtx.scale(dpr, dpr);
+  _sigCtx.strokeStyle = '#1a1a2e';
+  _sigCtx.lineWidth   = 2.5;
+  _sigCtx.lineCap     = 'round';
+  _sigCtx.lineJoin    = 'round';
+  _sigHasData = false;
+
+  function getPos(e) {
+    const r = _sigCanvas.getBoundingClientRect();
+    const src = e.touches ? e.touches[0] : e;
+    return { x: src.clientX - r.left, y: src.clientY - r.top };
+  }
+  function start(e) {
+    e.preventDefault();
+    _sigDrawing = true;
+    const {x, y} = getPos(e);
+    _sigCtx.beginPath();
+    _sigCtx.moveTo(x, y);
+    document.getElementById('sigPlaceholder').style.display = 'none';
+    _sigHasData = true;
+  }
+  function move(e) {
+    e.preventDefault();
+    if (!_sigDrawing) return;
+    const {x, y} = getPos(e);
+    _sigCtx.lineTo(x, y);
+    _sigCtx.stroke();
+  }
+  function end(e) { e.preventDefault(); _sigDrawing = false; }
+
+  _sigCanvas.addEventListener('mousedown',  start);
+  _sigCanvas.addEventListener('mousemove',  move);
+  _sigCanvas.addEventListener('mouseup',    end);
+  _sigCanvas.addEventListener('mouseleave', end);
+  _sigCanvas.addEventListener('touchstart', start, { passive: false });
+  _sigCanvas.addEventListener('touchmove',  move,  { passive: false });
+  _sigCanvas.addEventListener('touchend',   end,   { passive: false });
+}
+
+function clearSignature() {
+  if (!_sigCanvas || !_sigCtx) return;
+  _sigCtx.clearRect(0, 0, _sigCanvas.width, _sigCanvas.height);
+  _sigHasData = false;
+  document.getElementById('sigPlaceholder').style.display = '';
+}
+
+// ─── Submit Kiosk Report ──────────────────────────────────────────────────────
+async function submitKioskReport() {
+  const errEl = document.getElementById('kioskError');
+  errEl.classList.add('d-none');
+
+  const rooms = [..._selectedRooms];
+  if (!rooms.length) { errEl.textContent = 'Please select at least one room.'; errEl.classList.remove('d-none'); return; }
+  if (!document.getElementById('kioskCage').checked)  { errEl.textContent = 'Please confirm inside cage cleaning.'; errEl.classList.remove('d-none'); return; }
+  if (!document.getElementById('kioskTray').checked)  { errEl.textContent = 'Please confirm tray cleaning.'; errEl.classList.remove('d-none'); return; }
+  if (!document.getElementById('kioskFloor').checked) { errEl.textContent = 'Please confirm sweeping, scraping, and mopping.'; errEl.classList.remove('d-none'); return; }
+  if (!document.getElementById('kioskFood').checked)  { errEl.textContent = 'Please confirm food and water check.'; errEl.classList.remove('d-none'); return; }
+  if (!_sigHasData) { errEl.textContent = 'Please sign the form before submitting.'; errEl.classList.remove('d-none'); return; }
+
+  const issueText = document.getElementById('kioskIssues').value.trim();
+  const hadIssues = issueText.length > 0 || _issueTagsSelected.size > 0;
+  const sigData   = _sigCanvas.toDataURL('image/png');
+
+  try {
+    await api('/cleaning-reports', { method: 'POST', body: {
+      rooms_cleaned: rooms,
+      inside_cage_cleaning: true,
+      tray_cleaning: true,
+      sweeping_mopping: true,
+      food_water_check: true,
+      had_issues: hadIssues,
+      issue_description: issueText || null,
+      signature_data: sigData
+    }});
+    document.getElementById('kioskForm').style.display = 'none';
+    document.getElementById('kioskSuccess').classList.remove('d-none');
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.classList.remove('d-none');
+  }
+}
+
+function resetKioskForm() {
+  _selectedRooms.clear();
+  _issueTagsSelected.clear();
+  document.getElementById('kioskSuccess').classList.add('d-none');
+  document.getElementById('kioskForm').style.display = '';
+  document.getElementById('kioskIssues').value = '';
+  document.getElementById('kioskError').classList.add('d-none');
+  // Reset room buttons
+  document.querySelectorAll('.room-btn').forEach(b => {
+    b.classList.remove('btn-primary');
+    b.classList.add('btn-outline-secondary');
+  });
+  // Reset issue tags
+  document.querySelectorAll('.issue-tag').forEach(b => {
+    b.classList.remove('btn-primary');
+    b.classList.add('btn-outline-secondary');
+  });
+  // Reset checkboxes
+  ['kioskCage','kioskTray','kioskFloor','kioskFood'].forEach(id => {
+    const cb = document.getElementById(id);
+    if (cb) cb.checked = false;
+    const boxId = id + 'Box';
+    const box = document.getElementById(boxId);
+    if (box) { box.style.borderColor = '#dee2e6'; box.style.background = '#f8f9fa'; }
+    const checkEl = document.getElementById(id + 'Check');
+    if (checkEl) { checkEl.style.background = '#fff'; checkEl.style.borderColor = '#adb5bd'; checkEl.innerHTML = ''; }
+  });
+  clearSignature();
+  // Re-init sig pad after a tick so canvas dimensions are correct
+  setTimeout(initSignaturePad, 50);
+}
+
+// ─── Cleaning Reports Admin Page ──────────────────────────────────────────────
+async function loadCleaningReports() {
+  try {
+    // Populate room filter
+    const rooms = await api('/rooms');
+    const filterEl = document.getElementById('crRoomFilter');
+    const currentVal = filterEl.value;
+    filterEl.innerHTML = '<option value="">All Rooms</option>' +
+      rooms.map(r => `<option value="${r}" ${currentVal == r ? 'selected' : ''}>Room ${r}</option>`).join('');
+
+    const room = filterEl.value || '';
+    const reports = await api('/cleaning-reports' + (room ? `?room=${room}` : ''));
+    const tbody = document.getElementById('crTable');
+    if (!reports.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="text-muted text-center py-4">No cleaning reports found.</td></tr>';
+      return;
+    }
+    const check = v => v ? '<span class="text-success fw-bold">✓</span>' : '<span class="text-danger">✗</span>';
+    tbody.innerHTML = reports.map(r => `
+      <tr>
+        <td class="small text-muted">${fmtDT(r.submitted_at)}</td>
+        <td><strong>${r.reported_by_name}</strong></td>
+        <td>${r.rooms_cleaned.split(',').map(n => `<span class="badge bg-secondary me-1">Room ${n}</span>`).join('')}</td>
+        <td class="text-center">${check(r.inside_cage_cleaning)}</td>
+        <td class="text-center">${check(r.tray_cleaning)}</td>
+        <td class="text-center">${check(r.sweeping_mopping)}</td>
+        <td class="text-center">${check(r.food_water_check)}</td>
+        <td>${r.had_issues
+          ? `<span class="badge bg-warning text-dark">Yes</span><div class="small text-muted mt-1" style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.issue_description || ''}</div>`
+          : '<span class="badge bg-success-subtle text-success border border-success-subtle">None</span>'}</td>
+        <td><button class="btn btn-sm btn-outline-primary" onclick="viewCleaningReport(${r.report_id})"><i class="bi bi-eye"></i></button></td>
+      </tr>`).join('');
+  } catch (err) { console.error(err); }
+}
+
+async function viewCleaningReport(id) {
+  try {
+    const r = await api('/cleaning-reports/' + id);
+    const check = v => v ? '<span class="badge bg-success">✓ Done</span>' : '<span class="badge bg-danger">✗ Not done</span>';
+    document.getElementById('crDetailBody').innerHTML = `
+      <div class="row g-3">
+        <div class="col-md-6"><strong>Cleaner:</strong> ${r.reported_by_name}</div>
+        <div class="col-md-6"><strong>Submitted:</strong> ${fmtDT(r.submitted_at)}</div>
+        <div class="col-12"><strong>Rooms:</strong> ${r.rooms_cleaned.split(',').map(n => `<span class="badge bg-secondary me-1">Room ${n}</span>`).join('')}</div>
+        <div class="col-md-6"><strong>Inside Cage Cleaning:</strong> ${check(r.inside_cage_cleaning)}</div>
+        <div class="col-md-6"><strong>Tray Cleaning:</strong> ${check(r.tray_cleaning)}</div>
+        <div class="col-md-6"><strong>Sweeping &amp; Mopping:</strong> ${check(r.sweeping_mopping)}</div>
+        <div class="col-md-6"><strong>Food &amp; Water Check:</strong> ${check(r.food_water_check)}</div>
+        ${r.had_issues ? `
+        <div class="col-12">
+          <strong>Issues Reported:</strong>
+          <div class="border rounded p-3 bg-light mt-1" style="white-space:pre-wrap">${r.issue_description || '(no description)'}</div>
+        </div>` : '<div class="col-12"><strong>Issues:</strong> <span class="text-success">None reported</span></div>'}
+        <div class="col-12">
+          <strong>Signature:</strong>
+          <div class="border rounded p-2 mt-1 bg-white" style="text-align:center">
+            <img src="${r.signature_data}" style="max-width:100%;max-height:180px;border-radius:6px;">
+          </div>
+        </div>
+      </div>`;
+    new bootstrap.Modal(document.getElementById('crDetailModal')).show();
+  } catch (err) { alert(err.message); }
+}
 </script>
 </body>
 </html>

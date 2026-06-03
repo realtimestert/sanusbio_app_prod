@@ -39,8 +39,6 @@ const upload = multer({
 app.use(express.json());
 app.use(cors());
 app.use('/uploads', express.static(UPLOADS_DIR));
-app.get('/sanusbio_favicon.svg', (req, res) =>
-  res.sendFile(path.join(__dirname, 'sanusbio_favicon.svg')));
 
 // ─── Database ─────────────────────────────────────────────────────────────────
 const pool = mysql.createPool({
@@ -58,7 +56,8 @@ const PERMS = {
   admin:     new Set(['read', 'write', 'update', 'delete', 'manage_users']),
   research:  new Set(['read', 'write', 'update', 'delete']),
   maternity: new Set(['read', 'write', 'update']),
-  caretaker: new Set(['read', 'write'])
+  caretaker: new Set(['read', 'write']),
+  cleaner:   new Set(['cleaning_report'])
 };
 
 function can(role, action) { return PERMS[role]?.has(action) ?? false; }
@@ -732,5 +731,83 @@ app.get('/api/activity-log', authenticate, admin_only, async (req, res) => {
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n🐾 SanusBio running → http://localhost:${PORT}`);
-  console.log(`   Roles: admin > research > maternity > caretaker\n`);
+  console.log(`   Roles: admin > research > maternity > caretaker > cleaner\n`);
+});
+// ─── Cleaning Reports ─────────────────────────────────────────────────────────
+
+// Get distinct rooms from address table (for the cleaner form dropdown)
+app.get('/api/rooms', authenticate, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT DISTINCT room_id FROM address WHERE room_id IS NOT NULL AND room_id > 0 ORDER BY room_id'
+    );
+    res.json(rows.map(r => r.room_id));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Submit a cleaning report (cleaner role only, or admin)
+app.post('/api/cleaning-reports', authenticate, async (req, res) => {
+  if (!['admin', 'cleaner'].includes(req.user.role))
+    return res.status(403).json({ error: 'Only cleaner or admin can submit cleaning reports' });
+  const {
+    rooms_cleaned, inside_cage_cleaning, tray_cleaning,
+    sweeping_mopping, food_water_check, had_issues,
+    issue_description, signature_data
+  } = req.body;
+  if (!rooms_cleaned || !rooms_cleaned.length)
+    return res.status(400).json({ error: 'At least one room must be selected' });
+  if (!inside_cage_cleaning || !tray_cleaning || !sweeping_mopping || !food_water_check)
+    return res.status(400).json({ error: 'All required checkboxes must be confirmed' });
+  if (!signature_data)
+    return res.status(400).json({ error: 'Signature is required' });
+  try {
+    const roomStr = Array.isArray(rooms_cleaned) ? rooms_cleaned.join(',') : rooms_cleaned;
+    const [r] = await pool.query(
+      `INSERT INTO room_cleaning_report
+        (reported_by_user_id, reported_by_name, rooms_cleaned,
+         inside_cage_cleaning, tray_cleaning, sweeping_mopping, food_water_check,
+         had_issues, issue_description, signature_data)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [req.user.user_id, req.user.full_name || req.user.username, roomStr,
+       inside_cage_cleaning ? 1 : 0, tray_cleaning ? 1 : 0,
+       sweeping_mopping ? 1 : 0, food_water_check ? 1 : 0,
+       had_issues ? 1 : 0, issue_description || null, signature_data]
+    );
+    await log_activity(req.user.user_id, 'CLEANING_REPORT', 'room_cleaning_report', r.insertId,
+      `Room(s) ${roomStr} cleaned by ${req.user.full_name || req.user.username}`);
+    res.json({ id: r.insertId, message: 'Cleaning report submitted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Get cleaning reports (admin/research can view)
+app.get('/api/cleaning-reports', authenticate, async (req, res) => {
+  if (!['admin', 'research'].includes(req.user.role))
+    return res.status(403).json({ error: 'Admin or Research access required' });
+  try {
+    const limit = parseInt(req.query.limit) || 100;
+    const room  = req.query.room || null;
+    let q = `SELECT report_id, reported_by_name, rooms_cleaned,
+               inside_cage_cleaning, tray_cleaning, sweeping_mopping,
+               food_water_check, had_issues, issue_description, submitted_at
+             FROM room_cleaning_report`;
+    const params = [];
+    if (room) { q += ` WHERE FIND_IN_SET(?, rooms_cleaned)`; params.push(room); }
+    q += ` ORDER BY submitted_at DESC LIMIT ?`;
+    params.push(limit);
+    const [rows] = await pool.query(q, params);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Get single cleaning report (with signature) for admin
+app.get('/api/cleaning-reports/:id', authenticate, async (req, res) => {
+  if (!['admin', 'research'].includes(req.user.role))
+    return res.status(403).json({ error: 'Admin or Research access required' });
+  try {
+    const [[row]] = await pool.query(
+      'SELECT * FROM room_cleaning_report WHERE report_id = ?', [req.params.id]
+    );
+    if (!row) return res.status(404).json({ error: 'Report not found' });
+    res.json(row);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
