@@ -46,6 +46,7 @@
     .photo-upload-zone.dragover { border-color:#0d6efd; background:#f0f4ff; }
     .kit-row { background:#f8f9fa; border-radius:8px; padding:.75rem; margin-bottom:.5rem; }
     .history-icon { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.85rem; flex-shrink:0; }
+    .cr-checkmark { width:28px; height:28px; border-radius:6px; border:2px solid #adb5bd; background:#fff; display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; transition: all .15s; }
   </style>
 </head>
 <body>
@@ -82,7 +83,7 @@
       <a class="nav-link" href="#" data-page="assignments"><i class="bi bi-clipboard-check"></i>Assignments</a>
       <a class="nav-link admin-only" href="#" data-page="users"><i class="bi bi-people"></i>Users</a>
       <a class="nav-link admin-only" href="#" data-page="activity"><i class="bi bi-journal-text"></i>Activity Log</a>
-      <a class="nav-link admin-research-only" href="#" data-page="cleaning-reports"><i class="bi bi-check2-square"></i>Cleaning Reports</a>
+      <a class="nav-link" href="#" data-page="cleaning-reports"><i class="bi bi-check2-square"></i>Cleaning Reports</a>
     </nav>
     <div class="user-block">
       <div id="userInfo" class="mb-2"></div>
@@ -218,28 +219,192 @@
     <div id="page-cleaning-reports" class="page">
       <div class="page-header">
         <h4><i class="bi bi-check2-square me-2"></i>Cleaning Reports</h4>
-        <div class="ms-auto d-flex gap-2 align-items-center">
-          <label class="form-label mb-0 text-muted small">Filter by Room:</label>
-          <select id="crRoomFilter" class="form-select form-select-sm" style="max-width:130px" onchange="loadCleaningReports()">
-            <option value="">All Rooms</option>
-          </select>
+      </div>
+
+      <!-- Submit Form (all users) -->
+      <div id="crSubmitSection">
+        <div id="crSuccess" class="d-none mb-4">
+          <div class="card text-center p-5 shadow-sm" style="border-radius:16px;">
+            <div style="font-size:3.5rem; margin-bottom:1rem;">✅</div>
+            <h4 class="fw-bold text-success mb-2">Report Submitted!</h4>
+            <p class="text-muted mb-4">Your cleaning report has been recorded successfully.</p>
+            <button class="btn btn-primary px-5" onclick="resetCleaningForm()">
+              <i class="bi bi-plus-lg me-2"></i>Submit Another Report
+            </button>
+          </div>
+        </div>
+        <div id="crFormWrap">
+          <div class="card shadow-sm mb-4" style="border-radius:14px;">
+            <div class="card-body p-4">
+
+              <!-- Reporter Name -->
+              <div class="mb-4">
+                <label class="fw-bold fs-6 d-block mb-1">
+                  <span class="text-danger me-1">●</span>Your Name
+                </label>
+                <p class="text-muted small mb-2">Enter your full name so the report can be attributed to you.</p>
+                <input id="crReporterName" class="form-control form-control-lg" placeholder="First and last name" style="max-width:400px;">
+              </div>
+
+              <hr class="my-3">
+
+              <!-- Room Selection -->
+              <div class="mb-4">
+                <label class="fw-bold fs-6 d-block mb-1">
+                  <span class="text-danger me-1">●</span>What room(s) did you clean?
+                </label>
+                <p class="text-muted small mb-2">Select all rooms you cleaned during this session.</p>
+                <div id="crRoomList" class="d-flex flex-wrap gap-2"></div>
+              </div>
+
+              <hr class="my-3">
+
+              <!-- Inside Cage Cleaning -->
+              <div class="mb-4">
+                <div class="d-flex align-items-start gap-3 p-3 rounded-3 cr-check-box" id="crCageBox"
+                  style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
+                  onclick="toggleCrCheck('crCage','crCageBox')">
+                  <div style="margin-top:2px;">
+                    <div id="crCageCheck" class="cr-checkmark"></div>
+                  </div>
+                  <div>
+                    <div class="fw-bold"><span class="text-danger me-1">●</span>Inside Cage Cleaning</div>
+                    <div class="text-muted small mt-1">Check to confirm that you scraped or vacuumed inside the cages.</div>
+                  </div>
+                </div>
+                <input type="checkbox" id="crCage" style="display:none">
+              </div>
+
+              <!-- Tray Cleaning -->
+              <div class="mb-4">
+                <div class="d-flex align-items-start gap-3 p-3 rounded-3 cr-check-box" id="crTrayBox"
+                  style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
+                  onclick="toggleCrCheck('crTray','crTrayBox')">
+                  <div style="margin-top:2px;">
+                    <div id="crTrayCheck" class="cr-checkmark"></div>
+                  </div>
+                  <div>
+                    <div class="fw-bold"><span class="text-danger me-1">●</span>Tray Cleaning</div>
+                    <div class="text-muted small mt-1">Check to confirm that you scraped or vacuumed the trays under the cages.</div>
+                  </div>
+                </div>
+                <input type="checkbox" id="crTray" style="display:none">
+              </div>
+
+              <!-- Sweeping, Scraping, Mopping -->
+              <div class="mb-4">
+                <div class="d-flex align-items-start gap-3 p-3 rounded-3 cr-check-box" id="crFloorBox"
+                  style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
+                  onclick="toggleCrCheck('crFloor','crFloorBox')">
+                  <div style="margin-top:2px;">
+                    <div id="crFloorCheck" class="cr-checkmark"></div>
+                  </div>
+                  <div>
+                    <div class="fw-bold"><span class="text-danger me-1">●</span>Sweeping, Scraping, and Mopping</div>
+                    <div class="text-muted small mt-1">Check to confirm that you swept, scraped, and mopped the floors.</div>
+                  </div>
+                </div>
+                <input type="checkbox" id="crFloor" style="display:none">
+              </div>
+
+              <!-- Food and Water Check -->
+              <div class="mb-4">
+                <div class="d-flex align-items-start gap-3 p-3 rounded-3 cr-check-box" id="crFoodBox"
+                  style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
+                  onclick="toggleCrCheck('crFood','crFoodBox')">
+                  <div style="margin-top:2px;">
+                    <div id="crFoodCheck" class="cr-checkmark"></div>
+                  </div>
+                  <div>
+                    <div class="fw-bold"><span class="text-danger me-1">●</span>Food and Water Check</div>
+                    <div class="text-muted small mt-1">Check to confirm that you checked that every animal had access to food and water.</div>
+                  </div>
+                </div>
+                <input type="checkbox" id="crFood" style="display:none">
+              </div>
+
+              <hr class="my-3">
+
+              <!-- Issues -->
+              <div class="mb-4">
+                <label class="fw-bold fs-6 d-block mb-1">Were there any issues when cleaning the room?</label>
+                <p class="text-muted small mb-2">Such as animal fighting, broken cage, animals escaped the room, or other. If so, please describe what happened below.</p>
+                <div class="d-flex gap-2 mb-2 flex-wrap">
+                  <button type="button" class="btn btn-outline-secondary btn-sm cr-issue-tag" onclick="toggleCrIssueTag(this, 'Animal fighting')">🐾 Animal Fighting</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm cr-issue-tag" onclick="toggleCrIssueTag(this, 'Broken cage')">🔧 Broken Cage</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm cr-issue-tag" onclick="toggleCrIssueTag(this, 'Animal escaped room')">🚨 Animal Escaped</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm cr-issue-tag" onclick="toggleCrIssueTag(this, 'Other')">📝 Other</button>
+                </div>
+                <div class="position-relative">
+                  <textarea id="crIssues" class="form-control" rows="3"
+                    placeholder="Type your answer or tap the microphone to speak…"
+                    style="padding-right:3rem; font-size:1rem;"></textarea>
+                  <button type="button" id="crMicBtn" onclick="toggleCrSpeech()" title="Tap to speak"
+                    style="position:absolute;right:10px;bottom:10px;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#6c757d;padding:4px;">🎤</button>
+                </div>
+                <div id="crMicStatus" class="text-muted small mt-1" style="display:none;">
+                  <span class="spinner-grow spinner-grow-sm text-danger me-1"></span>Listening… tap mic to stop.
+                </div>
+              </div>
+
+              <hr class="my-3">
+
+              <!-- Signature -->
+              <div class="mb-2">
+                <label class="fw-bold fs-6 d-block mb-1">
+                  <span class="text-danger me-1">●</span>Signature
+                </label>
+                <p class="text-muted small mb-2">Sign below to confirm that everything marked above was completed.</p>
+                <div style="border:2px solid #dee2e6; border-radius:10px; background:#fff; position:relative; max-width:640px;">
+                  <canvas id="crSigCanvas" style="width:100%;height:180px;display:block;border-radius:8px;touch-action:none;"></canvas>
+                  <button type="button" onclick="clearCrSignature()"
+                    style="position:absolute;top:8px;right:10px;background:none;border:none;color:#adb5bd;font-size:.8rem;cursor:pointer;">
+                    <i class="bi bi-x-circle me-1"></i>Clear
+                  </button>
+                  <div id="crSigPlaceholder" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#adb5bd;pointer-events:none;font-size:.95rem;">✍️ Sign here</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <div id="crFormError" class="alert alert-danger d-none mb-3"></div>
+
+          <button class="btn btn-success px-5 py-3 fw-bold fs-5 shadow-sm mb-5" onclick="submitCleaningReport()" style="border-radius:12px;">
+            <i class="bi bi-check2-circle me-2"></i>Submit Cleaning Report
+          </button>
         </div>
       </div>
-      <div class="card">
-        <div class="table-responsive">
-          <table class="table table-hover mb-0">
-            <thead><tr><th>Date &amp; Time</th><th>Cleaner</th><th>Rooms</th><th>Cage</th><th>Trays</th><th>Floors</th><th>Food/Water</th><th>Issues</th><th></th></tr></thead>
-            <tbody id="crTable"></tbody>
-          </table>
+
+      <!-- Report History (admin/research only) -->
+      <div id="crHistorySection" class="d-none">
+        <hr class="my-4">
+        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+          <h5 class="fw-bold mb-0"><i class="bi bi-clock-history me-2"></i>Report History</h5>
+          <div class="ms-auto d-flex gap-2 align-items-center">
+            <label class="form-label mb-0 text-muted small">Filter by Room:</label>
+            <select id="crRoomFilter" class="form-select form-select-sm" style="max-width:130px" onchange="loadCrHistory()">
+              <option value="">All Rooms</option>
+            </select>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead><tr><th>Date &amp; Time</th><th>Name</th><th>Rooms</th><th>Cage</th><th>Trays</th><th>Floors</th><th>Food/Water</th><th>Issues</th><th></th></tr></thead>
+              <tbody id="crTable"></tbody>
+            </table>
+          </div>
         </div>
       </div>
+
     </div>
 
   </div><!-- /main -->
 </div><!-- /app -->
 
-<!-- ─── CLEANER KIOSK ──────────────────────────────────────────────────────── -->
-<div id="cleanerKiosk" style="display:none; min-height:100vh; background:#f0f2f5;">
+<!-- placeholder so kiosk references don't break during transition -->
+<div id="cleanerKiosk" style="display:none;">
   <div style="background:var(--brand); padding:1rem 1.5rem; display:flex; align-items:center; justify-content:space-between;">
     <div style="color:#fff; font-size:1.1rem; font-weight:700;">🐾 SanusBio &mdash; Room Cleaning Report</div>
     <div style="display:flex; align-items:center; gap:1rem;">
@@ -787,23 +952,11 @@ function initApp() {
   if (!TOKEN || !USER) {
     document.getElementById('loginWrap').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
-    document.getElementById('cleanerKiosk').style.display = 'none';
-    return;
-  }
-
-  // Cleaner role → kiosk mode only
-  if (USER.role === 'cleaner') {
-    document.getElementById('loginWrap').style.display = 'none';
-    document.getElementById('app').style.display = 'none';
-    document.getElementById('cleanerKiosk').style.display = 'block';
-    document.getElementById('kioskUserInfo').textContent = USER.full_name || USER.username;
-    initKiosk();
     return;
   }
 
   document.getElementById('loginWrap').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
-  document.getElementById('cleanerKiosk').style.display = 'none';
   document.getElementById('userInfo').innerHTML =
     `<div class="text-white fw-semibold small">${USER.full_name || USER.username}</div>
      <span class="badge role-${USER.role} role-badge">${USER.role}</span>`;
@@ -812,7 +965,7 @@ function initApp() {
   document.getElementById('navLinks').querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', e => { e.preventDefault(); nav(link.dataset.page); });
   });
-  nav('dashboard');
+  nav(USER.role === 'cleaner' ? 'cleaning-reports' : 'dashboard');
 }
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
@@ -1836,104 +1989,112 @@ function fmtTime(dt) {
 }
 function fmtDT(dt) { if (!dt) return '—'; return `${fmtDate(dt)} ${fmtTime(dt)}`; }
 
-// ─── Kiosk (Cleaner Role) ─────────────────────────────────────────────────────
-let _sigCanvas, _sigCtx, _sigDrawing = false, _sigHasData = false;
-let _speechRecognition = null, _speechActive = false;
-let _selectedRooms = new Set();
-let _issueTagsSelected = new Set();
+// ─── Cleaning Report Form (all users) ────────────────────────────────────────
+let _crSigCanvas, _crSigCtx, _crSigDrawing = false, _crSigHasData = false;
+let _crSpeechRecognition = null, _crSpeechActive = false;
+let _crSelectedRooms = new Set();
+let _crIssueTagsSelected = new Set();
 
-async function initKiosk() {
-  resetKioskForm();
+async function loadCleaningReports() {
+  // Show history section only for admin/research
+  if (['admin', 'research'].includes(USER?.role)) {
+    document.getElementById('crHistorySection').classList.remove('d-none');
+    loadCrHistory();
+  }
+  // Load room buttons for the form
   try {
     const rooms = await api('/rooms');
-    const container = document.getElementById('kioskRoomList');
+    const container = document.getElementById('crRoomList');
     if (!rooms.length) {
-      container.innerHTML = '<span class="text-muted small">No rooms configured yet.</span>';
-      return;
+      container.innerHTML = '<span class="text-muted small">No rooms configured yet. Ask an admin to add locations.</span>';
+    } else {
+      container.innerHTML = rooms.map(r => `
+        <button type="button" class="btn btn-outline-secondary px-4 py-2 fw-semibold cr-room-btn"
+          data-room="${r}" onclick="toggleCrRoom(this, ${r})"
+          style="border-radius:10px; font-size:1rem;">
+          Room ${r}
+        </button>`).join('');
     }
-    container.innerHTML = rooms.map(r => `
-      <button type="button" class="btn btn-outline-secondary px-4 py-2 fw-semibold room-btn"
-        data-room="${r}" onclick="toggleRoom(this, ${r})" style="border-radius:10px; font-size:1rem;">
-        Room ${r}
-      </button>`).join('');
   } catch (err) { console.error(err); }
-  initSignaturePad();
+
+  // Pre-fill name from user profile
+  const nameEl = document.getElementById('crReporterName');
+  if (nameEl && (USER?.full_name || USER?.username)) {
+    nameEl.value = USER.full_name || USER.username;
+  }
+
+  // Init signature pad (small delay so canvas is visible/sized)
+  setTimeout(initCrSigPad, 80);
 }
 
-function toggleRoom(btn, roomId) {
-  if (_selectedRooms.has(roomId)) {
-    _selectedRooms.delete(roomId);
+function toggleCrRoom(btn, roomId) {
+  if (_crSelectedRooms.has(roomId)) {
+    _crSelectedRooms.delete(roomId);
     btn.classList.remove('btn-primary');
     btn.classList.add('btn-outline-secondary');
   } else {
-    _selectedRooms.add(roomId);
+    _crSelectedRooms.add(roomId);
     btn.classList.remove('btn-outline-secondary');
     btn.classList.add('btn-primary');
   }
 }
 
-function toggleKioskCheck(checkId, boxId) {
-  const cb = document.getElementById(checkId);
+function toggleCrCheck(checkId, boxId) {
+  const cb  = document.getElementById(checkId);
   const box = document.getElementById(boxId);
   const checkEl = document.getElementById(checkId + 'Check');
   cb.checked = !cb.checked;
   if (cb.checked) {
     box.style.borderColor = '#198754';
-    box.style.background = '#f0fff4';
-    checkEl.style.background = '#198754';
-    checkEl.style.borderColor = '#198754';
+    box.style.background  = '#f0fff4';
+    checkEl.style.background   = '#198754';
+    checkEl.style.borderColor  = '#198754';
     checkEl.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="white"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
   } else {
     box.style.borderColor = '#dee2e6';
-    box.style.background = '#f8f9fa';
-    checkEl.style.background = '#fff';
+    box.style.background  = '#f8f9fa';
+    checkEl.style.background  = '#fff';
     checkEl.style.borderColor = '#adb5bd';
     checkEl.innerHTML = '';
   }
 }
 
-function toggleIssueTag(btn, tag) {
-  if (_issueTagsSelected.has(tag)) {
-    _issueTagsSelected.delete(tag);
+function toggleCrIssueTag(btn, tag) {
+  if (_crIssueTagsSelected.has(tag)) {
+    _crIssueTagsSelected.delete(tag);
     btn.classList.remove('btn-primary');
     btn.classList.add('btn-outline-secondary');
   } else {
-    _issueTagsSelected.add(tag);
+    _crIssueTagsSelected.add(tag);
     btn.classList.remove('btn-outline-secondary');
     btn.classList.add('btn-primary');
   }
-  // Prepend selected tags to textarea if it's empty or only has tags
-  const textarea = document.getElementById('kioskIssues');
-  const tagText = _issueTagsSelected.size ? [..._issueTagsSelected].join(', ') + ': ' : '';
-  const current = textarea.value;
-  // Replace any existing tag prefix
-  const withoutPrefix = current.replace(/^[^:]+: /, '');
-  textarea.value = tagText + (withoutPrefix && !_issueTagsSelected.size ? withoutPrefix : (withoutPrefix && _issueTagsSelected.size ? withoutPrefix : ''));
+  const textarea = document.getElementById('crIssues');
+  const tagPrefix = _crIssueTagsSelected.size ? [..._crIssueTagsSelected].join(', ') + ': ' : '';
+  const withoutPrefix = textarea.value.replace(/^[^:]+: /, '');
+  textarea.value = tagPrefix + (withoutPrefix && _crIssueTagsSelected.size ? withoutPrefix : (!_crIssueTagsSelected.size ? withoutPrefix : ''));
 }
 
 // ─── Speech Input ─────────────────────────────────────────────────────────────
-function toggleSpeechInput() {
+function toggleCrSpeech() {
   if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
     alert('Speech recognition is not supported in this browser. Please type your answer.');
     return;
   }
-  if (_speechActive) {
-    _speechRecognition && _speechRecognition.stop();
-    return;
-  }
+  if (_crSpeechActive) { _crSpeechRecognition && _crSpeechRecognition.stop(); return; }
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  _speechRecognition = new SR();
-  _speechRecognition.continuous = true;
-  _speechRecognition.interimResults = true;
-  _speechRecognition.lang = 'en-US';
-  const textarea = document.getElementById('kioskIssues');
-  const micBtn   = document.getElementById('kioskMicBtn');
-  const micStatus = document.getElementById('kioskMicStatus');
-  const baseText = textarea.value;
-  _speechActive = true;
+  _crSpeechRecognition = new SR();
+  _crSpeechRecognition.continuous = true;
+  _crSpeechRecognition.interimResults = true;
+  _crSpeechRecognition.lang = 'en-US';
+  const textarea  = document.getElementById('crIssues');
+  const micBtn    = document.getElementById('crMicBtn');
+  const micStatus = document.getElementById('crMicStatus');
+  const baseText  = textarea.value;
+  _crSpeechActive = true;
   micBtn.style.color = '#dc3545';
   micStatus.style.display = 'block';
-  _speechRecognition.onresult = e => {
+  _crSpeechRecognition.onresult = e => {
     let interim = '', final = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
       if (e.results[i].isFinal) final += e.results[i][0].transcript;
@@ -1941,94 +2102,80 @@ function toggleSpeechInput() {
     }
     textarea.value = baseText + final + interim;
   };
-  _speechRecognition.onend = () => {
-    _speechActive = false;
-    micBtn.style.color = '#6c757d';
-    micStatus.style.display = 'none';
-  };
-  _speechRecognition.onerror = () => {
-    _speechActive = false;
-    micBtn.style.color = '#6c757d';
-    micStatus.style.display = 'none';
-  };
-  _speechRecognition.start();
+  _crSpeechRecognition.onend = () => { _crSpeechActive = false; micBtn.style.color = '#6c757d'; micStatus.style.display = 'none'; };
+  _crSpeechRecognition.onerror = () => { _crSpeechActive = false; micBtn.style.color = '#6c757d'; micStatus.style.display = 'none'; };
+  _crSpeechRecognition.start();
 }
 
 // ─── Signature Pad ────────────────────────────────────────────────────────────
-function initSignaturePad() {
-  _sigCanvas = document.getElementById('sigCanvas');
-  if (!_sigCanvas) return;
-  const dpr = window.devicePixelRatio || 1;
-  const rect = _sigCanvas.getBoundingClientRect();
-  _sigCanvas.width  = (rect.width  || 640) * dpr;
-  _sigCanvas.height = (rect.height || 180) * dpr;
-  _sigCtx = _sigCanvas.getContext('2d');
-  _sigCtx.scale(dpr, dpr);
-  _sigCtx.strokeStyle = '#1a1a2e';
-  _sigCtx.lineWidth   = 2.5;
-  _sigCtx.lineCap     = 'round';
-  _sigCtx.lineJoin    = 'round';
-  _sigHasData = false;
+function initCrSigPad() {
+  _crSigCanvas = document.getElementById('crSigCanvas');
+  if (!_crSigCanvas) return;
+  const dpr  = window.devicePixelRatio || 1;
+  const rect = _crSigCanvas.getBoundingClientRect();
+  _crSigCanvas.width  = (rect.width  || 640) * dpr;
+  _crSigCanvas.height = (rect.height || 180) * dpr;
+  _crSigCtx = _crSigCanvas.getContext('2d');
+  _crSigCtx.scale(dpr, dpr);
+  _crSigCtx.strokeStyle = '#1a1a2e';
+  _crSigCtx.lineWidth   = 2.5;
+  _crSigCtx.lineCap     = 'round';
+  _crSigCtx.lineJoin    = 'round';
+  _crSigHasData = false;
 
   function getPos(e) {
-    const r = _sigCanvas.getBoundingClientRect();
+    const r   = _crSigCanvas.getBoundingClientRect();
     const src = e.touches ? e.touches[0] : e;
     return { x: src.clientX - r.left, y: src.clientY - r.top };
   }
   function start(e) {
-    e.preventDefault();
-    _sigDrawing = true;
+    e.preventDefault(); _crSigDrawing = true;
     const {x, y} = getPos(e);
-    _sigCtx.beginPath();
-    _sigCtx.moveTo(x, y);
-    document.getElementById('sigPlaceholder').style.display = 'none';
-    _sigHasData = true;
+    _crSigCtx.beginPath(); _crSigCtx.moveTo(x, y);
+    document.getElementById('crSigPlaceholder').style.display = 'none';
+    _crSigHasData = true;
   }
-  function move(e) {
-    e.preventDefault();
-    if (!_sigDrawing) return;
-    const {x, y} = getPos(e);
-    _sigCtx.lineTo(x, y);
-    _sigCtx.stroke();
-  }
-  function end(e) { e.preventDefault(); _sigDrawing = false; }
+  function move(e) { e.preventDefault(); if (!_crSigDrawing) return; const {x, y} = getPos(e); _crSigCtx.lineTo(x, y); _crSigCtx.stroke(); }
+  function end(e)  { e.preventDefault(); _crSigDrawing = false; }
 
-  _sigCanvas.addEventListener('mousedown',  start);
-  _sigCanvas.addEventListener('mousemove',  move);
-  _sigCanvas.addEventListener('mouseup',    end);
-  _sigCanvas.addEventListener('mouseleave', end);
-  _sigCanvas.addEventListener('touchstart', start, { passive: false });
-  _sigCanvas.addEventListener('touchmove',  move,  { passive: false });
-  _sigCanvas.addEventListener('touchend',   end,   { passive: false });
+  _crSigCanvas.addEventListener('mousedown',  start);
+  _crSigCanvas.addEventListener('mousemove',  move);
+  _crSigCanvas.addEventListener('mouseup',    end);
+  _crSigCanvas.addEventListener('mouseleave', end);
+  _crSigCanvas.addEventListener('touchstart', start, { passive: false });
+  _crSigCanvas.addEventListener('touchmove',  move,  { passive: false });
+  _crSigCanvas.addEventListener('touchend',   end,   { passive: false });
 }
 
-function clearSignature() {
-  if (!_sigCanvas || !_sigCtx) return;
-  _sigCtx.clearRect(0, 0, _sigCanvas.width, _sigCanvas.height);
-  _sigHasData = false;
-  document.getElementById('sigPlaceholder').style.display = '';
+function clearCrSignature() {
+  if (!_crSigCanvas || !_crSigCtx) return;
+  _crSigCtx.clearRect(0, 0, _crSigCanvas.width, _crSigCanvas.height);
+  _crSigHasData = false;
+  document.getElementById('crSigPlaceholder').style.display = '';
 }
 
-// ─── Submit Kiosk Report ──────────────────────────────────────────────────────
-async function submitKioskReport() {
-  const errEl = document.getElementById('kioskError');
+// ─── Submit ───────────────────────────────────────────────────────────────────
+async function submitCleaningReport() {
+  const errEl = document.getElementById('crFormError');
   errEl.classList.add('d-none');
 
-  const rooms = [..._selectedRooms];
-  if (!rooms.length) { errEl.textContent = 'Please select at least one room.'; errEl.classList.remove('d-none'); return; }
-  if (!document.getElementById('kioskCage').checked)  { errEl.textContent = 'Please confirm inside cage cleaning.'; errEl.classList.remove('d-none'); return; }
-  if (!document.getElementById('kioskTray').checked)  { errEl.textContent = 'Please confirm tray cleaning.'; errEl.classList.remove('d-none'); return; }
-  if (!document.getElementById('kioskFloor').checked) { errEl.textContent = 'Please confirm sweeping, scraping, and mopping.'; errEl.classList.remove('d-none'); return; }
-  if (!document.getElementById('kioskFood').checked)  { errEl.textContent = 'Please confirm food and water check.'; errEl.classList.remove('d-none'); return; }
-  if (!_sigHasData) { errEl.textContent = 'Please sign the form before submitting.'; errEl.classList.remove('d-none'); return; }
+  const reporterName = document.getElementById('crReporterName').value.trim();
+  if (!reporterName)                                    { errEl.textContent = 'Please enter your name.'; errEl.classList.remove('d-none'); return; }
+  if (!_crSelectedRooms.size)                           { errEl.textContent = 'Please select at least one room.'; errEl.classList.remove('d-none'); return; }
+  if (!document.getElementById('crCage').checked)       { errEl.textContent = 'Please confirm inside cage cleaning.'; errEl.classList.remove('d-none'); return; }
+  if (!document.getElementById('crTray').checked)       { errEl.textContent = 'Please confirm tray cleaning.'; errEl.classList.remove('d-none'); return; }
+  if (!document.getElementById('crFloor').checked)      { errEl.textContent = 'Please confirm sweeping, scraping, and mopping.'; errEl.classList.remove('d-none'); return; }
+  if (!document.getElementById('crFood').checked)       { errEl.textContent = 'Please confirm food and water check.'; errEl.classList.remove('d-none'); return; }
+  if (!_crSigHasData)                                   { errEl.textContent = 'Please sign the form before submitting.'; errEl.classList.remove('d-none'); return; }
 
-  const issueText = document.getElementById('kioskIssues').value.trim();
-  const hadIssues = issueText.length > 0 || _issueTagsSelected.size > 0;
-  const sigData   = _sigCanvas.toDataURL('image/png');
+  const issueText = document.getElementById('crIssues').value.trim();
+  const hadIssues = issueText.length > 0 || _crIssueTagsSelected.size > 0;
+  const sigData   = _crSigCanvas.toDataURL('image/png');
 
   try {
     await api('/cleaning-reports', { method: 'POST', body: {
-      rooms_cleaned: rooms,
+      reporter_name: reporterName,
+      rooms_cleaned: [..._crSelectedRooms],
       inside_cage_cleaning: true,
       tray_cleaning: true,
       sweeping_mopping: true,
@@ -2037,57 +2184,56 @@ async function submitKioskReport() {
       issue_description: issueText || null,
       signature_data: sigData
     }});
-    document.getElementById('kioskForm').style.display = 'none';
-    document.getElementById('kioskSuccess').classList.remove('d-none');
+    document.getElementById('crFormWrap').style.display = 'none';
+    document.getElementById('crSuccess').classList.remove('d-none');
+    if (['admin','research'].includes(USER?.role)) loadCrHistory();
   } catch (err) {
     errEl.textContent = err.message;
     errEl.classList.remove('d-none');
   }
 }
 
-function resetKioskForm() {
-  _selectedRooms.clear();
-  _issueTagsSelected.clear();
-  document.getElementById('kioskSuccess').classList.add('d-none');
-  document.getElementById('kioskForm').style.display = '';
-  document.getElementById('kioskIssues').value = '';
-  document.getElementById('kioskError').classList.add('d-none');
+function resetCleaningForm() {
+  _crSelectedRooms.clear();
+  _crIssueTagsSelected.clear();
+  document.getElementById('crSuccess').classList.add('d-none');
+  document.getElementById('crFormWrap').style.display = '';
+  document.getElementById('crIssues').value = '';
+  document.getElementById('crFormError').classList.add('d-none');
+  // Pre-fill name again
+  const nameEl = document.getElementById('crReporterName');
+  if (nameEl) nameEl.value = USER?.full_name || USER?.username || '';
   // Reset room buttons
-  document.querySelectorAll('.room-btn').forEach(b => {
-    b.classList.remove('btn-primary');
-    b.classList.add('btn-outline-secondary');
+  document.querySelectorAll('.cr-room-btn').forEach(b => {
+    b.classList.remove('btn-primary'); b.classList.add('btn-outline-secondary');
   });
   // Reset issue tags
-  document.querySelectorAll('.issue-tag').forEach(b => {
-    b.classList.remove('btn-primary');
-    b.classList.add('btn-outline-secondary');
+  document.querySelectorAll('.cr-issue-tag').forEach(b => {
+    b.classList.remove('btn-primary'); b.classList.add('btn-outline-secondary');
   });
   // Reset checkboxes
-  ['kioskCage','kioskTray','kioskFloor','kioskFood'].forEach(id => {
-    const cb = document.getElementById(id);
-    if (cb) cb.checked = false;
-    const boxId = id + 'Box';
-    const box = document.getElementById(boxId);
+  ['crCage','crTray','crFloor','crFood'].forEach(id => {
+    const cb = document.getElementById(id); if (cb) cb.checked = false;
+    const box = document.getElementById(id + 'Box');
     if (box) { box.style.borderColor = '#dee2e6'; box.style.background = '#f8f9fa'; }
     const checkEl = document.getElementById(id + 'Check');
     if (checkEl) { checkEl.style.background = '#fff'; checkEl.style.borderColor = '#adb5bd'; checkEl.innerHTML = ''; }
   });
-  clearSignature();
-  // Re-init sig pad after a tick so canvas dimensions are correct
-  setTimeout(initSignaturePad, 50);
+  clearCrSignature();
+  setTimeout(initCrSigPad, 50);
 }
 
-// ─── Cleaning Reports Admin Page ──────────────────────────────────────────────
-async function loadCleaningReports() {
+// ─── Report History (admin/research) ─────────────────────────────────────────
+async function loadCrHistory() {
   try {
-    // Populate room filter
     const rooms = await api('/rooms');
     const filterEl = document.getElementById('crRoomFilter');
-    const currentVal = filterEl.value;
-    filterEl.innerHTML = '<option value="">All Rooms</option>' +
-      rooms.map(r => `<option value="${r}" ${currentVal == r ? 'selected' : ''}>Room ${r}</option>`).join('');
-
-    const room = filterEl.value || '';
+    if (filterEl) {
+      const currentVal = filterEl.value;
+      filterEl.innerHTML = '<option value="">All Rooms</option>' +
+        rooms.map(r => `<option value="${r}" ${currentVal == r ? 'selected' : ''}>Room ${r}</option>`).join('');
+    }
+    const room = filterEl?.value || '';
     const reports = await api('/cleaning-reports' + (room ? `?room=${room}` : ''));
     const tbody = document.getElementById('crTable');
     if (!reports.length) {
@@ -2118,7 +2264,7 @@ async function viewCleaningReport(id) {
     const check = v => v ? '<span class="badge bg-success">✓ Done</span>' : '<span class="badge bg-danger">✗ Not done</span>';
     document.getElementById('crDetailBody').innerHTML = `
       <div class="row g-3">
-        <div class="col-md-6"><strong>Cleaner:</strong> ${r.reported_by_name}</div>
+        <div class="col-md-6"><strong>Name:</strong> ${r.reported_by_name}</div>
         <div class="col-md-6"><strong>Submitted:</strong> ${fmtDT(r.submitted_at)}</div>
         <div class="col-12"><strong>Rooms:</strong> ${r.rooms_cleaned.split(',').map(n => `<span class="badge bg-secondary me-1">Room ${n}</span>`).join('')}</div>
         <div class="col-md-6"><strong>Inside Cage Cleaning:</strong> ${check(r.inside_cage_cleaning)}</div>
@@ -2140,6 +2286,7 @@ async function viewCleaningReport(id) {
     new bootstrap.Modal(document.getElementById('crDetailModal')).show();
   } catch (err) { alert(err.message); }
 }
+
 </script>
 </body>
 </html>

@@ -745,14 +745,12 @@ app.get('/api/rooms', authenticate, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Submit a cleaning report (cleaner role only, or admin)
+// Submit a cleaning report (any authenticated user)
 app.post('/api/cleaning-reports', authenticate, async (req, res) => {
-  if (!['admin', 'cleaner'].includes(req.user.role))
-    return res.status(403).json({ error: 'Only cleaner or admin can submit cleaning reports' });
   const {
     rooms_cleaned, inside_cage_cleaning, tray_cleaning,
     sweeping_mopping, food_water_check, had_issues,
-    issue_description, signature_data
+    issue_description, signature_data, reporter_name
   } = req.body;
   if (!rooms_cleaned || !rooms_cleaned.length)
     return res.status(400).json({ error: 'At least one room must be selected' });
@@ -760,6 +758,8 @@ app.post('/api/cleaning-reports', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'All required checkboxes must be confirmed' });
   if (!signature_data)
     return res.status(400).json({ error: 'Signature is required' });
+  const displayName = reporter_name?.trim() || req.user.full_name || req.user.username;
+  if (!displayName) return res.status(400).json({ error: 'Name is required' });
   try {
     const roomStr = Array.isArray(rooms_cleaned) ? rooms_cleaned.join(',') : rooms_cleaned;
     const [r] = await pool.query(
@@ -768,13 +768,13 @@ app.post('/api/cleaning-reports', authenticate, async (req, res) => {
          inside_cage_cleaning, tray_cleaning, sweeping_mopping, food_water_check,
          had_issues, issue_description, signature_data)
        VALUES (?,?,?,?,?,?,?,?,?,?)`,
-      [req.user.user_id, req.user.full_name || req.user.username, roomStr,
+      [req.user.user_id, displayName, roomStr,
        inside_cage_cleaning ? 1 : 0, tray_cleaning ? 1 : 0,
        sweeping_mopping ? 1 : 0, food_water_check ? 1 : 0,
        had_issues ? 1 : 0, issue_description || null, signature_data]
     );
     await log_activity(req.user.user_id, 'CLEANING_REPORT', 'room_cleaning_report', r.insertId,
-      `Room(s) ${roomStr} cleaned by ${req.user.full_name || req.user.username}`);
+      `Room(s) ${roomStr} cleaned by ${displayName}`);
     res.json({ id: r.insertId, message: 'Cleaning report submitted' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
