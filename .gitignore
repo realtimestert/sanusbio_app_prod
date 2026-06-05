@@ -10,4 +10,3 @@
 backups/
 node_modules/
 dist/
-backup.sh
