@@ -1,4 +1,4 @@
-<!-- SanusBio v1.0.2 | 2026-05-12 -->
+<!-- SanusBio v1.1.0 | 2026-06-05 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -406,7 +406,7 @@
 <!-- placeholder so kiosk references don't break during transition -->
 <div id="cleanerKiosk" style="display:none;">
   <div style="background:var(--brand); padding:1rem 1.5rem; display:flex; align-items:center; justify-content:space-between;">
-    <div style="color:#bfac1c68; font-size:1.1rem; font-weight:700;">🐾 SanusBio &mdash; Room Cleaning Report</div>
+    <div style="color:#fff; font-size:1.1rem; font-weight:700;">🐾 SanusBio &mdash; Room Cleaning Report</div>
     <div style="display:flex; align-items:center; gap:1rem;">
       <div id="kioskUserInfo" style="color:rgba(255,255,255,.8); font-size:.9rem;"></div>
       <button class="btn btn-sm btn-outline-light" onclick="doLogout()"><i class="bi bi-box-arrow-right me-1"></i>Sign Out</button>
@@ -576,7 +576,7 @@
           <div class="col-md-6" id="fSpayDateRow" style="display:none"><label class="form-label">Procedure Date</label><input id="fSpayDate" type="date" class="form-control"></div>
           <div class="col-md-6"><label class="form-label">Mother Name</label><input id="fMother" class="form-control"></div>
           <div class="col-md-6"><label class="form-label">Father Name</label><input id="fFather" class="form-control"></div>
-          <div class="col-md-6"><label class="form-label">Next Rabies Vaccine</label><input id="fVaccine" type="date" class="form-control"></div>
+          <div class="col-md-6"><label class="form-label">Next Rabies Vaccine</label><input id="fVaccine" type="date" class="form-control"><div class="form-text">Leave blank — set after first vaccination is recorded.</div></div>
           <div class="col-md-6"><label class="form-label">Acquired By</label><input id="fAcqBy" class="form-control"></div>
           <div class="col-12"><label class="form-label">Description</label><input id="fDesc" class="form-control"></div>
           <div class="col-md-6"><label class="form-label">Location (optional)</label>
@@ -643,6 +643,8 @@
         <div class="mb-2"><label class="form-label">Vaccination Date</label><input id="vDate" type="date" class="form-control"></div>
         <div class="mb-2"><label class="form-label">Expiration Date</label><input id="vExpiry" type="date" class="form-control"></div>
         <div class="mb-2" id="vNextRabiesRow"><label class="form-label">Next Rabies Vaccine Due</label><input id="vNextRabies" type="date" class="form-control"></div>
+        <div class="mb-2"><label class="form-label">Administered By <span class="text-danger">*</span></label>
+          <input id="vAdministeredBy" class="form-control" placeholder="Veterinarian or technician name"></div>
         <div class="mb-2"><label class="form-label">Notes</label><textarea id="vNotes" class="form-control" rows="2"></textarea></div>
       </div>
       <div class="modal-footer">
@@ -824,6 +826,38 @@
       <div class="modal-footer">
         <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button class="btn btn-primary" onclick="submitUser()">Save User</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RFID Modal -->
+<div class="modal fade" id="rfidModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Assign RFID Chip</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="rfidFerretId">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">RFID Value <span class="text-danger">*</span></label>
+          <input id="rfidValue" class="form-control font-monospace" placeholder="e.g. 0A1B2C3D4E">
+          <div class="form-text">Scan the chip or enter the code manually. If this chip is currently assigned to another ferret, it will be automatically unassigned from that ferret.</div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label fw-semibold">Reason</label>
+          <select id="rfidReason" class="form-select">
+            <option value="">— Optional —</option>
+            <option value="new_chip">New chip</option>
+            <option value="replacement">Replacement (lost/damaged)</option>
+            <option value="reuse">Reuse from deceased ferret</option>
+          </select>
+        </div>
+        <div class="mb-2"><label class="form-label fw-semibold">Notes</label>
+          <input id="rfidNotes" class="form-control" placeholder="Optional notes"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" onclick="submitRfid()">Assign Chip</button>
       </div>
     </div>
   </div>
@@ -1078,6 +1112,7 @@ function renderFerretGrid() {
               ${sexIcon(f.sex)}
               ${f.dead === '1' ? `<span class="badge bg-danger badge-pill small">Deceased</span>` : ''}
               ${vaccDue ? `<span class="badge bg-warning text-dark badge-pill small">Vaccine Due</span>` : ''}
+              ${f.eight_hour_light ? `<span class="badge bg-info text-dark badge-pill small">💡 8hr Light</span>` : ''}
             </div>
           </div>
         </div>
@@ -1139,6 +1174,43 @@ async function loadFerretDetail(id) {
         </div>
       </div>
 
+      <!-- RFID + 8-Hour Light row -->
+      <div class="row g-3 mb-3" id="rfidLightRow">
+        <div class="col-md-6">
+          <div class="card p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <span class="fw-semibold"><i class="bi bi-broadcast me-1 text-primary"></i>RFID Chip</span>
+              ${canUpdate() ? `<button class="btn btn-sm btn-outline-primary" onclick="openRfidModal(${id})"><i class="bi bi-pencil me-1"></i>Assign</button>` : ''}
+            </div>
+            <div id="rfidDisplay">
+              <div class="text-center text-muted py-2 small">
+                <div class="spinner-border spinner-border-sm" role="status"></div> Loading…
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between">
+              <div>
+                <span class="fw-semibold"><i class="bi bi-lightbulb me-1 text-warning"></i>8-Hour Light Schedule</span>
+                <div class="text-muted small mt-1">Ferret is on an 8-hour light cycle</div>
+              </div>
+              ${canUpdate() ? `
+              <div class="form-check form-switch ms-3">
+                <input class="form-check-input" type="checkbox" id="eightHourLightToggle"
+                  ${f.eight_hour_light ? 'checked' : ''}
+                  onchange="toggleEightHourLight(${id}, this.checked)"
+                  style="width:2.5em;height:1.4em;cursor:pointer;">
+              </div>` : `
+              <span class="badge ${f.eight_hour_light ? 'bg-warning text-dark' : 'bg-secondary'}">
+                ${f.eight_hour_light ? 'On' : 'Off'}
+              </span>`}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <ul class="nav nav-tabs mb-3" role="tablist">
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tHealth">Health Events</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tVacc">Vaccinations</button></li>
@@ -1180,15 +1252,16 @@ async function loadFerretDetail(id) {
             ${isMat ? `<button class="btn btn-sm btn-primary ms-auto" onclick="openVaccModal(${id})"><i class="bi bi-plus-lg me-1"></i>Record Vaccination</button>` : ''}
           </div>
           <table class="table table-sm">
-            <thead><tr><th>Date</th><th>Type</th><th>Expires</th><th>Notes</th><th>By</th></tr></thead>
+            <thead><tr><th>Date</th><th>Type</th><th>Expires</th><th>Administered By</th><th>Notes</th><th>Recorded By</th></tr></thead>
             <tbody>${vacc.length ? vacc.map(v => `
               <tr>
                 <td>${fmtDate(v.vaccination_date)}</td>
                 <td>${v.vaccine_type}</td>
                 <td>${fmtDate(v.expiration_date)}</td>
+                <td><strong>${v.administered_by || '—'}</strong></td>
                 <td>${v.notes || '—'}</td>
                 <td class="text-muted">${v.recorded_by || '—'}</td>
-              </tr>`).join('') : '<tr><td colspan="5" class="text-muted text-center py-3">No vaccinations</td></tr>'}
+              </tr>`).join('') : '<tr><td colspan="6" class="text-muted text-center py-3">No vaccinations</td></tr>'}
             </tbody>
           </table>
         </div>
@@ -1282,6 +1355,9 @@ async function loadFerretDetail(id) {
         options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false } } }
       });
     }
+
+    // Load RFID
+    loadRfidDisplay(id);
   } catch (err) { el.innerHTML = `<div class="alert alert-danger">${err.message}</div>`; }
 }
 
@@ -1297,6 +1373,90 @@ function historyMeta(action) {
     LOGIN:        { icon: '🔑', color: 'secondary' },
   };
   return map[action] || { icon: '•', color: 'secondary' };
+}
+
+// ─── RFID ─────────────────────────────────────────────────────────────────────
+async function loadRfidDisplay(ferretId) {
+  const el = document.getElementById('rfidDisplay');
+  if (!el) return;
+  try {
+    const rfids = await api(`/ferrets/${ferretId}/rfid`);
+    const active = rfids.find(r => !r.unassigned_date);
+    const history = rfids.filter(r => r.unassigned_date);
+    if (!active && !history.length) {
+      el.innerHTML = '<div class="text-muted small text-center py-2">No RFID chip assigned</div>';
+      return;
+    }
+    el.innerHTML = `
+      ${active ? `
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span class="badge bg-success">Active</span>
+          <code class="fs-6 fw-bold">${active.rfid}</code>
+          ${canUpdate() ? `<button class="btn btn-sm btn-outline-danger ms-auto" onclick="unassignRfid(${ferretId})"><i class="bi bi-x-circle me-1"></i>Unassign</button>` : ''}
+        </div>
+        <div class="text-muted small">Assigned ${fmtDate(active.assigned_date)}${active.reason ? ' · ' + active.reason : ''}${active.notes ? '<br>' + active.notes : ''}</div>
+      ` : '<div class="text-muted small mb-2">No active chip</div>'}
+      ${history.length ? `
+        <details class="mt-2">
+          <summary class="text-muted small" style="cursor:pointer">History (${history.length})</summary>
+          <table class="table table-sm mt-1 mb-0">
+            <thead><tr><th>RFID</th><th>Assigned</th><th>Unassigned</th><th>Reason</th></tr></thead>
+            <tbody>${history.map(r => `
+              <tr class="text-muted small">
+                <td><code>${r.rfid}</code></td>
+                <td>${fmtDate(r.assigned_date)}</td>
+                <td>${fmtDate(r.unassigned_date)}</td>
+                <td>${r.reason || '—'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </details>` : ''}`;
+  } catch (err) {
+    el.innerHTML = '<div class="text-danger small">Failed to load RFID data</div>';
+  }
+}
+
+function openRfidModal(ferretId) {
+  document.getElementById('rfidFerretId').value = ferretId;
+  document.getElementById('rfidValue').value = '';
+  document.getElementById('rfidReason').value = '';
+  document.getElementById('rfidNotes').value = '';
+  new bootstrap.Modal(document.getElementById('rfidModal')).show();
+}
+
+async function submitRfid() {
+  const ferretId = document.getElementById('rfidFerretId').value;
+  const rfid = document.getElementById('rfidValue').value.trim();
+  if (!rfid) return alert('Please enter an RFID value.');
+  try {
+    await api(`/ferrets/${ferretId}/rfid`, { method: 'POST', body: {
+      rfid,
+      reason: document.getElementById('rfidReason').value || null,
+      notes: document.getElementById('rfidNotes').value || null
+    }});
+    bootstrap.Modal.getInstance(document.getElementById('rfidModal')).hide();
+    loadRfidDisplay(ferretId);
+  } catch (err) { alert(err.message); }
+}
+
+async function unassignRfid(ferretId) {
+  if (!confirm('Unassign the active RFID chip from this ferret?')) return;
+  try {
+    await api(`/ferrets/${ferretId}/rfid/unassign`, { method: 'PUT', body: { reason: 'manual_unassign' } });
+    loadRfidDisplay(ferretId);
+  } catch (err) { alert(err.message); }
+}
+
+// ─── 8-Hour Light Toggle ──────────────────────────────────────────────────────
+async function toggleEightHourLight(ferretId, enabled) {
+  try {
+    await api(`/ferrets/${ferretId}`, { method: 'PUT', body: { eight_hour_light: enabled ? 1 : 0 } });
+  } catch (err) {
+    alert(err.message);
+    // Revert the toggle visually on failure
+    const toggle = document.getElementById('eightHourLightToggle');
+    if (toggle) toggle.checked = !enabled;
+  }
 }
 
 // ─── Photo ────────────────────────────────────────────────────────────────────
@@ -1449,6 +1609,7 @@ function openVaccModal(ferretId) {
   document.getElementById('vExpiry').value = '';
   document.getElementById('vNextRabies').value = '';
   document.getElementById('vNotes').value = '';
+  document.getElementById('vAdministeredBy').value = '';
   document.getElementById('vType').value = 'rabies';
   toggleRabiesDue();
   new bootstrap.Modal(document.getElementById('vaccModal')).show();
@@ -1456,6 +1617,8 @@ function openVaccModal(ferretId) {
 
 async function submitVaccination() {
   const ferret_id = document.getElementById('vFerretId').value;
+  const administered_by = document.getElementById('vAdministeredBy').value.trim();
+  if (!administered_by) return alert('Please enter who administered the vaccination.');
   try {
     await api('/vaccinations', { method:'POST', body: {
       ferret_id: parseInt(ferret_id),
@@ -1463,6 +1626,7 @@ async function submitVaccination() {
       vaccination_date: document.getElementById('vDate').value,
       expiration_date: document.getElementById('vExpiry').value || null,
       next_rabies_due: document.getElementById('vNextRabies').value || null,
+      administered_by,
       notes: document.getElementById('vNotes').value
     }});
     bootstrap.Modal.getInstance(document.getElementById('vaccModal')).hide();

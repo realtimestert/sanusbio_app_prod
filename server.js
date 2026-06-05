@@ -1,4 +1,4 @@
-// SanusBio v1.0.2 | 2026-05-12
+// SanusBio v1.1.0 | 2026-06-05
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -149,7 +149,7 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
       SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
              f.birth_date, f.weight, f.dead, f.description, f.litter_id,
              f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
-             f.next_rabies_vaccine_due, f.sex,
+             f.next_rabies_vaccine_due, f.sex, f.eight_hour_light,
              a.cage_address, a.room_id,
              s.supplier_name
       FROM ferret_qr005 f
@@ -249,7 +249,7 @@ app.post('/api/ferrets', authenticate, async (req, res) => {
 
 // Update ferret
 app.put('/api/ferrets/:id', authenticate, require_perm('update'), async (req, res) => {
-  const allowed = ['ferret_name', 'weight', 'description', 'dead', 'next_rabies_vaccine_due', 'photo_url', 'acquisition_by', 'sex'];
+  const allowed = ['ferret_name', 'weight', 'description', 'dead', 'next_rabies_vaccine_due', 'photo_url', 'acquisition_by', 'sex', 'eight_hour_light'];
   const sets = [], vals = [];
   for (const key of allowed) {
     if (req.body[key] !== undefined) { sets.push(`${key} = ?`); vals.push(req.body[key]); }
@@ -367,13 +367,13 @@ app.get('/api/ferrets/:id/vaccinations', authenticate, require_perm('read'), asy
 app.post('/api/vaccinations', authenticate, async (req, res) => {
   if (!['admin', 'maternity', 'research'].includes(req.user.role))
     return res.status(403).json({ error: 'Only admin, research, and maternity can record vaccinations' });
-  const { ferret_id, vaccine_type, vaccination_date, expiration_date, notes, next_rabies_due } = req.body;
+  const { ferret_id, vaccine_type, vaccination_date, expiration_date, notes, next_rabies_due, administered_by } = req.body;
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
     const [r] = await conn.query(
-      'INSERT INTO vaccination_event (ferret_id, vaccine_type, vaccination_date, expiration_date, notes, recorded_by) VALUES (?,?,?,?,?,?)',
-      [ferret_id, vaccine_type, vaccination_date, expiration_date || null, notes || null, req.user.username]
+      'INSERT INTO vaccination_event (ferret_id, vaccine_type, vaccination_date, expiration_date, notes, recorded_by, administered_by) VALUES (?,?,?,?,?,?,?)',
+      [ferret_id, vaccine_type, vaccination_date, expiration_date || null, notes || null, req.user.username, administered_by || null]
     );
     if (vaccine_type === 'rabies' && next_rabies_due) {
       await conn.query('UPDATE ferret_qr005 SET next_rabies_vaccine_due = ? WHERE Ferret_QR005_id = ?', [next_rabies_due, ferret_id]);
@@ -733,6 +733,71 @@ app.listen(PORT, () => {
   console.log(`\n🐾 SanusBio running → http://localhost:${PORT}`);
   console.log(`   Roles: admin > research > maternity > caretaker > cleaner\n`);
 });
+// ─── RFID ─────────────────────────────────────────────────────────────────────
+
+// Get active RFID for a ferret (unassigned_date IS NULL)
+app.get('/api/ferrets/:id/rfid', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT * FROM rfid_assignment WHERE ferret_id = ? ORDER BY assigned_date DESC',
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Assign a new RFID chip to a ferret (unassigns any currently active chip first)
+app.post('/api/ferrets/:id/rfid', authenticate, require_perm('update'), async (req, res) => {
+  const { rfid, reason, notes } = req.body;
+  if (!rfid || !rfid.trim()) return res.status(400).json({ error: 'rfid value is required' });
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    // Unassign any chip currently active on this ferret
+    await conn.query(
+      `UPDATE rfid_assignment SET unassigned_date = CURDATE()
+       WHERE ferret_id = ? AND unassigned_date IS NULL`,
+      [req.params.id]
+    );
+    // Also unassign this chip from any other ferret it may still be assigned to
+    // (handles reuse after a ferret dies without explicitly unassigning)
+    await conn.query(
+      `UPDATE rfid_assignment SET unassigned_date = CURDATE()
+       WHERE rfid = ? AND unassigned_date IS NULL AND ferret_id != ?`,
+      [rfid.trim(), req.params.id]
+    );
+    // Assign to this ferret
+    const [r] = await conn.query(
+      `INSERT INTO rfid_assignment (rfid, ferret_id, assigned_date, reason, notes)
+       VALUES (?, ?, CURDATE(), ?, ?)`,
+      [rfid.trim(), req.params.id, reason || null, notes || null]
+    );
+    await conn.commit();
+    await log_activity(req.user.user_id, 'RFID_ASSIGN', 'rfid_assignment', req.params.id,
+      `RFID ${rfid.trim()} assigned to ferret #${req.params.id}`);
+    res.json({ id: r.insertId, message: 'RFID assigned' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
+});
+
+// Unassign the active RFID chip from a ferret
+app.put('/api/ferrets/:id/rfid/unassign', authenticate, require_perm('update'), async (req, res) => {
+  const { reason } = req.body;
+  try {
+    const [result] = await pool.query(
+      `UPDATE rfid_assignment SET unassigned_date = CURDATE(), reason = COALESCE(?, reason)
+       WHERE ferret_id = ? AND unassigned_date IS NULL`,
+      [reason || null, req.params.id]
+    );
+    if (!result.affectedRows) return res.status(404).json({ error: 'No active RFID found for this ferret' });
+    await log_activity(req.user.user_id, 'RFID_UNASSIGN', 'rfid_assignment', req.params.id,
+      `RFID unassigned from ferret #${req.params.id}`);
+    res.json({ message: 'RFID unassigned' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ─── Cleaning Reports ─────────────────────────────────────────────────────────
 
 // Get distinct rooms from address table (for the cleaner form dropdown)
