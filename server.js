@@ -149,7 +149,10 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
       SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
              f.birth_date, f.weight, f.dead, f.description, f.litter_id,
              f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
-             f.next_rabies_vaccine_due, f.sex, f.eight_hour_light,
+             f.next_rabies_vaccine_due, f.sex,
+             IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ferret_qr005'
+               AND COLUMN_NAME = 'eight_hour_light'), f.eight_hour_light, 0) AS eight_hour_light,
              a.cage_address, a.room_id,
              s.supplier_name
       FROM ferret_qr005 f
