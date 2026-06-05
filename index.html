@@ -1,4 +1,4 @@
-<!-- SanusBio v1.1.0 | 2026-06-05 -->
+<!-- SanusBio v1.1.0 | 2026-06-04 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -242,7 +242,7 @@
                 <label class="fw-bold fs-6 d-block mb-1">
                   <span class="text-danger me-1">●</span>Your Name
                 </label>
-                <p class="text-muted small mb-2">Enter your name so the report can be attributed to you.</p>
+                <p class="text-muted small mb-2">Enter your full name so the report can be attributed to you.</p>
                 <input id="crReporterName" class="form-control form-control-lg" placeholder="First and last name" style="max-width:400px;">
               </div>
 
@@ -1137,6 +1137,7 @@ async function loadFerretDetail(id) {
     ]);
     const isAdmin = roleIs('admin');
     const isMat   = roleIs('admin','maternity');
+    const canEdit = roleIs('admin','research');
     el.innerHTML = `
       <div class="row g-3 mb-3">
         <div class="col-md-3">
@@ -1156,7 +1157,18 @@ async function loadFerretDetail(id) {
           </div>
           <div class="text-muted mb-2">Animal ID: ${f.animal_id || '—'}</div>
           <div class="row g-2 small">
-            <div class="col-6 col-md-4"><span class="text-muted">Birth Date</span><br><strong>${fmtDate(f.birth_date)}</strong></div>
+            <div class="col-6 col-md-4"><span class="text-muted">Birth Date</span><br>
+              ${canEdit
+                ? `<div class="d-flex align-items-center gap-2 mt-1">
+                    <input type="date" id="editBirthDate" class="form-control form-control-sm"
+                      value="${f.birth_date ? String(f.birth_date).slice(0,10) : ''}"
+                      style="max-width:160px">
+                    <button class="btn btn-sm btn-outline-primary" onclick="saveBirthDate(${id})">
+                      <i class="bi bi-check2"></i> Save
+                    </button>
+                   </div>`
+                : `<strong>${fmtDate(f.birth_date)}</strong>`}
+            </div>
             <div class="col-6 col-md-4"><span class="text-muted">Sex</span><br><strong>${f.sex ? f.sex.charAt(0).toUpperCase()+f.sex.slice(1) : '—'}</strong></div>
             <div class="col-6 col-md-4"><span class="text-muted">Weight</span><br><strong>${f.weight ? f.weight+' g' : '—'}</strong></div>
             <div class="col-6 col-md-4"><span class="text-muted">Location</span><br>
@@ -1492,6 +1504,15 @@ async function submitPhoto() {
 }
 
 // ─── Ferret Actions ───────────────────────────────────────────────────────────
+async function saveBirthDate(id) {
+  const val = document.getElementById('editBirthDate').value;
+  if (!val) return alert('Please enter a valid date.');
+  try {
+    await api(`/ferrets/${id}`, { method: 'PUT', body: { birth_date: val } });
+    loadFerretDetail(id);
+  } catch (err) { alert(err.message); }
+}
+
 async function toggleDead(id, current) {
   try { await api(`/ferrets/${id}`, { method:'PUT', body:{ dead: current==='1'?'0':'1' } }); loadFerretDetail(id); }
   catch (err) { alert(err.message); }

@@ -1,4 +1,4 @@
-// SanusBio v1.1.0 | 2026-06-05
+// SanusBio v1.1.0 | 2026-06-04
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -145,22 +145,36 @@ app.get('/api/dashboard', authenticate, require_perm('read'), async (req, res) =
 app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => {
   try {
     const q = req.query.search ? `%${req.query.search}%` : '%';
-    const [rows] = await pool.query(`
-      SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
-             f.birth_date, f.weight, f.dead, f.description, f.litter_id,
-             f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
-             f.next_rabies_vaccine_due, f.sex,
-             IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS
-               WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ferret_qr005'
-               AND COLUMN_NAME = 'eight_hour_light'), f.eight_hour_light, 0) AS eight_hour_light,
-             a.cage_address, a.room_id,
-             s.supplier_name
-      FROM ferret_qr005 f
-      LEFT JOIN address  a ON f.address_id  = a.address_id
-      LEFT JOIN supplier s ON f.supplier_id = s.supplier_id
-      WHERE f.ferret_name LIKE ? OR f.animal_id LIKE ?
-      ORDER BY f.ferret_name
-    `, [q, q]);
+    let rows;
+    try {
+      [rows] = await pool.query(`
+        SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
+               f.birth_date, f.weight, f.dead, f.description, f.litter_id,
+               f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
+               f.next_rabies_vaccine_due, f.sex, f.eight_hour_light,
+               a.cage_address, a.room_id,
+               s.supplier_name
+        FROM ferret_qr005 f
+        LEFT JOIN address  a ON f.address_id  = a.address_id
+        LEFT JOIN supplier s ON f.supplier_id = s.supplier_id
+        WHERE f.ferret_name LIKE ? OR f.animal_id LIKE ?
+        ORDER BY f.ferret_name
+      `, [q, q]);
+    } catch {
+      [rows] = await pool.query(`
+        SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
+               f.birth_date, f.weight, f.dead, f.description, f.litter_id,
+               f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
+               f.next_rabies_vaccine_due, f.sex, 0 AS eight_hour_light,
+               a.cage_address, a.room_id,
+               s.supplier_name
+        FROM ferret_qr005 f
+        LEFT JOIN address  a ON f.address_id  = a.address_id
+        LEFT JOIN supplier s ON f.supplier_id = s.supplier_id
+        WHERE f.ferret_name LIKE ? OR f.animal_id LIKE ?
+        ORDER BY f.ferret_name
+      `, [q, q]);
+    }
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -252,10 +266,15 @@ app.post('/api/ferrets', authenticate, async (req, res) => {
 
 // Update ferret
 app.put('/api/ferrets/:id', authenticate, require_perm('update'), async (req, res) => {
-  const allowed = ['ferret_name', 'weight', 'description', 'dead', 'next_rabies_vaccine_due', 'photo_url', 'acquisition_by', 'sex', 'eight_hour_light'];
+  const allowed = ['ferret_name', 'weight', 'description', 'dead', 'next_rabies_vaccine_due', 'photo_url', 'acquisition_by', 'sex', 'birth_date'];
   const sets = [], vals = [];
   for (const key of allowed) {
     if (req.body[key] !== undefined) { sets.push(`${key} = ?`); vals.push(req.body[key]); }
+  }
+  // eight_hour_light added in migration 04 — include only if present in request
+  if (req.body.eight_hour_light !== undefined) {
+    sets.push('eight_hour_light = ?');
+    vals.push(req.body.eight_hour_light ? 1 : 0);
   }
   if (!sets.length) return res.status(400).json({ error: 'No valid fields provided' });
   vals.push(req.params.id);
