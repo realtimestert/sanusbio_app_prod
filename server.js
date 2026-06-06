@@ -1,4 +1,4 @@
-// SanusBio v1.1.0 | 2026-06-04
+// SanusBio v1.3.0 | 2026-06-06
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -53,11 +53,11 @@ const pool = mysql.createPool({
 
 // ─── Role Permission Map ──────────────────────────────────────────────────────
 const PERMS = {
-  admin:     new Set(['read', 'write', 'update', 'delete', 'manage_users']),
-  research:  new Set(['read', 'write', 'update', 'delete']),
+  admin: new Set(['read', 'write', 'update', 'delete', 'manage_users']),
+  research: new Set(['read', 'write', 'update', 'delete']),
   maternity: new Set(['read', 'write', 'update']),
   caretaker: new Set(['read', 'write']),
-  cleaner:   new Set(['cleaning_report'])
+  cleaner: new Set(['cleaning_report'])
 };
 
 function can(role, action) { return PERMS[role]?.has(action) ?? false; }
@@ -100,6 +100,19 @@ async function log_activity(user_id, action, table_name = null, record_id = null
   } catch { /* non-fatal */ }
 }
 
+// ─── Address Label Helper ────────────────────────────────────────────────────
+function fmt_address(a) {
+  // a: { room_id, room_name, cage_address, room_lighting }
+  // room_lighting stores position: Top / Middle / Bottom
+  let label = `Room ${a.room_id || '?'}`;
+  if (a.room_name) label += ` ${a.room_name}`;
+  if (a.cage_address && a.cage_address !== 'N/A') {
+    label += ` · Cage ${a.cage_address}`;
+    if (a.room_lighting) label += ` ${a.room_lighting}`;
+  }
+  return label;
+}
+
 // ─── Serve Frontend ───────────────────────────────────────────────────────────
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
@@ -128,9 +141,9 @@ app.get('/api/me', authenticate, (req, res) => res.json(req.user));
 // ─── Dashboard Stats ──────────────────────────────────────────────────────────
 app.get('/api/dashboard', authenticate, require_perm('read'), async (req, res) => {
   try {
-    const [[{ total }]]     = await pool.query("SELECT COUNT(*) as total FROM ferret_qr005 WHERE dead='0' OR dead IS NULL");
-    const [[{ overdue }]]   = await pool.query("SELECT COUNT(*) as overdue FROM assignments WHERE completed=0 AND due_date < CURDATE()");
-    const [[{ vacc_due }]]  = await pool.query("SELECT COUNT(*) as vacc_due FROM ferret_qr005 WHERE next_rabies_vaccine_due <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND (dead='0' OR dead IS NULL)");
+    const [[{ total }]] = await pool.query("SELECT COUNT(*) as total FROM ferret_qr005 WHERE dead='0' OR dead IS NULL");
+    const [[{ overdue }]] = await pool.query("SELECT COUNT(*) as overdue FROM assignments WHERE completed=0 AND due_date < CURDATE()");
+    const [[{ vacc_due }]] = await pool.query("SELECT COUNT(*) as vacc_due FROM ferret_qr005 WHERE next_rabies_vaccine_due <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND (dead='0' OR dead IS NULL)");
     const [[{ litters_this_month }]] = await pool.query("SELECT COUNT(*) as litters_this_month FROM litter_log WHERE litter_date >= DATE_FORMAT(CURDATE(),'%Y-%m-01')");
     const [recent_activity] = await pool.query(`
       SELECT al.action, al.details, al.created_at, u.username
@@ -307,8 +320,12 @@ app.put('/api/ferrets/:id/location', authenticate, async (req, res) => {
   const { address_id } = req.body;
   if (!address_id) return res.status(400).json({ error: 'address_id required' });
   try {
+    const [[ferret]] = await pool.query('SELECT ferret_name FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]);
+    const [[addr]] = await pool.query('SELECT room_id, room_name, cage_address, room_lighting FROM address WHERE address_id = ?', [address_id]);
     await pool.query('UPDATE ferret_qr005 SET address_id = ? WHERE Ferret_QR005_id = ?', [address_id, req.params.id]);
-    await log_activity(req.user.user_id, 'MOVE', 'ferret_qr005', req.params.id, `Moved ferret #${req.params.id} to address #${address_id}`);
+    const ferretLabel = ferret?.ferret_name || `#${req.params.id}`;
+    const addressLabel = addr ? fmt_address(addr) : `address #${address_id}`;
+    await log_activity(req.user.user_id, 'MOVE', 'ferret_qr005', req.params.id, `Moved ${ferretLabel} to ${addressLabel}`);
     res.json({ message: 'Location updated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -481,8 +498,8 @@ app.post('/api/litters', authenticate, async (req, res) => {
         father, mother, anomalies_and_notes, created, created_by)
        VALUES (?,?,?,?,?,?,?,?,CURDATE(),?)`,
       [Ferret_QR005_id, litter_id || null, litter_date, kit_count || null,
-       stillborn || null, father || null, mother || null,
-       anomalies_and_notes || null, req.user.username]
+        stillborn || null, father || null, mother || null,
+        anomalies_and_notes || null, req.user.username]
     );
     await log_activity(req.user.user_id, 'CREATE', 'litter_log', Ferret_QR005_id, `Litter recorded for ferret #${Ferret_QR005_id} — ${kit_count || 0} kits`);
     res.json({ id: r.insertId, message: 'Litter recorded' });
@@ -491,7 +508,7 @@ app.post('/api/litters', authenticate, async (req, res) => {
 
 // Update litter
 app.put('/api/litters/:id', authenticate, require_perm('update'), async (req, res) => {
-  const allowed = ['litter_id','litter_date','kit_count','stillborn','infant_deaths','surviving_litter_count','father','mother','anomalies_and_notes'];
+  const allowed = ['litter_id', 'litter_date', 'kit_count', 'stillborn', 'infant_deaths', 'surviving_litter_count', 'father', 'mother', 'anomalies_and_notes'];
   const sets = [], vals = [];
   for (const key of allowed) {
     if (req.body[key] !== undefined) { sets.push(`${key} = ?`); vals.push(req.body[key]); }
@@ -629,7 +646,7 @@ app.post('/api/suppliers', authenticate, admin_or_research, async (req, res) => 
     const [r] = await pool.query(
       'INSERT INTO supplier (supplier_name, contact_info, supplier_address, supplier_phone_number) VALUES (?,?,?,?)',
       [supplier_name, contact_info || null, supplier_address || null,
-       supplier_phone_number ? supplier_phone_number.toString().replace(/\D/g, '').substring(0, 15) : null]
+        supplier_phone_number ? supplier_phone_number.toString().replace(/\D/g, '').substring(0, 15) : null]
     );
     await log_activity(req.user.user_id, 'CREATE', 'supplier', r.insertId, `Added supplier: ${supplier_name}`);
     res.json({ id: r.insertId, message: 'Supplier added' });
@@ -663,18 +680,22 @@ app.delete('/api/suppliers/:id', authenticate, admin_only, async (req, res) => {
 // ─── Addresses ────────────────────────────────────────────────────────────────
 app.get('/api/addresses', authenticate, require_perm('read'), async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM address ORDER BY room_id, cage_address');
+    const [rows] = await pool.query('SELECT * FROM address ORDER BY room_id, room_name, cage_address');
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/addresses', authenticate, admin_or_research, async (req, res) => {
-  const { room_id, cage_address, room_lighting, maintenance } = req.body;
+  // room_lighting field stores cage position (Top / Middle / Bottom)
+  const { room_id, room_name, cage_address, position, maintenance } = req.body;
+  if (!room_id) return res.status(400).json({ error: 'room_id is required' });
   try {
     const [r] = await pool.query(
-      'INSERT INTO address (room_id, cage_address, room_lighting, maintenance) VALUES (?,?,?,?)',
-      [room_id, cage_address || null, room_lighting || null, maintenance || null]
+      'INSERT INTO address (room_id, room_name, cage_address, room_lighting, maintenance) VALUES (?,?,?,?,?)',
+      [room_id, room_name || null, cage_address || null, position || null, maintenance || null]
     );
+    const label = fmt_address({ room_id, room_name, cage_address, room_lighting: position });
+    await log_activity(req.user.user_id, 'CREATE', 'address', r.insertId, `Added location: ${label}`);
     res.json({ id: r.insertId, message: 'Address added' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -856,9 +877,9 @@ app.post('/api/cleaning-reports', authenticate, async (req, res) => {
          had_issues, issue_description, signature_data)
        VALUES (?,?,?,?,?,?,?,?,?,?)`,
       [req.user.user_id, displayName, roomStr,
-       inside_cage_cleaning ? 1 : 0, tray_cleaning ? 1 : 0,
-       sweeping_mopping ? 1 : 0, food_water_check ? 1 : 0,
-       had_issues ? 1 : 0, issue_description || null, signature_data]
+      inside_cage_cleaning ? 1 : 0, tray_cleaning ? 1 : 0,
+      sweeping_mopping ? 1 : 0, food_water_check ? 1 : 0,
+      had_issues ? 1 : 0, issue_description || null, signature_data]
     );
     await log_activity(req.user.user_id, 'CLEANING_REPORT', 'room_cleaning_report', r.insertId,
       `Room(s) ${roomStr} cleaned by ${displayName}`);
@@ -872,7 +893,7 @@ app.get('/api/cleaning-reports', authenticate, async (req, res) => {
     return res.status(403).json({ error: 'Admin or Research access required' });
   try {
     const limit = parseInt(req.query.limit) || 100;
-    const room  = req.query.room || null;
+    const room = req.query.room || null;
     let q = `SELECT report_id, reported_by_name, rooms_cleaned,
                inside_cage_cleaning, tray_cleaning, sweeping_mopping,
                food_water_check, had_issues, issue_description, submitted_at
