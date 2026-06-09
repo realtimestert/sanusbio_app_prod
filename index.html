@@ -952,8 +952,8 @@
             </div>
             <div class="col-md-6"><label class="form-label">Acquired By</label><input id="fAcqBy" class="form-control">
             </div>
-            <div class="col-12"><label class="form-label">Description</label><input id="fDesc" class="form-control">
-            </div>
+            <div class="col-12"><label class="form-label">Description</label><textarea id="fDesc" class="form-control"
+                rows="3" placeholder="Physical description, markings, behaviour notes…"></textarea></div>
             <div class="col-md-6"><label class="form-label">Location (optional)</label>
               <select id="fAddrId" class="form-select">
                 <option value="">— Unassigned —</option>
@@ -1334,27 +1334,11 @@
           <h5 class="modal-title">Add Location</h5><button class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <div class="row g-2">
-            <div class="col-6"><label class="form-label">Room ID <span class="text-danger">*</span></label><input
-                id="adRoom" type="number" class="form-control" placeholder="e.g. 11"></div>
-            <div class="col-6"><label class="form-label">Room Name</label><input id="adRoomName" class="form-control"
-                maxlength="50" placeholder="e.g. JB, Breeding"></div>
-          </div>
-          <div class="mt-2 mb-2"><label class="form-label">Cage Address</label><input id="adCage" class="form-control"
-              maxlength="5" placeholder="e.g. J, A1"></div>
-          <div class="mb-2">
-            <label class="form-label">Position</label>
-            <div class="d-flex gap-3 mt-1">
-              <div class="form-check"><input class="form-check-input" type="radio" name="adPosition" id="adPosTop"
-                  value="Top"><label class="form-check-label" for="adPosTop">Top</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="adPosition" id="adPosMid"
-                  value="Middle"><label class="form-check-label" for="adPosMid">Middle</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="adPosition" id="adPosBot"
-                  value="Bottom"><label class="form-check-label" for="adPosBot">Bottom</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="adPosition" id="adPosNone"
-                  value="" checked><label class="form-check-label" for="adPosNone">None</label></div>
-            </div>
-          </div>
+          <div class="mb-2"><label class="form-label">Room ID <span class="text-danger">*</span></label><input
+              id="adRoom" type="number" class="form-control"></div>
+          <div class="mb-2"><label class="form-label">Cage Address</label><input id="adCage" class="form-control"
+              maxlength="5" placeholder="e.g. A1"></div>
+          <div class="mb-2"><label class="form-label">Lighting</label><input id="adLight" class="form-control"></div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -1601,7 +1585,7 @@
               <span class="status-dot mt-1 ${f.dead === '1' ? 'dot-dead' : 'dot-active'}"></span>
             </div>
             <div class="text-muted small">ID: ${f.animal_id || '—'}</div>
-            <div class="small">${fmtAddr(f)}</div>
+            <div class="small">Room ${f.room_id || '?'} · Cage ${f.cage_address || '?'}</div>
             <div class="mt-1 d-flex flex-wrap gap-1">
               ${sexIcon(f.sex)}
               ${f.dead === '1' ? `<span class="badge bg-danger badge-pill small">Deceased</span>` : ''}
@@ -1666,7 +1650,7 @@
             <div class="col-6 col-md-4"><span class="text-muted">Sex</span><br><strong>${f.sex ? f.sex.charAt(0).toUpperCase() + f.sex.slice(1) : '—'}</strong></div>
             <div class="col-6 col-md-4"><span class="text-muted">Weight</span><br><strong>${f.weight ? f.weight + ' g' : '—'}</strong></div>
             <div class="col-6 col-md-4"><span class="text-muted">Location</span><br>
-              <strong>${fmtAddr(f)}</strong>
+              <strong>Room ${f.room_id || '?'} · ${f.cage_address || '?'}</strong>
               <button class="btn btn-link btn-sm p-0 ms-1" onclick="openMoveModal(${id})"><i class="bi bi-arrow-left-right"></i></button></div>
             <div class="col-6 col-md-4"><span class="text-muted">Supplier</span><br><strong>${f.supplier_name || '—'}</strong></div>
             <div class="col-6 col-md-4"><span class="text-muted">Mother</span><br><strong>${f.mother_name || '—'}</strong></div>
@@ -1679,6 +1663,30 @@
           </div>
         </div>
       </div>
+
+      <!-- Description -->
+      ${(f.description || canEdit) ? `
+      <div class="card mb-3 p-3" style="border-left:4px solid #0d6efd;">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="fw-semibold text-primary"><i class="bi bi-card-text me-1"></i>Description</span>
+          ${canEdit ? `<button class="btn btn-sm btn-outline-secondary" id="descEditBtn" onclick="toggleDescEdit()">
+            <i class="bi bi-pencil me-1"></i>Edit
+          </button>` : ''}
+        </div>
+        <div id="descDisplay">
+          ${f.description
+              ? `<p class="mb-0" style="white-space:pre-wrap; line-height:1.7">${f.description}</p>`
+              : '<p class="text-muted small mb-0">No description yet.</p>'}
+        </div>
+        ${canEdit ? `
+        <div id="descEditArea" style="display:none">
+          <textarea id="editDesc" class="form-control mt-2" rows="4" style="font-size:.93rem">${f.description || ''}</textarea>
+          <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-sm btn-primary" onclick="saveDesc(${id})"><i class="bi bi-check2 me-1"></i>Save</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="toggleDescEdit()">Cancel</button>
+          </div>
+        </div>` : ''}
+      </div>` : ''}
 
       <!-- RFID + 8-Hour Light row -->
       <div class="row g-3 mb-3" id="rfidLightRow">
@@ -1791,7 +1799,7 @@
                 <td class="small">${l.anomalies_and_notes || '—'}</td>
                 <td>
                   ${canUpdate() && (!l.individuals_created || l.individuals_created < l.kit_count)
-                ? `<button class="btn btn-xs btn-outline-success btn-sm" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>` : ''}
+                  ? `<button class="btn btn-xs btn-outline-success btn-sm" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>` : ''}
                 </td>
               </tr>`).join('') : '<tr><td colspan="8" class="text-muted text-center py-3">No litter records</td></tr>'}
             </tbody>
@@ -2013,6 +2021,27 @@
       } catch (err) { alert(err.message); }
     }
 
+    function toggleDescEdit() {
+      const display = document.getElementById('descDisplay');
+      const editArea = document.getElementById('descEditArea');
+      const btn = document.getElementById('descEditBtn');
+      if (!editArea) return;
+      const editing = editArea.style.display !== 'none';
+      editArea.style.display = editing ? 'none' : '';
+      display.style.display = editing ? '' : 'none';
+      if (btn) btn.innerHTML = editing
+        ? '<i class="bi bi-pencil me-1"></i>Edit'
+        : '<i class="bi bi-x me-1"></i>Cancel';
+    }
+
+    async function saveDesc(id) {
+      const val = document.getElementById('editDesc')?.value ?? '';
+      try {
+        await api(`/ferrets/${id}`, { method: 'PUT', body: { description: val.trim() || null } });
+        loadFerretDetail(id);
+      } catch (err) { alert(err.message); }
+    }
+
     async function toggleDead(id, current) {
       try { await api(`/ferrets/${id}`, { method: 'PUT', body: { dead: current === '1' ? '0' : '1' } }); loadFerretDetail(id); }
       catch (err) { alert(err.message); }
@@ -2030,7 +2059,7 @@
         const [addresses, suppliers] = await Promise.all([api('/addresses'), api('/suppliers')]);
         document.getElementById('fAddrId').innerHTML =
           '<option value="">— Unassigned —</option>' +
-          addresses.map(a => `<option value="${a.address_id}">${fmtAddr(a)}</option>`).join('');
+          addresses.map(a => `<option value="${a.address_id}">Room ${a.room_id} · ${a.cage_address || '?'}</option>`).join('');
         document.getElementById('fSupplierId').innerHTML =
           '<option value="">— Unknown —</option>' +
           suppliers.map(s => `<option value="${s.supplier_id}">${s.supplier_name}</option>`).join('');
@@ -2319,7 +2348,8 @@
         <h2 class="accordion-header">
           <button class="accordion-button ${i === 0 ? '' : 'collapsed'}" type="button"
             data-bs-toggle="collapse" data-bs-target="#loc${a.address_id}">
-            ${fmtAddr(a)}
+            Room ${a.room_id} · Cage ${a.cage_address || '—'}
+            ${a.room_lighting ? `<span class="text-muted small ms-2">(${a.room_lighting})</span>` : ''}
           </button>
         </h2>
         <div id="loc${a.address_id}" class="accordion-collapse collapse ${i === 0 ? 'show' : ''}">
@@ -2355,7 +2385,7 @@
       try {
         const addresses = await api('/addresses');
         document.getElementById('moveAddrId').innerHTML = addresses.map(a =>
-          `<option value="${a.address_id}">${fmtAddr(a)}</option>`).join('');
+          `<option value="${a.address_id}">Room ${a.room_id} · Cage ${a.cage_address || '?'}</option>`).join('');
         new bootstrap.Modal(document.getElementById('moveModal')).show();
       } catch (err) { alert(err.message); }
     }
@@ -2373,23 +2403,19 @@
     async function submitAddress() {
       const room = document.getElementById('adRoom').value;
       if (!room) return alert('Room ID is required');
-      const posEl = document.querySelector('input[name="adPosition"]:checked');
       try {
         await api('/addresses', {
           method: 'POST', body: {
             room_id: parseInt(room),
-            room_name: document.getElementById('adRoomName').value.trim() || null,
-            cage_address: document.getElementById('adCage').value.trim() || null,
-            position: posEl?.value || null
+            cage_address: document.getElementById('adCage').value || null,
+            room_lighting: document.getElementById('adLight').value || null
           }
         });
         bootstrap.Modal.getInstance(document.getElementById('addrModal')).hide();
-        // Reset fields
         document.getElementById('adRoom').value = '';
-        document.getElementById('adRoomName').value = '';
         document.getElementById('adCage').value = '';
-        document.getElementById('adPosNone').checked = true;
-        loadLocations();
+        document.getElementById('adLight').value = '';
+        alert('Location added!');
       } catch (err) { alert(err.message); }
     }
 
@@ -2678,18 +2704,6 @@
 
     // ─── Helpers ──────────────────────────────────────────────────────────────────
     function today() { return new Date().toISOString().split('T')[0]; }
-
-    // Build a human-readable address label from an address object
-    function fmtAddr(a) {
-      if (!a) return '—';
-      let label = `Room ${a.room_id || '?'}`;
-      if (a.room_name) label += ` ${a.room_name}`;
-      if (a.cage_address && a.cage_address !== 'N/A') {
-        label += ` · Cage ${a.cage_address}`;
-        if (a.room_lighting) label += ` ${a.room_lighting}`;
-      }
-      return label;
-    }
     function nowTime() { return new Date().toTimeString().slice(0, 5); }
     function fmtDate(d) {
       if (!d) return '—';
