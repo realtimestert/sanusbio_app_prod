@@ -1,4 +1,4 @@
-// SanusBio v1.3.0 | 2026-06-06
+// SanusBio v1.1.0 | 2026-06-04
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -98,19 +98,6 @@ async function log_activity(user_id, action, table_name = null, record_id = null
       [user_id, action, table_name, record_id, details]
     );
   } catch { /* non-fatal */ }
-}
-
-// ─── Address Label Helper ────────────────────────────────────────────────────
-function fmt_address(a) {
-  // a: { room_id, room_name, cage_address, room_lighting }
-  // room_lighting stores position: Top / Middle / Bottom
-  let label = `Room ${a.room_id || '?'}`;
-  if (a.room_name) label += ` ${a.room_name}`;
-  if (a.cage_address && a.cage_address !== 'N/A') {
-    label += ` · Cage ${a.cage_address}`;
-    if (a.room_lighting) label += ` ${a.room_lighting}`;
-  }
-  return label;
 }
 
 // ─── Serve Frontend ───────────────────────────────────────────────────────────
@@ -320,12 +307,8 @@ app.put('/api/ferrets/:id/location', authenticate, async (req, res) => {
   const { address_id } = req.body;
   if (!address_id) return res.status(400).json({ error: 'address_id required' });
   try {
-    const [[ferret]] = await pool.query('SELECT ferret_name FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]);
-    const [[addr]] = await pool.query('SELECT room_id, room_name, cage_address, room_lighting FROM address WHERE address_id = ?', [address_id]);
     await pool.query('UPDATE ferret_qr005 SET address_id = ? WHERE Ferret_QR005_id = ?', [address_id, req.params.id]);
-    const ferretLabel = ferret?.ferret_name || `#${req.params.id}`;
-    const addressLabel = addr ? fmt_address(addr) : `address #${address_id}`;
-    await log_activity(req.user.user_id, 'MOVE', 'ferret_qr005', req.params.id, `Moved ${ferretLabel} to ${addressLabel}`);
+    await log_activity(req.user.user_id, 'MOVE', 'ferret_qr005', req.params.id, `Moved ferret #${req.params.id} to address #${address_id}`);
     res.json({ message: 'Location updated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -680,22 +663,18 @@ app.delete('/api/suppliers/:id', authenticate, admin_only, async (req, res) => {
 // ─── Addresses ────────────────────────────────────────────────────────────────
 app.get('/api/addresses', authenticate, require_perm('read'), async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM address ORDER BY room_id, room_name, cage_address');
+    const [rows] = await pool.query('SELECT * FROM address ORDER BY room_id, cage_address');
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/addresses', authenticate, admin_or_research, async (req, res) => {
-  // room_lighting field stores cage position (Top / Middle / Bottom)
-  const { room_id, room_name, cage_address, position, maintenance } = req.body;
-  if (!room_id) return res.status(400).json({ error: 'room_id is required' });
+  const { room_id, cage_address, room_lighting, maintenance } = req.body;
   try {
     const [r] = await pool.query(
-      'INSERT INTO address (room_id, room_name, cage_address, room_lighting, maintenance) VALUES (?,?,?,?,?)',
-      [room_id, room_name || null, cage_address || null, position || null, maintenance || null]
+      'INSERT INTO address (room_id, cage_address, room_lighting, maintenance) VALUES (?,?,?,?)',
+      [room_id, cage_address || null, room_lighting || null, maintenance || null]
     );
-    const label = fmt_address({ room_id, room_name, cage_address, room_lighting: position });
-    await log_activity(req.user.user_id, 'CREATE', 'address', r.insertId, `Added location: ${label}`);
     res.json({ id: r.insertId, message: 'Address added' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -838,6 +817,28 @@ app.put('/api/ferrets/:id/rfid/unassign', authenticate, require_perm('update'), 
     await log_activity(req.user.user_id, 'RFID_UNASSIGN', 'rfid_assignment', req.params.id,
       `RFID unassigned from ferret #${req.params.id}`);
     res.json({ message: 'RFID unassigned' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+
+// ─── RFID Lookup ──────────────────────────────────────────────────────────────
+app.get('/api/rfid-lookup', authenticate, require_perm('read'), async (req, res) => {
+  const { rfid } = req.query;
+  if (!rfid || !rfid.trim()) return res.status(400).json({ error: 'rfid query param required' });
+  try {
+    const [rows] = await pool.query(`
+      SELECT ra.rfid, ra.assigned_date, ra.unassigned_date, ra.reason,
+             f.Ferret_QR005_id AS ferret_id, f.ferret_name, f.animal_id,
+             f.sex, f.birth_date, f.weight, f.dead, f.description,
+             a.room_id, a.room_name, a.cage_address, a.room_lighting
+      FROM rfid_assignment ra
+      JOIN ferret_qr005 f ON ra.ferret_id = f.Ferret_QR005_id
+      LEFT JOIN address a ON f.address_id = a.address_id
+      WHERE ra.rfid = ? AND ra.unassigned_date IS NULL
+      LIMIT 1
+    `, [rfid.trim()]);
+    if (!rows.length) return res.status(404).json({ error: 'No assignment found for this RFID' });
+    res.json(rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
