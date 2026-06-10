@@ -149,7 +149,7 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
     try {
       [rows] = await pool.query(`
         SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
-               f.birth_date, f.weight, f.dead, f.description, f.litter_id,
+               f.birth_date, f.weight, f.dead, f.description, f.color, f.litter_id,
                f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
                f.next_rabies_vaccine_due, f.sex, f.eight_hour_light,
                a.cage_address, a.room_id,
@@ -163,7 +163,7 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
     } catch {
       [rows] = await pool.query(`
         SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
-               f.birth_date, f.weight, f.dead, f.description, f.litter_id,
+               f.birth_date, f.weight, f.dead, f.description, f.color, f.litter_id,
                f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
                f.next_rabies_vaccine_due, f.sex, 0 AS eight_hour_light,
                a.cage_address, a.room_id,
@@ -210,7 +210,7 @@ app.post('/api/ferrets', authenticate, async (req, res) => {
   try {
     await conn.beginTransaction();
     const {
-      ferret_name, animal_id, birth_date, weight = 0, description,
+      ferret_name, animal_id, birth_date, weight = 0, description, color,
       address_id, supplier_id, mother_name, father_name,
       next_rabies_vaccine_due, acquisition_by, photo_url, sex,
       castrated_or_spayed, castration_or_spay_date, litter_id, litter_date
@@ -244,12 +244,12 @@ app.post('/api/ferrets', authenticate, async (req, res) => {
 
     const [r] = await conn.query(`
       INSERT INTO ferret_qr005
-        (ferret_name, animal_id, birth_date, weight, description, address_id,
+        (ferret_name, animal_id, birth_date, weight, description, color, address_id,
          medical_info_id, estrus_check_log_id, females_to_mate_id, health_log_id,
          supplier_id, mother_name, father_name, next_rabies_vaccine_due,
          acquisition_by, photo_url, created_by, dead, sex, litter_id, litter_date)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'','0',?,?,?)
-    `, [ferret_name, animal_id || null, birth_date, weight, description || null,
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'','0',?,?,?)
+    `, [ferret_name, animal_id || null, birth_date, weight, description || null, color || null,
       resolved_address_id, mi.insertId, ec.insertId, fm.insertId, hl.insertId,
       resolved_supplier_id, mother_name || null, father_name || null,
       next_rabies_vaccine_due || null, acquisition_by || null, photo_url || null,
@@ -266,7 +266,7 @@ app.post('/api/ferrets', authenticate, async (req, res) => {
 
 // Update ferret
 app.put('/api/ferrets/:id', authenticate, require_perm('update'), async (req, res) => {
-  const allowed = ['ferret_name', 'weight', 'description', 'dead', 'next_rabies_vaccine_due', 'photo_url', 'acquisition_by', 'sex', 'birth_date'];
+  const allowed = ['ferret_name', 'weight', 'description', 'color', 'dead', 'next_rabies_vaccine_due', 'photo_url', 'acquisition_by', 'sex', 'birth_date'];
   const sets = [], vals = [];
   for (const key of allowed) {
     if (req.body[key] !== undefined) { sets.push(`${key} = ?`); vals.push(req.body[key]); }
@@ -817,28 +817,6 @@ app.put('/api/ferrets/:id/rfid/unassign', authenticate, require_perm('update'), 
     await log_activity(req.user.user_id, 'RFID_UNASSIGN', 'rfid_assignment', req.params.id,
       `RFID unassigned from ferret #${req.params.id}`);
     res.json({ message: 'RFID unassigned' });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-
-// ─── RFID Lookup ──────────────────────────────────────────────────────────────
-app.get('/api/rfid-lookup', authenticate, require_perm('read'), async (req, res) => {
-  const { rfid } = req.query;
-  if (!rfid || !rfid.trim()) return res.status(400).json({ error: 'rfid query param required' });
-  try {
-    const [rows] = await pool.query(`
-      SELECT ra.rfid, ra.assigned_date, ra.unassigned_date, ra.reason,
-             f.Ferret_QR005_id AS ferret_id, f.ferret_name, f.animal_id,
-             f.sex, f.birth_date, f.weight, f.dead, f.description,
-             a.room_id, a.room_name, a.cage_address, a.room_lighting
-      FROM rfid_assignment ra
-      JOIN ferret_qr005 f ON ra.ferret_id = f.Ferret_QR005_id
-      LEFT JOIN address a ON f.address_id = a.address_id
-      WHERE ra.rfid = ? AND ra.unassigned_date IS NULL
-      LIMIT 1
-    `, [rfid.trim()]);
-    if (!rows.length) return res.status(404).json({ error: 'No assignment found for this RFID' });
-    res.json(rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

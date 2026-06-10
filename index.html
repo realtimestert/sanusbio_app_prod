@@ -310,7 +310,6 @@
         <a class="nav-link admin-only" href="#" data-page="activity"><i class="bi bi-journal-text"></i>Activity Log</a>
         <a class="nav-link" href="#" data-page="cleaning-reports"><i class="bi bi-check2-square"></i>Cleaning
           Reports</a>
-        <a class="nav-link" href="#" data-page="rfid-lookup"><i class="bi bi-broadcast"></i>RFID Lookup</a>
       </nav>
       <div class="user-block">
         <div id="userInfo" class="mb-2"></div>
@@ -716,41 +715,6 @@
 
       </div>
 
-
-      <!-- RFID Lookup -->
-      <div id="page-rfid-lookup" class="page">
-        <div class="page-header">
-          <h4><i class="bi bi-broadcast me-2"></i>RFID Lookup</h4>
-        </div>
-
-        <!-- NFC status bar -->
-        <div id="nfcStatusBar" class="alert py-2 small mb-3 d-none"></div>
-
-        <!-- Manual / wedge input (always visible as fallback) -->
-        <div class="card shadow-sm mb-4" style="max-width:540px">
-          <div class="card-body p-3">
-            <label class="fw-semibold mb-2 d-block">
-              <i class="bi bi-upc-scan me-1 text-primary"></i>Scan or enter RFID
-            </label>
-            <div class="d-flex gap-2">
-              <input id="rfidManualInput" class="form-control font-monospace" placeholder="Scan tag or type chip ID…"
-                autocomplete="off" spellcheck="false"
-                onkeydown="if(event.key==='Enter'){ event.preventDefault(); doRfidLookup(this.value); }">
-              <button class="btn btn-primary px-3"
-                onclick="doRfidLookup(document.getElementById('rfidManualInput').value)">
-                <i class="bi bi-search"></i>
-              </button>
-            </div>
-            <div class="text-muted small mt-2">
-              USB/Bluetooth wedge readers work automatically — just scan and the result appears instantly.
-            </div>
-          </div>
-        </div>
-
-        <!-- Result area -->
-        <div id="rfidResult" style="max-width:540px"></div>
-      </div>
-
     </div><!-- /main -->
   </div><!-- /app -->
 
@@ -988,7 +952,12 @@
             </div>
             <div class="col-md-6"><label class="form-label">Acquired By</label><input id="fAcqBy" class="form-control">
             </div>
-            <div class="col-12"><label class="form-label">Description</label><input id="fDesc" class="form-control">
+            <div class="col-12"><label class="form-label">Description</label>
+              <textarea id="fDesc" class="form-control" rows="3"
+                placeholder="Physical description, markings, behaviour notes…"></textarea>
+            </div>
+            <div class="col-md-6"><label class="form-label">Color / Coat Pattern</label>
+              <input id="fColor" class="form-control" placeholder="e.g. Sable, Albino, Silver Mitt…">
             </div>
             <div class="col-md-6"><label class="form-label">Location (optional)</label>
               <select id="fAddrId" class="form-select">
@@ -1525,8 +1494,7 @@
       const loaders = {
         dashboard: loadDashboard, ferrets: loadFerrets, litters: loadLitters,
         locations: loadLocations, suppliers: loadSuppliers, assignments: loadAssignments,
-        users: loadUsers, activity: loadActivity, 'cleaning-reports': loadCleaningReports,
-        'rfid-lookup': initRfidLookupPage
+        users: loadUsers, activity: loadActivity, 'cleaning-reports': loadCleaningReports
       };
       if (loaders[page]) loaders[page]();
     }
@@ -1701,6 +1669,40 @@
         </div>
       </div>
 
+      <!-- Description & Color card -->
+      ${(f.description || f.color || canEdit) ? `
+      <div class="card mb-3 p-3" style="border-left:4px solid #0d6efd;">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="fw-semibold text-primary"><i class="bi bi-card-text me-1"></i>Description</span>
+          ${canEdit ? `<button class="btn btn-sm btn-outline-secondary" id="descEditBtn" onclick="toggleDescEdit()">
+            <i class="bi bi-pencil me-1"></i>Edit
+          </button>` : ''}
+        </div>
+        ${f.color ? `<div class="mb-2 small"><span class="text-muted me-1">Color / Coat:</span><strong>${f.color}</strong></div>` : ''}
+        <div id="descDisplay">
+          ${f.description
+              ? `<p class="mb-0" style="white-space:pre-wrap; line-height:1.7">${f.description}</p>`
+              : '<p class="text-muted small mb-0">No description yet.</p>'}
+        </div>
+        ${canEdit ? `
+        <div id="descEditArea" style="display:none">
+          <div class="row g-2 mt-1">
+            <div class="col-12">
+              <label class="form-label small text-muted mb-1">Color / Coat Pattern</label>
+              <input id="editColor" class="form-control form-control-sm" value="${f.color || ''}" placeholder="e.g. Sable, Albino, Silver Mitt…">
+            </div>
+            <div class="col-12">
+              <label class="form-label small text-muted mb-1">Description</label>
+              <textarea id="editDesc" class="form-control" rows="5" style="font-size:.93rem">${f.description || ''}</textarea>
+            </div>
+          </div>
+          <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-sm btn-primary" onclick="saveColorDesc(${id})"><i class="bi bi-check2 me-1"></i>Save</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="toggleDescEdit()">Cancel</button>
+          </div>
+        </div>` : ''}
+      </div>` : ''}
+
       <!-- RFID + 8-Hour Light row -->
       <div class="row g-3 mb-3" id="rfidLightRow">
         <div class="col-md-6">
@@ -1812,7 +1814,7 @@
                 <td class="small">${l.anomalies_and_notes || '—'}</td>
                 <td>
                   ${canUpdate() && (!l.individuals_created || l.individuals_created < l.kit_count)
-                ? `<button class="btn btn-xs btn-outline-success btn-sm" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>` : ''}
+                  ? `<button class="btn btn-xs btn-outline-success btn-sm" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>` : ''}
                 </td>
               </tr>`).join('') : '<tr><td colspan="8" class="text-muted text-center py-3">No litter records</td></tr>'}
             </tbody>
@@ -2034,6 +2036,32 @@
       } catch (err) { alert(err.message); }
     }
 
+    function toggleDescEdit() {
+      const display = document.getElementById('descDisplay');
+      const editArea = document.getElementById('descEditArea');
+      const btn = document.getElementById('descEditBtn');
+      if (!editArea) return;
+      const editing = editArea.style.display !== 'none';
+      editArea.style.display = editing ? 'none' : '';
+      display.style.display = editing ? '' : 'none';
+      if (btn) btn.innerHTML = editing
+        ? '<i class="bi bi-pencil me-1"></i>Edit'
+        : '<i class="bi bi-x me-1"></i>Cancel';
+    }
+
+    async function saveColorDesc(id) {
+      const body = {};
+      const colorEl = document.getElementById('editColor');
+      const descEl = document.getElementById('editDesc');
+      if (colorEl !== null) body.color = colorEl.value.trim() || null;
+      if (descEl !== null) body.description = descEl.value.trim() || null;
+      if (!Object.keys(body).length) return;
+      try {
+        await api(`/ferrets/${id}`, { method: 'PUT', body });
+        loadFerretDetail(id);
+      } catch (err) { alert(err.message); }
+    }
+
     async function toggleDead(id, current) {
       try { await api(`/ferrets/${id}`, { method: 'PUT', body: { dead: current === '1' ? '0' : '1' } }); loadFerretDetail(id); }
       catch (err) { alert(err.message); }
@@ -2055,7 +2083,7 @@
         document.getElementById('fSupplierId').innerHTML =
           '<option value="">— Unknown —</option>' +
           suppliers.map(s => `<option value="${s.supplier_id}">${s.supplier_name}</option>`).join('');
-        ['fName', 'fAnimalId', 'fDesc', 'fMother', 'fFather', 'fAcqBy'].forEach(id => document.getElementById(id).value = '');
+        ['fName', 'fAnimalId', 'fDesc', 'fColor', 'fMother', 'fFather', 'fAcqBy'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('fBirthDate').value = today();
         document.getElementById('fWeight').value = '0';
         document.getElementById('fVaccine').value = '';
@@ -2084,6 +2112,7 @@
             birth_date: bd,
             weight: parseInt(document.getElementById('fWeight').value) || 0,
             description: document.getElementById('fDesc').value || null,
+            color: document.getElementById('fColor').value.trim() || null,
             address_id: document.getElementById('fAddrId').value || null,
             supplier_id: document.getElementById('fSupplierId').value || null,
             mother_name: document.getElementById('fMother').value || null,
@@ -3011,183 +3040,6 @@
       </div>`;
         new bootstrap.Modal(document.getElementById('crDetailModal')).show();
       } catch (err) { alert(err.message); }
-    }
-
-    // ─── RFID Lookup Page ─────────────────────────────────────────────────────────
-    let _nfcReader = null;
-    let _nfcAbort = null;
-
-    async function initRfidLookupPage() {
-      // Clear previous result and input
-      document.getElementById('rfidResult').innerHTML = '';
-      const input = document.getElementById('rfidManualInput');
-      if (input) { input.value = ''; setTimeout(() => input.focus(), 120); }
-
-      // Try to start Web NFC if available (Chrome on Android / supported browsers)
-      if ('NDEFReader' in window) {
-        await startNfc();
-      } else {
-        setNfcStatus('info',
-          '<i class="bi bi-keyboard me-2"></i>NFC not available in this browser — use the input field above. ' +
-          'USB/Bluetooth wedge readers work automatically.');
-      }
-    }
-
-    async function startNfc() {
-      try {
-        // Abort any existing session
-        if (_nfcAbort) { _nfcAbort.abort(); _nfcAbort = null; }
-
-        _nfcAbort = new AbortController();
-        _nfcReader = new NDEFReader();
-
-        await _nfcReader.scan({ signal: _nfcAbort.signal });
-
-        setNfcStatus('success',
-          '<span class="spinner-grow spinner-grow-sm text-success me-2" style="width:.6rem;height:.6rem"></span>' +
-          'NFC active — hold a tag near the reader.');
-
-        _nfcReader.addEventListener('reading', ({ serialNumber, message }) => {
-          // Prefer text record payload; fall back to serial number
-          let rfid = serialNumber || '';
-          if (message?.records?.length) {
-            for (const rec of message.records) {
-              if (rec.recordType === 'text') {
-                const decoder = new TextDecoder(rec.encoding || 'utf-8');
-                rfid = decoder.decode(rec.data).trim();
-                break;
-              }
-              if (rec.recordType === 'url') {
-                const decoder = new TextDecoder();
-                rfid = decoder.decode(rec.data).trim();
-                break;
-              }
-            }
-          }
-          if (!rfid) return;
-          // Show scanned value in the manual input too so user can see what was read
-          const input = document.getElementById('rfidManualInput');
-          if (input) input.value = rfid;
-          doRfidLookup(rfid);
-        });
-
-        _nfcReader.addEventListener('readingerror', () => {
-          setNfcStatus('warning', '<i class="bi bi-exclamation-triangle me-2"></i>Could not read tag — try again.');
-        });
-
-      } catch (err) {
-        if (err.name === 'NotAllowedError') {
-          setNfcStatus('warning',
-            '<i class="bi bi-lock me-2"></i>NFC permission denied. Use the input field to look up by chip ID.');
-        } else {
-          setNfcStatus('info',
-            '<i class="bi bi-keyboard me-2"></i>NFC unavailable — use the input field or a USB/Bluetooth wedge reader.');
-        }
-      }
-    }
-
-    function setNfcStatus(type, html) {
-      const bar = document.getElementById('nfcStatusBar');
-      if (!bar) return;
-      const map = { success: 'alert-success', info: 'alert-info', warning: 'alert-warning', danger: 'alert-danger' };
-      bar.className = `alert py-2 small mb-3 ${map[type] || 'alert-secondary'}`;
-      bar.innerHTML = html;
-      bar.classList.remove('d-none');
-    }
-
-    async function doRfidLookup(rfid) {
-      rfid = (rfid || '').trim();
-      const resultEl = document.getElementById('rfidResult');
-      if (!rfid) {
-        resultEl.innerHTML = '<div class="alert alert-warning py-2 small">No RFID value — scan a tag or enter a chip ID.</div>';
-        return;
-      }
-
-      resultEl.innerHTML = `
-    <div class="d-flex align-items-center gap-2 text-muted small py-2">
-      <div class="spinner-border spinner-border-sm"></div> Looking up <code>${rfid}</code>…
-    </div>`;
-
-      try {
-        const f = await api('/rfid-lookup?rfid=' + encodeURIComponent(rfid));
-
-        // Build location label
-        let locLabel = '—';
-        if (f.room_id) {
-          locLabel = 'Room ' + f.room_id;
-          if (f.room_name) locLabel += ' ' + f.room_name;
-          if (f.cage_address && f.cage_address !== 'N/A') {
-            locLabel += ' · Cage ' + f.cage_address;
-            if (f.room_lighting) locLabel += ' ' + f.room_lighting;
-          }
-        }
-
-        const sexLabel = f.sex ? f.sex.charAt(0).toUpperCase() + f.sex.slice(1) : '—';
-        const deadBadge = f.dead === '1'
-          ? '<span class="badge bg-danger ms-2">Deceased</span>'
-          : '<span class="badge bg-success ms-2">Active</span>';
-
-        resultEl.innerHTML = `
-      <div class="card shadow-sm" style="border-radius:14px; border-left:4px solid #198754;">
-        <div class="card-body p-4">
-
-          <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
-            <i class="bi bi-broadcast text-success fs-5"></i>
-            <code class="fs-6 fw-bold">${rfid}</code>
-            <span class="badge bg-success-subtle text-success border border-success-subtle">Active Assignment</span>
-          </div>
-          <div class="text-muted small mb-3">Assigned ${fmtDate(f.assigned_date)}</div>
-
-          <h4 class="fw-bold mb-0">${f.ferret_name}${deadBadge}</h4>
-          <div class="text-muted mb-3">Animal ID: ${f.animal_id || '—'}</div>
-
-          <div class="row g-2 small mb-3">
-            <div class="col-6 col-md-3">
-              <span class="text-muted d-block">Sex</span>
-              <strong>${sexLabel}</strong>
-            </div>
-            <div class="col-6 col-md-3">
-              <span class="text-muted d-block">Weight</span>
-              <strong>${f.weight ? f.weight + ' g' : '—'}</strong>
-            </div>
-            <div class="col-6 col-md-3">
-              <span class="text-muted d-block">Birth Date</span>
-              <strong>${fmtDate(f.birth_date)}</strong>
-            </div>
-            <div class="col-6 col-md-3">
-              <span class="text-muted d-block">Location</span>
-              <strong>${locLabel}</strong>
-            </div>
-          </div>
-
-          ${f.description ? `
-          <div class="border rounded p-2 bg-light small mb-3" style="white-space:pre-wrap; line-height:1.6">
-            ${f.description}
-          </div>` : ''}
-
-          <button class="btn btn-primary" onclick="loadFerretDetail(${f.ferret_id})">
-            <i class="bi bi-arrow-right me-2"></i>Open Full Profile
-          </button>
-        </div>
-      </div>`;
-
-      } catch (err) {
-        if (err.message.includes('No assignment')) {
-          resultEl.innerHTML = `
-        <div class="card shadow-sm" style="border-radius:14px; border-left:4px solid #6c757d;">
-          <div class="card-body p-4">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <i class="bi bi-broadcast text-muted fs-5"></i>
-              <code class="fs-6 fw-bold">${rfid}</code>
-            </div>
-            <div class="fw-semibold text-muted">No Assignment</div>
-            <div class="text-muted small mt-1">This chip is not currently assigned to any ferret.</div>
-          </div>
-        </div>`;
-        } else {
-          resultEl.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
-        }
-      }
     }
 
   </script>
