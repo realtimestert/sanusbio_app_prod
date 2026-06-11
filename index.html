@@ -366,6 +366,21 @@
                 class="bi bi-plus-lg me-1"></i>Add Ferret</button>
           </div>
         </div>
+        <!-- Active / Deceased tabs -->
+        <ul class="nav nav-tabs mb-3" id="ferretTabs">
+          <li class="nav-item">
+            <button class="nav-link active" id="tabActive" onclick="switchFerretTab('active')">
+              <span class="status-dot dot-active me-1" style="display:inline-block"></span>
+              Active <span id="tabActiveCount" class="badge bg-secondary ms-1"></span>
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" id="tabDeceased" onclick="switchFerretTab('deceased')">
+              <span class="status-dot dot-dead me-1" style="display:inline-block"></span>
+              Deceased <span id="tabDeceasedCount" class="badge bg-secondary ms-1"></span>
+            </button>
+          </li>
+        </ul>
         <div id="ferretGrid" class="row g-3"></div>
       </div>
 
@@ -952,12 +967,7 @@
             </div>
             <div class="col-md-6"><label class="form-label">Acquired By</label><input id="fAcqBy" class="form-control">
             </div>
-            <div class="col-12"><label class="form-label">Description</label>
-              <textarea id="fDesc" class="form-control" rows="3"
-                placeholder="Physical description, markings, behaviour notes…"></textarea>
-            </div>
-            <div class="col-md-6"><label class="form-label">Color / Coat Pattern</label>
-              <input id="fColor" class="form-control" placeholder="e.g. Sable, Albino, Silver Mitt…">
+            <div class="col-12"><label class="form-label">Description</label><input id="fDesc" class="form-control">
             </div>
             <div class="col-md-6"><label class="form-label">Location (optional)</label>
               <select id="fAddrId" class="form-select">
@@ -1563,11 +1573,59 @@
       } catch (err) { console.error(err); }
     }
 
+    let _ferretTab = 'active';
+
+    function switchFerretTab(tab) {
+      _ferretTab = tab;
+      document.getElementById('tabActive').classList.toggle('active', tab === 'active');
+      document.getElementById('tabDeceased').classList.toggle('active', tab === 'deceased');
+      renderFerretGrid();
+    }
+
+    function ferretAge(birthDate) {
+      if (!birthDate) return '—';
+      const birth = new Date(birthDate);
+      const now = new Date();
+      const totalDays = Math.floor((now - birth) / 864e5);
+      if (totalDays < 0) return '—';
+      const totalWeeks = Math.floor(totalDays / 7);
+      if (totalWeeks < 52) return totalWeeks + 'wk';
+      // 1 year or older — calculate Y / mo / wk
+      let years = now.getFullYear() - birth.getFullYear();
+      let months = now.getMonth() - birth.getMonth();
+      let days = now.getDate() - birth.getDate();
+      if (days < 0) { months--; days += new Date(now.getFullYear(), now.getMonth(), 0).getDate(); }
+      if (months < 0) { years--; months += 12; }
+      const weeks = Math.floor(days / 7);
+      let parts = [];
+      if (years) parts.push(years + 'Y');
+      if (months) parts.push(months + 'mo');
+      if (weeks) parts.push(weeks + 'wk');
+      return parts.length ? parts.join(' ') : years + 'Y';
+    }
+
     function renderFerretGrid() {
       const grid = document.getElementById('ferretGrid');
       if (!_ferretData.length) { grid.innerHTML = '<div class="col"><p class="text-muted mt-2">No ferrets found.</p></div>'; return; }
+
+      const showDeceased = _ferretTab === 'deceased';
+      const filtered = _ferretData.filter(f => showDeceased ? f.dead === '1' : f.dead !== '1');
+
+      // Update tab counts
+      const activeCount = _ferretData.filter(f => f.dead !== '1').length;
+      const deceasedCount = _ferretData.filter(f => f.dead === '1').length;
+      const tabAC = document.getElementById('tabActiveCount');
+      const tabDC = document.getElementById('tabDeceasedCount');
+      if (tabAC) tabAC.textContent = activeCount;
+      if (tabDC) tabDC.textContent = deceasedCount || '';
+
+      if (!filtered.length) {
+        grid.innerHTML = `<div class="col"><p class="text-muted mt-2">${showDeceased ? 'No deceased ferrets.' : 'No active ferrets.'}</p></div>`;
+        return;
+      }
+
       const sortBy = document.getElementById('ferretSort')?.value || 'name';
-      const sorted = [..._ferretData].sort((a, b) => {
+      const sorted = [...filtered].sort((a, b) => {
         if (sortBy === 'age') return new Date(a.birth_date || 0) - new Date(b.birth_date || 0);
         if (sortBy === 'sex') return (a.sex || 'zzz').localeCompare(b.sex || 'zzz');
         if (sortBy === 'room') return (a.room_id || 0) - (b.room_id || 0);
@@ -1578,6 +1636,7 @@
       grid.innerHTML = sorted.map(f => {
         const vaccDue = f.next_rabies_vaccine_due &&
           new Date(f.next_rabies_vaccine_due) <= new Date(Date.now() + 30 * 864e5) && f.dead !== '1';
+        const age = ferretAge(f.birth_date);
         return `
       <div class="col-md-4 col-lg-3">
         <div class="card ferret-card" onclick="loadFerretDetail(${f.id})">
@@ -1586,10 +1645,13 @@
             : `<div class="ferret-placeholder">🐾</div>`}
           <div class="card-body p-2">
             <div class="d-flex align-items-start justify-content-between">
-              <h6 class="mb-0 fw-semibold">${f.name}</h6>
+              <div>
+                <h6 class="mb-0 fw-semibold">${f.name}</h6>
+                <div class="text-muted small">${age}</div>
+              </div>
               <span class="status-dot mt-1 ${f.dead === '1' ? 'dot-dead' : 'dot-active'}"></span>
             </div>
-            <div class="text-muted small">ID: ${f.animal_id || '—'}</div>
+            <div class="text-muted small mt-1">ID: ${f.animal_id || '—'}</div>
             <div class="small">Room ${f.room_id || '?'} · Cage ${f.cage_address || '?'}</div>
             <div class="mt-1 d-flex flex-wrap gap-1">
               ${sexIcon(f.sex)}
@@ -1668,40 +1730,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Description & Color card -->
-      ${(f.description || f.color || canEdit) ? `
-      <div class="card mb-3 p-3" style="border-left:4px solid #0d6efd;">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-          <span class="fw-semibold text-primary"><i class="bi bi-card-text me-1"></i>Description</span>
-          ${canEdit ? `<button class="btn btn-sm btn-outline-secondary" id="descEditBtn" onclick="toggleDescEdit()">
-            <i class="bi bi-pencil me-1"></i>Edit
-          </button>` : ''}
-        </div>
-        ${f.color ? `<div class="mb-2 small"><span class="text-muted me-1">Color / Coat:</span><strong>${f.color}</strong></div>` : ''}
-        <div id="descDisplay">
-          ${f.description
-              ? `<p class="mb-0" style="white-space:pre-wrap; line-height:1.7">${f.description}</p>`
-              : '<p class="text-muted small mb-0">No description yet.</p>'}
-        </div>
-        ${canEdit ? `
-        <div id="descEditArea" style="display:none">
-          <div class="row g-2 mt-1">
-            <div class="col-12">
-              <label class="form-label small text-muted mb-1">Color / Coat Pattern</label>
-              <input id="editColor" class="form-control form-control-sm" value="${f.color || ''}" placeholder="e.g. Sable, Albino, Silver Mitt…">
-            </div>
-            <div class="col-12">
-              <label class="form-label small text-muted mb-1">Description</label>
-              <textarea id="editDesc" class="form-control" rows="5" style="font-size:.93rem">${f.description || ''}</textarea>
-            </div>
-          </div>
-          <div class="d-flex gap-2 mt-2">
-            <button class="btn btn-sm btn-primary" onclick="saveColorDesc(${id})"><i class="bi bi-check2 me-1"></i>Save</button>
-            <button class="btn btn-sm btn-outline-secondary" onclick="toggleDescEdit()">Cancel</button>
-          </div>
-        </div>` : ''}
-      </div>` : ''}
 
       <!-- RFID + 8-Hour Light row -->
       <div class="row g-3 mb-3" id="rfidLightRow">
@@ -1814,7 +1842,7 @@
                 <td class="small">${l.anomalies_and_notes || '—'}</td>
                 <td>
                   ${canUpdate() && (!l.individuals_created || l.individuals_created < l.kit_count)
-                  ? `<button class="btn btn-xs btn-outline-success btn-sm" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>` : ''}
+                ? `<button class="btn btn-xs btn-outline-success btn-sm" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>` : ''}
                 </td>
               </tr>`).join('') : '<tr><td colspan="8" class="text-muted text-center py-3">No litter records</td></tr>'}
             </tbody>
@@ -2036,32 +2064,6 @@
       } catch (err) { alert(err.message); }
     }
 
-    function toggleDescEdit() {
-      const display = document.getElementById('descDisplay');
-      const editArea = document.getElementById('descEditArea');
-      const btn = document.getElementById('descEditBtn');
-      if (!editArea) return;
-      const editing = editArea.style.display !== 'none';
-      editArea.style.display = editing ? 'none' : '';
-      display.style.display = editing ? '' : 'none';
-      if (btn) btn.innerHTML = editing
-        ? '<i class="bi bi-pencil me-1"></i>Edit'
-        : '<i class="bi bi-x me-1"></i>Cancel';
-    }
-
-    async function saveColorDesc(id) {
-      const body = {};
-      const colorEl = document.getElementById('editColor');
-      const descEl = document.getElementById('editDesc');
-      if (colorEl !== null) body.color = colorEl.value.trim() || null;
-      if (descEl !== null) body.description = descEl.value.trim() || null;
-      if (!Object.keys(body).length) return;
-      try {
-        await api(`/ferrets/${id}`, { method: 'PUT', body });
-        loadFerretDetail(id);
-      } catch (err) { alert(err.message); }
-    }
-
     async function toggleDead(id, current) {
       try { await api(`/ferrets/${id}`, { method: 'PUT', body: { dead: current === '1' ? '0' : '1' } }); loadFerretDetail(id); }
       catch (err) { alert(err.message); }
@@ -2083,7 +2085,7 @@
         document.getElementById('fSupplierId').innerHTML =
           '<option value="">— Unknown —</option>' +
           suppliers.map(s => `<option value="${s.supplier_id}">${s.supplier_name}</option>`).join('');
-        ['fName', 'fAnimalId', 'fDesc', 'fColor', 'fMother', 'fFather', 'fAcqBy'].forEach(id => document.getElementById(id).value = '');
+        ['fName', 'fAnimalId', 'fDesc', 'fMother', 'fFather', 'fAcqBy'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('fBirthDate').value = today();
         document.getElementById('fWeight').value = '0';
         document.getElementById('fVaccine').value = '';
@@ -2112,7 +2114,6 @@
             birth_date: bd,
             weight: parseInt(document.getElementById('fWeight').value) || 0,
             description: document.getElementById('fDesc').value || null,
-            color: document.getElementById('fColor').value.trim() || null,
             address_id: document.getElementById('fAddrId').value || null,
             supplier_id: document.getElementById('fSupplierId').value || null,
             mother_name: document.getElementById('fMother').value || null,
