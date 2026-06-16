@@ -1,4 +1,4 @@
-<!-- SanusBio v1.1.0 | 2026-06-04 -->
+<!-- SanusBio v1.2.0 | 2026-06-16 -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -305,6 +305,7 @@
         <a class="nav-link" href="#" data-page="litters"><i class="bi bi-egg"></i>Litters</a>
         <a class="nav-link" href="#" data-page="locations"><i class="bi bi-geo-alt"></i>Locations</a>
         <a class="nav-link" href="#" data-page="suppliers"><i class="bi bi-truck"></i>Suppliers</a>
+        <a class="nav-link" href="#" data-page="distribution"><i class="bi bi-box-arrow-right"></i>Distribution</a>
         <a class="nav-link" href="#" data-page="assignments"><i class="bi bi-clipboard-check"></i>Assignments</a>
         <a class="nav-link admin-only" href="#" data-page="users"><i class="bi bi-people"></i>Users</a>
         <a class="nav-link admin-only" href="#" data-page="activity"><i class="bi bi-journal-text"></i>Activity Log</a>
@@ -366,7 +367,6 @@
                 class="bi bi-plus-lg me-1"></i>Add Ferret</button>
           </div>
         </div>
-        <!-- Active / Deceased tabs -->
         <ul class="nav nav-tabs mb-3" id="ferretTabs">
           <li class="nav-item">
             <button class="nav-link active" id="tabActive" onclick="switchFerretTab('active')">
@@ -378,6 +378,12 @@
             <button class="nav-link" id="tabDeceased" onclick="switchFerretTab('deceased')">
               <span class="status-dot dot-dead me-1" style="display:inline-block"></span>
               Deceased <span id="tabDeceasedCount" class="badge bg-secondary ms-1"></span>
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" id="tabDistributed" onclick="switchFerretTab('distributed')">
+              <i class="bi bi-box-arrow-right me-1"></i>
+              Distributed <span id="tabDistributedCount" class="badge bg-secondary ms-1"></span>
             </button>
           </li>
         </ul>
@@ -439,6 +445,55 @@
               class="bi bi-plus-lg me-1"></i>Add Supplier</button>
         </div>
         <div class="row g-3" id="supplierCards"></div>
+      </div>
+
+      <!-- Distribution -->
+      <div id="page-distribution" class="page">
+        <div class="page-header">
+          <h4><i class="bi bi-box-arrow-right me-2"></i>Distribution</h4>
+          <div class="ms-auto d-flex gap-2">
+            <button id="btnAddDistributor" class="btn btn-outline-secondary d-none" onclick="openDistributorModal()">
+              <i class="bi bi-plus-lg me-1"></i>Add Distributor
+            </button>
+          </div>
+        </div>
+
+        <!-- Distributor filter bar -->
+        <div class="card mb-3 p-3">
+          <div class="d-flex align-items-center gap-3 flex-wrap">
+            <span class="fw-semibold text-muted small">Filter by Distributor:</span>
+            <div id="distFilterBtns" class="d-flex flex-wrap gap-2"></div>
+          </div>
+        </div>
+
+        <!-- Summary cards per distributor -->
+        <div id="distSummaryCards" class="row g-3 mb-4"></div>
+
+        <!-- Events table -->
+        <div class="card">
+          <div class="card-header bg-white d-flex align-items-center py-3">
+            <span class="fw-semibold" id="distTableTitle">All Distribution Records</span>
+            <span id="distTableCount" class="badge bg-secondary ms-2"></span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Ferret</th>
+                  <th>Animal ID</th>
+                  <th>Sex</th>
+                  <th>Distributor</th>
+                  <th>Price</th>
+                  <th>Notes</th>
+                  <th>Recorded By</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="distTable"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <!-- Assignments -->
@@ -1341,26 +1396,106 @@
     </div>
   </div>
 
-  <!-- Add Address Modal -->
-  <div class="modal fade" id="addrModal" tabindex="-1">
-    <div class="modal-dialog modal-sm">
+  <!-- Distribute Ferret Modal -->
+  <div class="modal fade" id="distributeModal" tabindex="-1">
+    <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Add Location</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+          <h5 class="modal-title"><i class="bi bi-box-arrow-right me-2"></i>Distribute Ferret</h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <div class="mb-2"><label class="form-label">Room ID <span class="text-danger">*</span></label><input
-              id="adRoom" type="number" class="form-control"></div>
-          <div class="mb-2"><label class="form-label">Cage Address</label><input id="adCage" class="form-control"
-              maxlength="5" placeholder="e.g. A1"></div>
-          <div class="mb-2"><label class="form-label">Lighting</label><input id="adLight" class="form-control"></div>
+          <input type="hidden" id="distFerretId">
+          <div id="distFerretName" class="alert alert-info py-2 small mb-3"></div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Distributor <span class="text-danger">*</span></label>
+            <select id="distDistributorId" class="form-select"></select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Distribution Date <span class="text-danger">*</span></label>
+            <input id="distDate" type="date" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Price (optional)</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input id="distPrice" type="number" step="0.01" min="0" class="form-control" placeholder="0.00">
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label fw-semibold">Notes (optional)</label>
+            <textarea id="distNotes" class="form-control" rows="2"
+              placeholder="Any relevant notes about this distribution…"></textarea>
+          </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button class="btn btn-primary" onclick="submitAddress()">Add</button>
+          <button class="btn btn-primary" onclick="submitDistribute()"><i
+              class="bi bi-box-arrow-right me-1"></i>Distribute</button>
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Add / Edit Distributor Modal -->
+  <div class="modal fade" id="distributorModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="distributorModalTitle">Add Distributor</h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="distMgrId">
+          <div class="row g-2">
+            <div class="col-12">
+              <label class="form-label">Distributor Name <span class="text-danger">*</span></label>
+              <input id="distMgrName" class="form-control"
+                placeholder="e.g. BIOLOGICAL SCIENCES, University of Georgia">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Contact Info</label>
+              <input id="distMgrContact" class="form-control" placeholder="Contact person or email">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Address</label>
+              <input id="distMgrAddr" class="form-control" placeholder="e.g. Athens, GA">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Phone</label>
+              <input id="distMgrPhone" class="form-control" placeholder="e.g. 7065551234">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Notes</label>
+              <textarea id="distMgrNotes" class="form-control" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitDistributor()">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Location</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2"><label class="form-label">Room ID <span class="text-danger">*</span></label><input id="adRoom"
+            type="number" class="form-control"></div>
+        <div class="mb-2"><label class="form-label">Cage Address</label><input id="adCage" class="form-control"
+            maxlength="5" placeholder="e.g. A1"></div>
+        <div class="mb-2"><label class="form-label">Lighting</label><input id="adLight" class="form-control"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" onclick="submitAddress()">Add</button>
+      </div>
+    </div>
+  </div>
   </div>
 
   <!-- Supplier Modal -->
@@ -1504,7 +1639,8 @@
       const loaders = {
         dashboard: loadDashboard, ferrets: loadFerrets, litters: loadLitters,
         locations: loadLocations, suppliers: loadSuppliers, assignments: loadAssignments,
-        users: loadUsers, activity: loadActivity, 'cleaning-reports': loadCleaningReports
+        users: loadUsers, activity: loadActivity, 'cleaning-reports': loadCleaningReports,
+        distribution: loadDistribution
       };
       if (loaders[page]) loaders[page]();
     }
@@ -1579,6 +1715,7 @@
       _ferretTab = tab;
       document.getElementById('tabActive').classList.toggle('active', tab === 'active');
       document.getElementById('tabDeceased').classList.toggle('active', tab === 'deceased');
+      document.getElementById('tabDistributed').classList.toggle('active', tab === 'distributed');
       renderFerretGrid();
     }
 
@@ -1608,19 +1745,27 @@
       const grid = document.getElementById('ferretGrid');
       if (!_ferretData.length) { grid.innerHTML = '<div class="col"><p class="text-muted mt-2">No ferrets found.</p></div>'; return; }
 
-      const showDeceased = _ferretTab === 'deceased';
-      const filtered = _ferretData.filter(f => showDeceased ? f.dead === '1' : f.dead !== '1');
+      // Categorise: distributed takes priority over dead for display purposes
+      const isDistributed = f => f.distributed == 1;
+      const isDeceased = f => !isDistributed(f) && f.dead === '1';
+      const isActive = f => !isDistributed(f) && f.dead !== '1';
+
+      let filtered;
+      if (_ferretTab === 'distributed') filtered = _ferretData.filter(isDistributed);
+      else if (_ferretTab === 'deceased') filtered = _ferretData.filter(isDeceased);
+      else filtered = _ferretData.filter(isActive);
 
       // Update tab counts
-      const activeCount = _ferretData.filter(f => f.dead !== '1').length;
-      const deceasedCount = _ferretData.filter(f => f.dead === '1').length;
       const tabAC = document.getElementById('tabActiveCount');
       const tabDC = document.getElementById('tabDeceasedCount');
-      if (tabAC) tabAC.textContent = activeCount;
-      if (tabDC) tabDC.textContent = deceasedCount || '';
+      const tabDist = document.getElementById('tabDistributedCount');
+      if (tabAC) tabAC.textContent = _ferretData.filter(isActive).length;
+      if (tabDC) tabDC.textContent = _ferretData.filter(isDeceased).length || '';
+      if (tabDist) tabDist.textContent = _ferretData.filter(isDistributed).length || '';
 
       if (!filtered.length) {
-        grid.innerHTML = `<div class="col"><p class="text-muted mt-2">${showDeceased ? 'No deceased ferrets.' : 'No active ferrets.'}</p></div>`;
+        const msgs = { active: 'No active ferrets.', deceased: 'No deceased ferrets.', distributed: 'No distributed ferrets.' };
+        grid.innerHTML = `<div class="col"><p class="text-muted mt-2">${msgs[_ferretTab]}</p></div>`;
         return;
       }
 
@@ -1635,7 +1780,7 @@
         : s === 'female' ? '<span class="badge bg-danger badge-pill small">♀ F</span>' : '';
       grid.innerHTML = sorted.map(f => {
         const vaccDue = f.next_rabies_vaccine_due &&
-          new Date(f.next_rabies_vaccine_due) <= new Date(Date.now() + 30 * 864e5) && f.dead !== '1';
+          new Date(f.next_rabies_vaccine_due) <= new Date(Date.now() + 30 * 864e5) && !isDistributed(f) && f.dead !== '1';
         const age = ferretAge(f.birth_date);
         return `
       <div class="col-md-4 col-lg-3">
@@ -1649,16 +1794,19 @@
                 <h6 class="mb-0 fw-semibold">${f.name}</h6>
                 <div class="text-muted small">${age}</div>
               </div>
-              <span class="status-dot mt-1 ${f.dead === '1' ? 'dot-dead' : 'dot-active'}"></span>
+              <span class="status-dot mt-1 ${isDistributed(f) ? 'dot-dead' : f.dead === '1' ? 'dot-dead' : 'dot-active'}"
+                style="${isDistributed(f) ? 'background:#7c3aed' : ''}"></span>
             </div>
             <div class="text-muted small mt-1">ID: ${f.animal_id || '—'}</div>
             <div class="small">Room ${f.room_id || '?'} · Cage ${f.cage_address || '?'}</div>
             <div class="mt-1 d-flex flex-wrap gap-1">
               ${sexIcon(f.sex)}
-              ${f.dead === '1' ? `<span class="badge bg-danger badge-pill small">Deceased</span>` : ''}
+              ${isDistributed(f) ? `<span class="badge badge-pill small" style="background:#7c3aed;color:#fff">Distributed</span>` : ''}
+              ${f.dead === '1' && !isDistributed(f) ? `<span class="badge bg-danger badge-pill small">Deceased</span>` : ''}
               ${vaccDue ? `<span class="badge bg-warning text-dark badge-pill small">Vaccine Due</span>` : ''}
-              ${f.eight_hour_light ? `<span class="badge bg-info text-dark badge-pill small">💡 8hr Light</span>` : ''}
+              ${f.eight_hour_light && !isDistributed(f) ? `<span class="badge bg-info text-dark badge-pill small">💡 8hr Light</span>` : ''}
             </div>
+            ${isDistributed(f) && f.distributor_name ? `<div class="text-muted small mt-1" style="font-size:.75rem">→ ${f.distributor_name}</div>` : ''}
           </div>
         </div>
       </div>`;
@@ -1696,9 +1844,13 @@
         <div class="col-md-9">
           <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
             <h3 class="mb-0 fw-bold">${f.ferret_name}</h3>
-            ${f.dead === '1' ? `<span class="badge bg-danger">Deceased</span>` : `<span class="badge bg-success">Active</span>`}
-            ${canUpdate() ? `<button class="btn btn-sm btn-outline-secondary ms-auto" onclick="toggleDead(${id},'${f.dead}')">${f.dead === '1' ? 'Mark Active' : 'Mark Deceased'}</button>` : ''}
-            ${isAdmin ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteFerret(${id})">Delete</button>` : ''}
+            ${f.distributed == 1 ? `<span class="badge" style="background:#7c3aed">Distributed</span>` : f.dead === '1' ? `<span class="badge bg-danger">Deceased</span>` : `<span class="badge bg-success">Active</span>`}
+            <div class="ms-auto d-flex gap-2 flex-wrap">
+              ${canUpdate() && !f.distributed ? `<button class="btn btn-sm btn-outline-secondary" onclick="toggleDead(${id},'${f.dead}')">${f.dead === '1' ? 'Mark Active' : 'Mark Deceased'}</button>` : ''}
+              ${canUpdate() && f.dead !== '1' && !f.distributed ? `<button class="btn btn-sm btn-outline-primary" onclick="openDistributeModal(${id}, '${f.ferret_name.replace(/'/g, "\\'")}')"><i class="bi bi-box-arrow-right me-1"></i>Distribute</button>` : ''}
+              ${canUpdate() && f.distributed ? `<button class="btn btn-sm btn-outline-secondary" onclick="undoDistribute(${id})">Undo Distribution</button>` : ''}
+              ${isAdmin ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteFerret(${id})">Delete</button>` : ''}
+            </div>
           </div>
           <div class="text-muted mb-2">Animal ID: ${f.animal_id || '—'}</div>
           <div class="row g-2 small">
@@ -1773,6 +1925,7 @@
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tVacc">Vaccinations</button></li>
         ${isMat ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tLitter">Litters</button></li>` : ''}
         ${canUpdate() ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMed">Medical Info</button></li>` : ''}
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tDist">Distribution</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tHistory">History</button></li>
       </ul>
 
@@ -1876,6 +2029,13 @@
               : `<p class="text-muted small">No procedures logged yet.</p>`}
         </div>` : ''}
 
+        <!-- Distribution -->
+        <div id="tDist" class="tab-pane">
+          <div id="distFerretHistory">
+            <div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm" role="status"></div> Loading…</div>
+          </div>
+        </div>
+
         <!-- History -->
         <div id="tHistory" class="tab-pane">
           <div class="timeline ps-2">
@@ -1919,6 +2079,9 @@
 
         // Load RFID
         loadRfidDisplay(id);
+
+        // Load distribution history for this ferret
+        loadFerretDistHistory(id);
       } catch (err) { el.innerHTML = `<div class="alert alert-danger">${err.message}</div>`; }
     }
 
@@ -2007,6 +2170,236 @@
       try {
         await api(`/ferrets/${ferretId}/rfid/unassign`, { method: 'PUT', body: { reason: 'manual_unassign' } });
         loadRfidDisplay(ferretId);
+      } catch (err) { alert(err.message); }
+    }
+
+    // ─── Distribution (ferret detail) ─────────────────────────────────────────────
+    async function openDistributeModal(ferretId, ferretName) {
+      document.getElementById('distFerretId').value = ferretId;
+      document.getElementById('distFerretName').textContent = `Distributing: ${ferretName}`;
+      document.getElementById('distDate').value = today();
+      document.getElementById('distPrice').value = '';
+      document.getElementById('distNotes').value = '';
+      try {
+        const distributors = await api('/distributors');
+        document.getElementById('distDistributorId').innerHTML =
+          distributors.map(d => `<option value="${d.distributor_id}">${d.distributor_name}</option>`).join('');
+        new bootstrap.Modal(document.getElementById('distributeModal')).show();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function submitDistribute() {
+      const ferretId = document.getElementById('distFerretId').value;
+      const distId = document.getElementById('distDistributorId').value;
+      const date = document.getElementById('distDate').value;
+      const price = document.getElementById('distPrice').value;
+      const notes = document.getElementById('distNotes').value;
+      if (!distId || !date) return alert('Distributor and date are required.');
+      try {
+        await api(`/ferrets/${ferretId}/distribute`, {
+          method: 'POST',
+          body: {
+            distributor_id: parseInt(distId), distribution_date: date,
+            price: price ? parseFloat(price) : null, notes: notes || null
+          }
+        });
+        bootstrap.Modal.getInstance(document.getElementById('distributeModal')).hide();
+        loadFerretDetail(ferretId);
+      } catch (err) { alert(err.message); }
+    }
+
+    async function undoDistribute(ferretId) {
+      if (!confirm('Undo this distribution? The ferret will be returned to active status.')) return;
+      try {
+        await api(`/ferrets/${ferretId}/distribute/undo`, { method: 'PUT', body: {} });
+        loadFerretDetail(ferretId);
+      } catch (err) { alert(err.message); }
+    }
+
+    async function loadFerretDistHistory(ferretId) {
+      const el = document.getElementById('distFerretHistory');
+      if (!el) return;
+      try {
+        const events = await api(`/ferrets/${ferretId}/distribution`);
+        if (!events.length) {
+          el.innerHTML = '<p class="text-muted small">This ferret has no distribution records.</p>';
+          return;
+        }
+        el.innerHTML = `
+          <table class="table table-sm">
+            <thead><tr><th>Date</th><th>Distributor</th><th>Price</th><th>Notes</th><th>Recorded By</th></tr></thead>
+            <tbody>
+              ${events.map(e => `
+                <tr>
+                  <td>${fmtDate(e.distribution_date)}</td>
+                  <td><strong>${e.distributor_name}</strong><br><span class="text-muted small">${e.distributor_address || ''}</span></td>
+                  <td>${e.price != null ? '$' + parseFloat(e.price).toFixed(2) : '—'}</td>
+                  <td class="small">${e.notes || '—'}</td>
+                  <td class="text-muted small">${e.recorded_by || '—'}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>`;
+      } catch (err) {
+        el.innerHTML = '<div class="text-danger small">Failed to load distribution records.</div>';
+      }
+    }
+
+    // ─── Distribution Page ────────────────────────────────────────────────────────
+    let _distFilterId = null;
+    let _editDistributorId = null;
+
+    async function loadDistribution() {
+      const canManage = roleIs('admin', 'research');
+      if (canManage) document.getElementById('btnAddDistributor').classList.remove('d-none');
+      else document.getElementById('btnAddDistributor').classList.add('d-none');
+
+      try {
+        const [distributors, events] = await Promise.all([
+          api('/distributors'),
+          api('/distribution-events')
+        ]);
+
+        // Filter buttons
+        const filterWrap = document.getElementById('distFilterBtns');
+        filterWrap.innerHTML = `
+          <button class="btn btn-sm ${_distFilterId === null ? 'btn-primary' : 'btn-outline-secondary'}" onclick="setDistFilter(null)">All</button>
+          ${distributors.map(d => `
+            <button class="btn btn-sm ${_distFilterId === d.distributor_id ? 'btn-primary' : 'btn-outline-secondary'}"
+              onclick="setDistFilter(${d.distributor_id})">${d.distributor_name}</button>`).join('')}`;
+
+        // Summary cards
+        const cardsWrap = document.getElementById('distSummaryCards');
+        cardsWrap.innerHTML = distributors.map(d => {
+          const ferretCount = d.distribution_count || 0;
+          const totalVal = d.total_value ? '$' + parseFloat(d.total_value).toFixed(2) : '—';
+          const lastDate = d.last_distribution_date ? fmtDate(d.last_distribution_date) : 'Never';
+          return `
+            <div class="col-md-4 col-lg-3">
+              <div class="card h-100">
+                <div class="card-body">
+                  <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div>
+                      <h6 class="fw-bold mb-0">${d.distributor_name}</h6>
+                      ${d.address ? `<div class="text-muted small"><i class="bi bi-geo-alt me-1"></i>${d.address}</div>` : ''}
+                      ${d.contact_info ? `<div class="text-muted small"><i class="bi bi-person me-1"></i>${d.contact_info}</div>` : ''}
+                      ${d.phone ? `<div class="text-muted small"><i class="bi bi-telephone me-1"></i>${d.phone}</div>` : ''}
+                    </div>
+                    ${canManage ? `
+                    <div class="d-flex flex-column gap-1">
+                      <button class="btn btn-sm btn-outline-primary" onclick="openEditDistributor(${d.distributor_id})"><i class="bi bi-pencil"></i></button>
+                      ${roleIs('admin') ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteDistributor(${d.distributor_id})"><i class="bi bi-trash"></i></button>` : ''}
+                    </div>` : ''}
+                  </div>
+                  <div class="d-flex gap-2 flex-wrap mt-2">
+                    <span class="badge bg-primary bg-opacity-10 text-primary">${ferretCount} ferret(s)</span>
+                    <span class="badge bg-success bg-opacity-10 text-success">${totalVal}</span>
+                    <span class="badge bg-secondary bg-opacity-10 text-secondary small">Last: ${lastDate}</span>
+                  </div>
+                  <button class="btn btn-sm btn-outline-secondary w-100 mt-2" onclick="setDistFilter(${d.distributor_id})">
+                    <i class="bi bi-list me-1"></i>View Records
+                  </button>
+                </div>
+              </div>
+            </div>`;
+        }).join('') || '<div class="col"><p class="text-muted">No distributors yet.</p></div>';
+
+        renderDistTable(events);
+      } catch (err) { console.error(err); }
+    }
+
+    function setDistFilter(id) {
+      _distFilterId = id;
+      // Re-highlight filter buttons
+      document.querySelectorAll('#distFilterBtns button').forEach((btn, i) => {
+        const isAll = (id === null && i === 0);
+        btn.className = `btn btn-sm ${(isAll || btn.textContent.trim() && btn.onclick?.toString().includes(`(${id})`)) ? 'btn-primary' : 'btn-outline-secondary'}`;
+      });
+      // Reload just the table with the new filter
+      api('/distribution-events' + (id ? `?distributor_id=${id}` : ''))
+        .then(events => renderDistTable(events))
+        .catch(console.error);
+    }
+
+    function renderDistTable(events) {
+      const tbody = document.getElementById('distTable');
+      const titleEl = document.getElementById('distTableTitle');
+      const countEl = document.getElementById('distTableCount');
+      titleEl.textContent = _distFilterId ? 'Records for Selected Distributor' : 'All Distribution Records';
+      countEl.textContent = events.length;
+      if (!events.length) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-muted text-center py-4">No distribution records found.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = events.map(e => `
+        <tr style="cursor:pointer" onclick="loadFerretDetail(${e.ferret_id})">
+          <td>${fmtDate(e.distribution_date)}</td>
+          <td><strong>${e.ferret_name}</strong></td>
+          <td class="text-muted">${e.animal_id || '—'}</td>
+          <td>${e.sex ? e.sex.charAt(0).toUpperCase() + e.sex.slice(1) : '—'}</td>
+          <td>${e.distributor_name}</td>
+          <td>${e.price != null ? '$' + parseFloat(e.price).toFixed(2) : '—'}</td>
+          <td class="small text-muted">${e.dist_notes || '—'}</td>
+          <td class="text-muted small">${e.recorded_by || '—'}</td>
+          <td><i class="bi bi-chevron-right text-muted"></i></td>
+        </tr>`).join('');
+    }
+
+    // ─── Distributor CRUD ─────────────────────────────────────────────────────────
+    function openDistributorModal() {
+      _editDistributorId = null;
+      document.getElementById('distributorModalTitle').textContent = 'Add Distributor';
+      document.getElementById('distMgrId').value = '';
+      document.getElementById('distMgrName').value = '';
+      document.getElementById('distMgrContact').value = '';
+      document.getElementById('distMgrAddr').value = '';
+      document.getElementById('distMgrPhone').value = '';
+      document.getElementById('distMgrNotes').value = '';
+      new bootstrap.Modal(document.getElementById('distributorModal')).show();
+    }
+
+    async function openEditDistributor(id) {
+      _editDistributorId = id;
+      try {
+        const distributors = await api('/distributors');
+        const d = distributors.find(x => x.distributor_id === id);
+        if (!d) return;
+        document.getElementById('distributorModalTitle').textContent = `Edit: ${d.distributor_name}`;
+        document.getElementById('distMgrId').value = id;
+        document.getElementById('distMgrName').value = d.distributor_name || '';
+        document.getElementById('distMgrContact').value = d.contact_info || '';
+        document.getElementById('distMgrAddr').value = d.address || '';
+        document.getElementById('distMgrPhone').value = d.phone || '';
+        document.getElementById('distMgrNotes').value = d.notes || '';
+        new bootstrap.Modal(document.getElementById('distributorModal')).show();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function submitDistributor() {
+      const name = document.getElementById('distMgrName').value.trim();
+      if (!name) return alert('Distributor name is required.');
+      const body = {
+        distributor_name: name,
+        contact_info: document.getElementById('distMgrContact').value || null,
+        address: document.getElementById('distMgrAddr').value || null,
+        phone: document.getElementById('distMgrPhone').value || null,
+        notes: document.getElementById('distMgrNotes').value || null
+      };
+      try {
+        if (_editDistributorId) {
+          await api(`/distributors/${_editDistributorId}`, { method: 'PUT', body });
+        } else {
+          await api('/distributors', { method: 'POST', body });
+        }
+        bootstrap.Modal.getInstance(document.getElementById('distributorModal')).hide();
+        loadDistribution();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function deleteDistributor(id) {
+      if (!confirm('Delete this distributor? This will fail if any distribution records reference it.')) return;
+      try {
+        await api(`/distributors/${id}`, { method: 'DELETE' });
+        loadDistribution();
       } catch (err) { alert(err.message); }
     }
 

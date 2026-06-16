@@ -1,4 +1,4 @@
-// SanusBio v1.1.0 | 2026-06-04
+// SanusBio v1.2.0 | 2026-06-16
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -152,11 +152,14 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
                f.birth_date, f.weight, f.dead, f.description, f.color, f.litter_id,
                f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
                f.next_rabies_vaccine_due, f.sex, f.eight_hour_light,
+               f.distributed, f.distributor_id,
                a.cage_address, a.room_id,
-               s.supplier_name
+               s.supplier_name,
+               d.distributor_name
         FROM ferret_qr005 f
-        LEFT JOIN address  a ON f.address_id  = a.address_id
-        LEFT JOIN supplier s ON f.supplier_id = s.supplier_id
+        LEFT JOIN address     a ON f.address_id     = a.address_id
+        LEFT JOIN supplier    s ON f.supplier_id    = s.supplier_id
+        LEFT JOIN distributor d ON f.distributor_id = d.distributor_id
         WHERE f.ferret_name LIKE ? OR f.animal_id LIKE ?
         ORDER BY f.ferret_name
       `, [q, q]);
@@ -166,8 +169,9 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
                f.birth_date, f.weight, f.dead, f.description, f.color, f.litter_id,
                f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
                f.next_rabies_vaccine_due, f.sex, 0 AS eight_hour_light,
+               0 AS distributed, NULL AS distributor_id,
                a.cage_address, a.room_id,
-               s.supplier_name
+               s.supplier_name, NULL AS distributor_name
         FROM ferret_qr005 f
         LEFT JOIN address  a ON f.address_id  = a.address_id
         LEFT JOIN supplier s ON f.supplier_id = s.supplier_id
@@ -896,5 +900,203 @@ app.get('/api/cleaning-reports/:id', authenticate, async (req, res) => {
     );
     if (!row) return res.status(404).json({ error: 'Report not found' });
     res.json(row);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});// ─── Distributors ─────────────────────────────────────────────────────────────
+
+// List all distributors
+app.get('/api/distributors', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT d.*,
+             COUNT(de.distribution_id)          AS distribution_count,
+             SUM(de.price)                       AS total_value,
+             MAX(de.distribution_date)           AS last_distribution_date
+      FROM distributor d
+      LEFT JOIN distribution_event de ON d.distributor_id = de.distributor_id
+      GROUP BY d.distributor_id
+      ORDER BY d.distributor_name
+    `);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Create distributor
+app.post('/api/distributors', authenticate, admin_or_research, async (req, res) => {
+  const { distributor_name, contact_info, address, phone, notes } = req.body;
+  if (!distributor_name) return res.status(400).json({ error: 'distributor_name is required' });
+  try {
+    const [r] = await pool.query(
+      'INSERT INTO distributor (distributor_name, contact_info, address, phone, notes) VALUES (?,?,?,?,?)',
+      [distributor_name, contact_info || null, address || null, phone || null, notes || null]
+    );
+    await log_activity(req.user.user_id, 'CREATE', 'distributor', r.insertId, `Added distributor: ${distributor_name}`);
+    res.json({ id: r.insertId, message: 'Distributor added' });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'A distributor with that name already exists' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update distributor
+app.put('/api/distributors/:id', authenticate, admin_or_research, async (req, res) => {
+  const { distributor_name, contact_info, address, phone, notes } = req.body;
+  const sets = [], vals = [];
+  if (distributor_name !== undefined) { sets.push('distributor_name = ?'); vals.push(distributor_name); }
+  if (contact_info !== undefined) { sets.push('contact_info = ?'); vals.push(contact_info || null); }
+  if (address !== undefined) { sets.push('address = ?'); vals.push(address || null); }
+  if (phone !== undefined) { sets.push('phone = ?'); vals.push(phone || null); }
+  if (notes !== undefined) { sets.push('notes = ?'); vals.push(notes || null); }
+  if (!sets.length) return res.status(400).json({ error: 'Nothing to update' });
+  vals.push(req.params.id);
+  try {
+    await pool.query(`UPDATE distributor SET ${sets.join(', ')} WHERE distributor_id = ?`, vals);
+    await log_activity(req.user.user_id, 'UPDATE', 'distributor', req.params.id, `Updated distributor #${req.params.id}`);
+    res.json({ message: 'Distributor updated' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Delete distributor (only if no distribution events reference it)
+app.delete('/api/distributors/:id', authenticate, admin_only, async (req, res) => {
+  try {
+    const [[{ cnt }]] = await pool.query(
+      'SELECT COUNT(*) AS cnt FROM distribution_event WHERE distributor_id = ?', [req.params.id]
+    );
+    if (cnt > 0) return res.status(400).json({ error: `Cannot delete — ${cnt} distribution record(s) reference this distributor` });
+    await pool.query('DELETE FROM distributor WHERE distributor_id = ?', [req.params.id]);
+    await log_activity(req.user.user_id, 'DELETE', 'distributor', req.params.id, `Deleted distributor #${req.params.id}`);
+    res.json({ message: 'Distributor deleted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Get ferrets distributed to a specific distributor
+app.get('/api/distributors/:id/ferrets', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT de.distribution_id, de.distribution_date, de.price, de.notes AS dist_notes,
+             de.recorded_by, de.created_at AS dist_created_at,
+             f.Ferret_QR005_id AS ferret_id, f.ferret_name, f.animal_id,
+             f.birth_date, f.sex, f.weight, f.photo_url, f.dead
+      FROM distribution_event de
+      JOIN ferret_qr005 f ON de.ferret_id = f.Ferret_QR005_id
+      WHERE de.distributor_id = ?
+      ORDER BY de.distribution_date DESC, f.ferret_name
+    `, [req.params.id]);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Distribution Events ──────────────────────────────────────────────────────
+
+// Distribute a ferret
+app.post('/api/ferrets/:id/distribute', authenticate, require_perm('update'), async (req, res) => {
+  const { distributor_id, distribution_date, price, notes } = req.body;
+  if (!distributor_id) return res.status(400).json({ error: 'distributor_id is required' });
+  if (!distribution_date) return res.status(400).json({ error: 'distribution_date is required' });
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Verify ferret exists and isn't already distributed
+    const [[ferret]] = await conn.query(
+      'SELECT ferret_name, distributed FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]
+    );
+    if (!ferret) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Ferret not found' }); }
+    if (ferret.distributed) { await conn.rollback(); conn.release(); return res.status(400).json({ error: 'This ferret has already been distributed' }); }
+
+    // Verify distributor exists
+    const [[dist]] = await conn.query('SELECT distributor_name FROM distributor WHERE distributor_id = ?', [distributor_id]);
+    if (!dist) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Distributor not found' }); }
+
+    // Record distribution event
+    const [r] = await conn.query(
+      `INSERT INTO distribution_event (ferret_id, distributor_id, distribution_date, price, notes, recorded_by)
+       VALUES (?,?,?,?,?,?)`,
+      [req.params.id, distributor_id, distribution_date,
+      price != null ? parseFloat(price) : null, notes || null, req.user.username]
+    );
+
+    // Mark ferret as distributed and set distributor reference
+    await conn.query(
+      'UPDATE ferret_qr005 SET distributed = 1, distributor_id = ? WHERE Ferret_QR005_id = ?',
+      [distributor_id, req.params.id]
+    );
+
+    await conn.commit();
+    await log_activity(req.user.user_id, 'DISTRIBUTE', 'ferret_qr005', req.params.id,
+      `${ferret.ferret_name} distributed to ${dist.distributor_name} on ${distribution_date}`);
+    res.json({ id: r.insertId, message: 'Ferret distributed successfully' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
+});
+
+// Undo a distribution (admin only)
+app.put('/api/ferrets/:id/distribute/undo', authenticate, admin_only, async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[ferret]] = await conn.query(
+      'SELECT ferret_name FROM ferret_qr005 WHERE Ferret_QR005_id = ? AND distributed = 1', [req.params.id]
+    );
+    if (!ferret) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'No active distribution found for this ferret' }); }
+    // Remove most recent distribution event
+    await conn.query(
+      `DELETE FROM distribution_event WHERE ferret_id = ?
+       ORDER BY distribution_date DESC, distribution_id DESC LIMIT 1`, [req.params.id]
+    );
+    // Check if any other events remain; if not, clear flags
+    const [[{ remaining }]] = await conn.query(
+      'SELECT COUNT(*) AS remaining FROM distribution_event WHERE ferret_id = ?', [req.params.id]
+    );
+    if (!remaining) {
+      await conn.query(
+        'UPDATE ferret_qr005 SET distributed = 0, distributor_id = NULL WHERE Ferret_QR005_id = ?', [req.params.id]
+      );
+    }
+    await conn.commit();
+    await log_activity(req.user.user_id, 'DISTRIBUTE_UNDO', 'ferret_qr005', req.params.id,
+      `Distribution undone for ${ferret.ferret_name}`);
+    res.json({ message: 'Distribution reversed' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
+});
+
+// Get distribution history for a single ferret
+app.get('/api/ferrets/:id/distribution', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT de.*, d.distributor_name, d.address AS distributor_address
+      FROM distribution_event de
+      JOIN distributor d ON de.distributor_id = d.distributor_id
+      WHERE de.ferret_id = ?
+      ORDER BY de.distribution_date DESC
+    `, [req.params.id]);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// All distribution events (for the Distribution page overview)
+app.get('/api/distribution-events', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 200;
+    const distributor_id = req.query.distributor_id || null;
+    let q = `
+      SELECT de.distribution_id, de.distribution_date, de.price, de.notes AS dist_notes,
+             de.recorded_by, de.created_at,
+             f.Ferret_QR005_id AS ferret_id, f.ferret_name, f.animal_id, f.sex, f.birth_date,
+             d.distributor_id, d.distributor_name
+      FROM distribution_event de
+      JOIN ferret_qr005 f  ON de.ferret_id      = f.Ferret_QR005_id
+      JOIN distributor  d  ON de.distributor_id = d.distributor_id
+    `;
+    const params = [];
+    if (distributor_id) { q += ' WHERE de.distributor_id = ?'; params.push(distributor_id); }
+    q += ' ORDER BY de.distribution_date DESC, f.ferret_name LIMIT ?';
+    params.push(limit);
+    const [rows] = await pool.query(q, params);
+    res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
