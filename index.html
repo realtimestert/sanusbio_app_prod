@@ -1478,24 +1478,26 @@
       </div>
     </div>
   </div>
-  <div class="modal-dialog modal-sm">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Add Location</h5><button class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-2"><label class="form-label">Room ID <span class="text-danger">*</span></label><input id="adRoom"
-            type="number" class="form-control"></div>
-        <div class="mb-2"><label class="form-label">Cage Address</label><input id="adCage" class="form-control"
-            maxlength="5" placeholder="e.g. A1"></div>
-        <div class="mb-2"><label class="form-label">Lighting</label><input id="adLight" class="form-control"></div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button class="btn btn-primary" onclick="submitAddress()">Add</button>
+  <!-- Add Address Modal -->
+  <div class="modal fade" id="addrModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Location</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-2"><label class="form-label">Room ID <span class="text-danger">*</span></label><input
+              id="adRoom" type="number" class="form-control"></div>
+          <div class="mb-2"><label class="form-label">Cage Address</label><input id="adCage" class="form-control"
+              maxlength="5" placeholder="e.g. A1"></div>
+          <div class="mb-2"><label class="form-label">Lighting</label><input id="adLight" class="form-control"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitAddress()">Add</button>
+        </div>
       </div>
     </div>
-  </div>
   </div>
 
   <!-- Supplier Modal -->
