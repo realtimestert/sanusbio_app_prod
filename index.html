@@ -1197,8 +1197,23 @@
         </div>
         <div class="modal-body">
           <input type="hidden" id="moveFerretId">
-          <label class="form-label">Select New Location</label>
-          <select id="moveAddrId" class="form-select"></select>
+          <div class="mb-3">
+            <label class="form-label">Select New Location</label>
+            <select id="moveAddrId" class="form-select"></select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Position in Cage</label>
+            <div class="d-flex gap-3 flex-wrap mt-1">
+              <div class="form-check"><input class="form-check-input" type="radio" name="movePosition" id="movePosTop"
+                  value="Top"><label class="form-check-label" for="movePosTop">Top</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="movePosition" id="movePosMid"
+                  value="Middle"><label class="form-check-label" for="movePosMid">Middle</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="movePosition" id="movePosBot"
+                  value="Bottom"><label class="form-check-label" for="movePosBot">Bottom</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="movePosition" id="movePosNone"
+                  value="" checked><label class="form-check-label" for="movePosNone">None</label></div>
+            </div>
+          </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -1488,9 +1503,23 @@
         <div class="modal-body">
           <div class="mb-2"><label class="form-label">Room ID <span class="text-danger">*</span></label><input
               id="adRoom" type="number" class="form-control"></div>
+          <div class="mb-2"><label class="form-label">Room Name</label><input id="adRoomName" class="form-control"
+              placeholder="e.g. JB, Breeding, ISO"></div>
           <div class="mb-2"><label class="form-label">Cage Address</label><input id="adCage" class="form-control"
               maxlength="5" placeholder="e.g. A1"></div>
-          <div class="mb-2"><label class="form-label">Lighting</label><input id="adLight" class="form-control"></div>
+          <div class="mb-2">
+            <label class="form-label">Position</label>
+            <div class="d-flex gap-3 flex-wrap mt-1">
+              <div class="form-check"><input class="form-check-input" type="radio" name="adPosition" id="adPosTop"
+                  value="Top"><label class="form-check-label" for="adPosTop">Top</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="adPosition" id="adPosMid"
+                  value="Middle"><label class="form-check-label" for="adPosMid">Middle</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="adPosition" id="adPosBot"
+                  value="Bottom"><label class="form-check-label" for="adPosBot">Bottom</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="adPosition" id="adPosNone"
+                  value="" checked><label class="form-check-label" for="adPosNone">None</label></div>
+            </div>
+          </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -1721,19 +1750,18 @@
       renderFerretGrid();
     }
 
-    function ferretAge(birthDate) {
+    function ferretAge(birthDate, endDate) {
       if (!birthDate) return '—';
       const birth = new Date(birthDate);
-      const now = new Date();
-      const totalDays = Math.floor((now - birth) / 864e5);
+      const end = endDate ? new Date(endDate) : new Date();
+      const totalDays = Math.floor((end - birth) / 864e5);
       if (totalDays < 0) return '—';
       const totalWeeks = Math.floor(totalDays / 7);
       if (totalWeeks < 52) return totalWeeks + 'wk';
-      // 1 year or older — calculate Y / mo / wk
-      let years = now.getFullYear() - birth.getFullYear();
-      let months = now.getMonth() - birth.getMonth();
-      let days = now.getDate() - birth.getDate();
-      if (days < 0) { months--; days += new Date(now.getFullYear(), now.getMonth(), 0).getDate(); }
+      let years = end.getFullYear() - birth.getFullYear();
+      let months = end.getMonth() - birth.getMonth();
+      let days = end.getDate() - birth.getDate();
+      if (days < 0) { months--; days += new Date(end.getFullYear(), end.getMonth(), 0).getDate(); }
       if (months < 0) { years--; months += 12; }
       const weeks = Math.floor(days / 7);
       let parts = [];
@@ -1783,7 +1811,12 @@
       grid.innerHTML = sorted.map(f => {
         const vaccDue = f.next_rabies_vaccine_due &&
           new Date(f.next_rabies_vaccine_due) <= new Date(Date.now() + 30 * 864e5) && !isDistributed(f) && f.dead !== '1';
-        const age = ferretAge(f.birth_date);
+        let ageLabel;
+        if (isDeceased(f)) {
+          ageLabel = 'Lived ' + ferretAge(f.birth_date, f.death_date);
+        } else {
+          ageLabel = ferretAge(f.birth_date);
+        }
         return `
       <div class="col-md-4 col-lg-3">
         <div class="card ferret-card" onclick="loadFerretDetail(${f.id})">
@@ -1794,7 +1827,7 @@
             <div class="d-flex align-items-start justify-content-between">
               <div>
                 <h6 class="mb-0 fw-semibold">${f.name}</h6>
-                <div class="text-muted small">${age}</div>
+                <div class="text-muted small">${ageLabel}</div>
               </div>
               <span class="status-dot mt-1 ${isDistributed(f) ? 'dot-dead' : f.dead === '1' ? 'dot-dead' : 'dot-active'}"
                 style="${isDistributed(f) ? 'background:#7c3aed' : ''}"></span>
@@ -1868,6 +1901,19 @@
                    </div>`
             : `<strong>${fmtDate(f.birth_date)}</strong>`}
             </div>
+            ${f.dead === '1' ? `
+            <div class="col-6 col-md-4"><span class="text-muted">Death Date</span><br>
+              ${canEdit
+              ? `<div class="d-flex align-items-center gap-2 mt-1">
+                    <input type="date" id="editDeathDate" class="form-control form-control-sm"
+                      value="${f.death_date ? String(f.death_date).slice(0, 10) : ''}"
+                      style="max-width:160px">
+                    <button class="btn btn-sm btn-outline-primary" onclick="saveDeathDate(${id})">
+                      <i class="bi bi-check2"></i> Save
+                    </button>
+                   </div>`
+              : `<strong>${fmtDate(f.death_date)}</strong>`}
+            </div>` : ''}
             <div class="col-6 col-md-4"><span class="text-muted">Sex</span><br><strong>${f.sex ? f.sex.charAt(0).toUpperCase() + f.sex.slice(1) : '—'}</strong></div>
             <div class="col-6 col-md-4"><span class="text-muted">Weight</span><br><strong>${f.weight ? f.weight + ' g' : '—'}</strong></div>
             <div class="col-6 col-md-4"><span class="text-muted">Location</span><br>
@@ -1997,7 +2043,7 @@
                 <td class="small">${l.anomalies_and_notes || '—'}</td>
                 <td>
                   ${canUpdate() && (!l.individuals_created || l.individuals_created < l.kit_count)
-                ? `<button class="btn btn-xs btn-outline-success btn-sm" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>` : ''}
+                  ? `<button class="btn btn-xs btn-outline-success btn-sm" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>` : ''}
                 </td>
               </tr>`).join('') : '<tr><td colspan="8" class="text-muted text-center py-3">No litter records</td></tr>'}
             </tbody>
@@ -2459,6 +2505,14 @@
       } catch (err) { alert(err.message); }
     }
 
+    async function saveDeathDate(id) {
+      const val = document.getElementById('editDeathDate').value;
+      try {
+        await api(`/ferrets/${id}`, { method: 'PUT', body: { death_date: val || null } });
+        loadFerretDetail(id);
+      } catch (err) { alert(err.message); }
+    }
+
     async function toggleDead(id, current) {
       try { await api(`/ferrets/${id}`, { method: 'PUT', body: { dead: current === '1' ? '0' : '1' } }); loadFerretDetail(id); }
       catch (err) { alert(err.message); }
@@ -2799,10 +2853,13 @@
 
     async function openMoveModal(ferretId) {
       document.getElementById('moveFerretId').value = ferretId;
+      document.getElementById('movePosNone').checked = true;
       try {
         const addresses = await api('/addresses');
-        document.getElementById('moveAddrId').innerHTML = addresses.map(a =>
-          `<option value="${a.address_id}">Room ${a.room_id} · Cage ${a.cage_address || '?'}</option>`).join('');
+        document.getElementById('moveAddrId').innerHTML = addresses.map(a => {
+          const label = `Room ${a.room_id}${a.room_name ? ' ' + a.room_name : ''} · Cage ${a.cage_address || '?'}`;
+          return `<option value="${a.address_id}">${label}</option>`;
+        }).join('');
         new bootstrap.Modal(document.getElementById('moveModal')).show();
       } catch (err) { alert(err.message); }
     }
@@ -2810,8 +2867,9 @@
     async function submitMove() {
       const ferretId = document.getElementById('moveFerretId').value;
       const address_id = document.getElementById('moveAddrId').value;
+      const position = document.querySelector('input[name="movePosition"]:checked')?.value || null;
       try {
-        await api(`/ferrets/${ferretId}/location`, { method: 'PUT', body: { address_id: parseInt(address_id) } });
+        await api(`/ferrets/${ferretId}/location`, { method: 'PUT', body: { address_id: parseInt(address_id), position } });
         bootstrap.Modal.getInstance(document.getElementById('moveModal')).hide();
         loadFerretDetail(ferretId);
       } catch (err) { alert(err.message); }
@@ -2820,18 +2878,21 @@
     async function submitAddress() {
       const room = document.getElementById('adRoom').value;
       if (!room) return alert('Room ID is required');
+      const position = document.querySelector('input[name="adPosition"]:checked')?.value || null;
       try {
         await api('/addresses', {
           method: 'POST', body: {
             room_id: parseInt(room),
+            room_name: document.getElementById('adRoomName').value || null,
             cage_address: document.getElementById('adCage').value || null,
-            room_lighting: document.getElementById('adLight').value || null
+            room_lighting: position || null
           }
         });
         bootstrap.Modal.getInstance(document.getElementById('addrModal')).hide();
         document.getElementById('adRoom').value = '';
+        document.getElementById('adRoomName').value = '';
         document.getElementById('adCage').value = '';
-        document.getElementById('adLight').value = '';
+        document.getElementById('adPosNone').checked = true;
         alert('Location added!');
       } catch (err) { alert(err.message); }
     }

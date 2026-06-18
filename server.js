@@ -149,7 +149,7 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
     try {
       [rows] = await pool.query(`
         SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
-               f.birth_date, f.weight, f.dead, f.description, f.color, f.litter_id,
+               f.birth_date, f.death_date, f.weight, f.dead, f.description, f.color, f.litter_id,
                f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
                f.next_rabies_vaccine_due, f.sex, f.eight_hour_light,
                f.distributed, f.distributor_id,
@@ -166,7 +166,7 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
     } catch {
       [rows] = await pool.query(`
         SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
-               f.birth_date, f.weight, f.dead, f.description, f.color, f.litter_id,
+               f.birth_date, f.death_date, f.weight, f.dead, f.description, f.color, f.litter_id,
                f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
                f.next_rabies_vaccine_due, f.sex, 0 AS eight_hour_light,
                0 AS distributed, NULL AS distributor_id,
@@ -270,7 +270,7 @@ app.post('/api/ferrets', authenticate, async (req, res) => {
 
 // Update ferret
 app.put('/api/ferrets/:id', authenticate, require_perm('update'), async (req, res) => {
-  const allowed = ['ferret_name', 'weight', 'description', 'color', 'dead', 'next_rabies_vaccine_due', 'photo_url', 'acquisition_by', 'sex', 'birth_date'];
+  const allowed = ['ferret_name', 'weight', 'description', 'color', 'dead', 'death_date', 'next_rabies_vaccine_due', 'photo_url', 'acquisition_by', 'sex', 'birth_date'];
   const sets = [], vals = [];
   for (const key of allowed) {
     if (req.body[key] !== undefined) { sets.push(`${key} = ?`); vals.push(req.body[key]); }
@@ -308,11 +308,15 @@ app.post('/api/ferrets/:id/photo', authenticate, require_perm('update'), upload.
 
 // Change ferret location
 app.put('/api/ferrets/:id/location', authenticate, async (req, res) => {
-  const { address_id } = req.body;
+  const { address_id, position } = req.body;
   if (!address_id) return res.status(400).json({ error: 'address_id required' });
   try {
     await pool.query('UPDATE ferret_qr005 SET address_id = ? WHERE Ferret_QR005_id = ?', [address_id, req.params.id]);
-    await log_activity(req.user.user_id, 'MOVE', 'ferret_qr005', req.params.id, `Moved ferret #${req.params.id} to address #${address_id}`);
+    // Store cage position (Top/Middle/Bottom/null) in address.room_lighting for this address
+    if (position !== undefined) {
+      await pool.query('UPDATE address SET room_lighting = ? WHERE address_id = ?', [position || null, address_id]);
+    }
+    await log_activity(req.user.user_id, 'MOVE', 'ferret_qr005', req.params.id, `Moved ferret #${req.params.id} to address #${address_id}${position ? ' · ' + position : ''}`);
     res.json({ message: 'Location updated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -673,11 +677,11 @@ app.get('/api/addresses', authenticate, require_perm('read'), async (req, res) =
 });
 
 app.post('/api/addresses', authenticate, admin_or_research, async (req, res) => {
-  const { room_id, cage_address, room_lighting, maintenance } = req.body;
+  const { room_id, room_name, cage_address, room_lighting, maintenance } = req.body;
   try {
     const [r] = await pool.query(
-      'INSERT INTO address (room_id, cage_address, room_lighting, maintenance) VALUES (?,?,?,?)',
-      [room_id, cage_address || null, room_lighting || null, maintenance || null]
+      'INSERT INTO address (room_id, room_name, cage_address, room_lighting, maintenance) VALUES (?,?,?,?,?)',
+      [room_id, room_name || null, cage_address || null, room_lighting || null, maintenance || null]
     );
     res.json({ id: r.insertId, message: 'Address added' });
   } catch (err) { res.status(500).json({ error: err.message }); }
