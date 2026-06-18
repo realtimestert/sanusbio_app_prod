@@ -765,7 +765,27 @@ app.listen(PORT, () => {
 });
 // ─── RFID ─────────────────────────────────────────────────────────────────────
 
-// Get active RFID for a ferret (unassigned_date IS NULL)
+// Lookup ferret by RFID chip value
+app.get('/api/rfid/lookup/:rfid', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT ra.rfid, ra.assigned_date, ra.reason, ra.notes,
+             f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
+             f.birth_date, f.death_date, f.dead, f.sex, f.weight, f.color,
+             f.description, f.photo_url, f.distributed, f.next_rabies_vaccine_due,
+             a.cage_address, a.room_id, a.room_name, a.room_lighting,
+             s.supplier_name
+      FROM rfid_assignment ra
+      JOIN ferret_qr005 f ON ra.ferret_id = f.Ferret_QR005_id
+      LEFT JOIN address  a ON f.address_id  = a.address_id
+      LEFT JOIN supplier s ON f.supplier_id = s.supplier_id
+      WHERE ra.rfid = ? AND ra.unassigned_date IS NULL
+      LIMIT 1
+    `, [req.params.rfid.trim()]);
+    if (!rows.length) return res.status(404).json({ error: 'unassigned' });
+    res.json(rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 app.get('/api/ferrets/:id/rfid', authenticate, require_perm('read'), async (req, res) => {
   try {
     const [rows] = await pool.query(

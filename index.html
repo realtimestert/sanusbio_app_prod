@@ -8,7 +8,8 @@
   <title>SanusBio</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  <link rel="icon" type="image/svg+xml" href="sanusbio_favicon.svg">
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐾%3C/text%3E%3C/svg%3E">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <style>
     :root {
@@ -302,6 +303,7 @@
       <nav class="nav flex-column pt-2 px-1 gap-1" id="navLinks">
         <a class="nav-link" href="#" data-page="dashboard"><i class="bi bi-speedometer2"></i>Dashboard</a>
         <a class="nav-link" href="#" data-page="ferrets"><i class="bi bi-grid-3x3-gap"></i>Ferrets</a>
+        <a class="nav-link" href="#" data-page="rfid-lookup"><i class="bi bi-broadcast"></i>RFID Lookup</a>
         <a class="nav-link" href="#" data-page="litters"><i class="bi bi-egg"></i>Litters</a>
         <a class="nav-link" href="#" data-page="locations"><i class="bi bi-geo-alt"></i>Locations</a>
         <a class="nav-link" href="#" data-page="suppliers"><i class="bi bi-truck"></i>Suppliers</a>
@@ -395,6 +397,56 @@
         <button class="btn btn-outline-secondary btn-sm mb-3" onclick="nav('ferrets')"><i
             class="bi bi-arrow-left me-1"></i>Back</button>
         <div id="ferretDetail"></div>
+      </div>
+
+      <!-- RFID Lookup -->
+      <div id="page-rfid-lookup" class="page">
+        <div class="page-header">
+          <h4><i class="bi bi-broadcast me-2"></i>RFID Lookup</h4>
+        </div>
+
+        <!-- NFC / manual input card -->
+        <div class="card mb-4 shadow-sm" style="border-radius:14px; max-width:560px;">
+          <div class="card-body p-4">
+
+            <!-- Web NFC status banner -->
+            <div id="nfcStatusBanner" class="alert alert-info py-2 small mb-3 d-none"></div>
+
+            <!-- Manual / USB wedge input -->
+            <div class="mb-3">
+              <label class="fw-bold fs-6 d-block mb-1"><i class="bi bi-upc-scan me-1"></i>Scan or Enter RFID</label>
+              <p class="text-muted small mb-2">
+                Scan with a USB RFID wedge reader, type the chip value, or use the NFC button below on a supported
+                device.
+              </p>
+              <div class="input-group">
+                <input id="rfidLookupInput" class="form-control font-monospace" placeholder="e.g. 0A1B2C3D4E"
+                  autocomplete="off" onkeydown="if(event.key==='Enter') doRfidLookup()">
+                <button class="btn btn-primary" onclick="doRfidLookup()">
+                  <i class="bi bi-search me-1"></i>Look Up
+                </button>
+              </div>
+            </div>
+
+            <!-- Web NFC scan button (shown only on compatible browsers) -->
+            <div id="nfcScanWrap" class="d-none">
+              <hr class="my-3">
+              <div class="d-flex align-items-center gap-3">
+                <button id="nfcScanBtn" class="btn btn-outline-primary" onclick="toggleNfcScan()">
+                  <i class="bi bi-broadcast me-1"></i>Start NFC Scan
+                </button>
+                <span id="nfcScanStatus" class="text-muted small"></span>
+              </div>
+              <div class="text-muted small mt-2">
+                Hold an RFID/NFC chip near the reader. Supported on Android Chrome with an NFC-capable device.
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Result area -->
+        <div id="rfidLookupResult"></div>
       </div>
 
       <!-- Litters -->
@@ -1671,7 +1723,7 @@
         dashboard: loadDashboard, ferrets: loadFerrets, litters: loadLitters,
         locations: loadLocations, suppliers: loadSuppliers, assignments: loadAssignments,
         users: loadUsers, activity: loadActivity, 'cleaning-reports': loadCleaningReports,
-        distribution: loadDistribution
+        distribution: loadDistribution, 'rfid-lookup': loadRfidLookupPage
       };
       if (loaders[page]) loaders[page]();
     }
@@ -1842,6 +1894,8 @@
               ${f.eight_hour_light && !isDistributed(f) ? `<span class="badge bg-info text-dark badge-pill small">💡 8hr Light</span>` : ''}
             </div>
             ${isDistributed(f) && f.distributor_name ? `<div class="text-muted small mt-1" style="font-size:.75rem">→ ${f.distributor_name}</div>` : ''}
+            ${f.color ? `<div class="text-muted small mt-1" style="font-size:.75rem">🎨 ${f.color}</div>` : ''}
+            ${f.description ? `<div class="text-muted small mt-1" style="font-size:.75rem;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${f.description}</div>` : ''}
           </div>
         </div>
       </div>`;
@@ -1927,6 +1981,8 @@
             <div class="col-6 col-md-4"><span class="text-muted">Last Exam</span><br><strong>${fmtDate(f.last_exam_date)}</strong></div>
             ${f.treatments ? `<div class="col-12"><span class="text-muted">Treatments</span><br><strong>${f.treatments}</strong></div>` : ''}
             ${f.orders ? `<div class="col-12"><span class="text-muted">Orders</span><br><strong>${f.orders}</strong></div>` : ''}
+            ${f.color ? `<div class="col-6 col-md-4"><span class="text-muted">Color</span><br><strong>${f.color}</strong></div>` : ''}
+            ${f.description ? `<div class="col-12"><span class="text-muted">Description</span><br><div class="mt-1 p-2 bg-light rounded small" style="white-space:pre-wrap;line-height:1.6">${f.description}</div></div>` : ''}
           </div>
         </div>
       </div>
@@ -2221,7 +2277,133 @@
       } catch (err) { alert(err.message); }
     }
 
-    // ─── Distribution (ferret detail) ─────────────────────────────────────────────
+    // ─── RFID Lookup Page ─────────────────────────────────────────────────────────
+    let _nfcReader = null, _nfcActive = false;
+
+    function loadRfidLookupPage() {
+      // Clear any previous result and input
+      document.getElementById('rfidLookupResult').innerHTML = '';
+      document.getElementById('rfidLookupInput').value = '';
+      document.getElementById('nfcStatusBanner').classList.add('d-none');
+
+      // Show NFC button only if Web NFC API is available
+      if ('NDEFReader' in window) {
+        document.getElementById('nfcScanWrap').classList.remove('d-none');
+        document.getElementById('nfcStatusBanner').textContent = '✅ Web NFC is supported on this device.';
+        document.getElementById('nfcStatusBanner').className = 'alert alert-success py-2 small mb-3';
+        document.getElementById('nfcStatusBanner').classList.remove('d-none');
+      } else {
+        document.getElementById('nfcScanWrap').classList.add('d-none');
+        document.getElementById('nfcStatusBanner').innerHTML =
+          '⚠️ Web NFC is not available in this browser. Use a USB RFID wedge reader or type the chip value manually. ' +
+          '<strong>Web NFC requires Android Chrome with NFC hardware.</strong>';
+        document.getElementById('nfcStatusBanner').className = 'alert alert-warning py-2 small mb-3';
+        document.getElementById('nfcStatusBanner').classList.remove('d-none');
+      }
+
+      // Focus the input so a USB wedge reader fires directly into it
+      setTimeout(() => document.getElementById('rfidLookupInput')?.focus(), 100);
+    }
+
+    async function doRfidLookup(rfidOverride) {
+      const val = (rfidOverride || document.getElementById('rfidLookupInput').value).trim();
+      if (!val) return;
+      const resultEl = document.getElementById('rfidLookupResult');
+      resultEl.innerHTML = '<div class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm me-2"></div>Looking up…</div>';
+      try {
+        const f = await api(`/rfid/lookup/${encodeURIComponent(val)}`);
+        // Success — render a ferret summary card with a "Go to Profile" button
+        const isDeceased = f.dead === '1';
+        const isDistributed = f.distributed == 1;
+        resultEl.innerHTML = `
+          <div class="card shadow-sm" style="border-radius:14px; max-width:560px; border-left:5px solid ${isDeceased ? '#dc3545' : isDistributed ? '#7c3aed' : '#198754'}">
+            <div class="card-body p-4">
+              <div class="d-flex align-items-center gap-3 mb-3">
+                ${f.photo_url
+            ? `<img src="${f.photo_url}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;">`
+            : `<div style="width:72px;height:72px;background:#e3eaf2;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2rem;">🐾</div>`}
+                <div>
+                  <h4 class="fw-bold mb-0">${f.name}</h4>
+                  <div class="text-muted small">Animal ID: ${f.animal_id || '—'}</div>
+                  ${isDeceased ? '<span class="badge bg-danger">Deceased</span>' : isDistributed ? '<span class="badge" style="background:#7c3aed">Distributed</span>' : '<span class="badge bg-success">Active</span>'}
+                </div>
+              </div>
+              <div class="row g-2 small mb-3">
+                <div class="col-6"><span class="text-muted">Sex</span><br><strong>${f.sex ? f.sex.charAt(0).toUpperCase() + f.sex.slice(1) : '—'}</strong></div>
+                <div class="col-6"><span class="text-muted">Weight</span><br><strong>${f.weight ? f.weight + ' g' : '—'}</strong></div>
+                <div class="col-6"><span class="text-muted">Birth Date</span><br><strong>${fmtDate(f.birth_date)}</strong></div>
+                ${isDeceased ? `<div class="col-6"><span class="text-muted">Death Date</span><br><strong>${fmtDate(f.death_date)}</strong></div>` : ''}
+                <div class="col-6"><span class="text-muted">Location</span><br><strong>Room ${f.room_id || '?'}${f.room_name ? ' ' + f.room_name : ''} · ${f.cage_address || '?'}${f.room_lighting ? ' · ' + f.room_lighting : ''}</strong></div>
+                ${f.color ? `<div class="col-6"><span class="text-muted">Color</span><br><strong>${f.color}</strong></div>` : ''}
+                ${f.description ? `<div class="col-12"><span class="text-muted">Description</span><br><div class="mt-1 p-2 bg-light rounded" style="white-space:pre-wrap;line-height:1.6">${f.description}</div></div>` : ''}
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <span class="text-muted small font-monospace">RFID: ${f.rfid}</span>
+                <button class="btn btn-primary ms-auto" onclick="loadFerretDetail(${f.id}); nav('ferrets');">
+                  <i class="bi bi-arrow-right-circle me-1"></i>Go to Full Profile
+                </button>
+              </div>
+            </div>
+          </div>`;
+      } catch (err) {
+        if (err.message === 'unassigned' || err.message.includes('404') || err.message.includes('not found')) {
+          resultEl.innerHTML = `
+            <div class="alert alert-danger d-flex align-items-center gap-3" style="max-width:560px;border-radius:12px;">
+              <i class="bi bi-exclamation-octagon-fill fs-3"></i>
+              <div>
+                <div class="fw-bold">Unassigned</div>
+                <div class="small">No ferret is currently assigned to chip <code>${val}</code>.</div>
+              </div>
+            </div>`;
+        } else {
+          resultEl.innerHTML = `<div class="alert alert-warning" style="max-width:560px">Error: ${err.message}</div>`;
+        }
+      }
+    }
+
+    async function toggleNfcScan() {
+      if (_nfcActive) {
+        _nfcActive = false;
+        _nfcReader = null;
+        document.getElementById('nfcScanBtn').innerHTML = '<i class="bi bi-broadcast me-1"></i>Start NFC Scan';
+        document.getElementById('nfcScanBtn').classList.remove('btn-danger');
+        document.getElementById('nfcScanBtn').classList.add('btn-outline-primary');
+        document.getElementById('nfcScanStatus').textContent = '';
+        return;
+      }
+      try {
+        _nfcReader = new NDEFReader();
+        await _nfcReader.scan();
+        _nfcActive = true;
+        document.getElementById('nfcScanBtn').innerHTML = '<i class="bi bi-stop-circle me-1"></i>Stop Scanning';
+        document.getElementById('nfcScanBtn').classList.remove('btn-outline-primary');
+        document.getElementById('nfcScanBtn').classList.add('btn-danger');
+        document.getElementById('nfcScanStatus').innerHTML = '<span class="spinner-grow spinner-grow-sm text-danger me-1"></span>Scanning… hold chip near reader';
+
+        _nfcReader.addEventListener('reading', ({ serialNumber, message }) => {
+          // serialNumber is the chip UID (hex, colon-separated on some devices)
+          const rfid = (serialNumber || '').replace(/:/g, '').toUpperCase();
+          if (!rfid) return;
+          document.getElementById('rfidLookupInput').value = rfid;
+          doRfidLookup(rfid);
+          // Auto-stop after a read
+          _nfcActive = false;
+          _nfcReader = null;
+          document.getElementById('nfcScanBtn').innerHTML = '<i class="bi bi-broadcast me-1"></i>Start NFC Scan';
+          document.getElementById('nfcScanBtn').classList.remove('btn-danger');
+          document.getElementById('nfcScanBtn').classList.add('btn-outline-primary');
+          document.getElementById('nfcScanStatus').textContent = `Read: ${rfid}`;
+        });
+
+        _nfcReader.addEventListener('error', (e) => {
+          document.getElementById('nfcScanStatus').textContent = 'NFC error: ' + e.message;
+          _nfcActive = false;
+        });
+      } catch (err) {
+        document.getElementById('nfcScanStatus').textContent = 'NFC unavailable: ' + err.message;
+        _nfcActive = false;
+      }
+    }
     async function openDistributeModal(ferretId, ferretName) {
       document.getElementById('distFerretId').value = ferretId;
       document.getElementById('distFerretName').textContent = `Distributing: ${ferretName}`;

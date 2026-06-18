@@ -1,0 +1,2 @@
+scp C:\Users\istew\sanusbio_app_prod\sanusbio_app_prod\index.html bazzite@100.126.146.37:~/sanusbio-app/index.html
+scp C:\Users\istew\sanusbio_app_prod\sanusbio_app_prod\server.js bazzite@100.126.146.37:~/sanusbio-app/server.js
