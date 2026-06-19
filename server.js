@@ -39,6 +39,7 @@ const upload = multer({
 app.use(express.json());
 app.use(cors());
 app.use('/uploads', express.static(UPLOADS_DIR));
+app.use(express.static(path.join(__dirname)));  // serves sanusbio_favicon.svg from app root
 
 // ─── Database ─────────────────────────────────────────────────────────────────
 const pool = mysql.createPool({
