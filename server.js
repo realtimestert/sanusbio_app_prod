@@ -193,6 +193,7 @@ app.get('/api/ferrets/:id', authenticate, require_perm('read'), async (req, res)
              mi.castrated_or_spayed, mi.castration_or_spay_date,
              mi.treatments, mi.last_exam_date, mi.orders, mi.performed_by,
              mi.weight_loss_or_gain, mi.exam_log, mi.surgical_procedure_log,
+             mi.cause_of_death,
              ecl.estrus_status, ecl.in_estrus, ecl.vulva_description,
              ecl.formed_observation, ecl.comments AS estrus_comments
       FROM ferret_qr005 f
@@ -288,6 +289,36 @@ app.put('/api/ferrets/:id', authenticate, require_perm('update'), async (req, re
     await log_activity(req.user.user_id, 'UPDATE', 'ferret_qr005', req.params.id, `Updated ferret #${req.params.id}`);
     res.json({ message: 'Ferret updated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Mark ferret deceased (sets dead flag, death_date, and cause_of_death atomically)
+app.put('/api/ferrets/:id/deceased', authenticate, require_perm('update'), async (req, res) => {
+  const { death_date, cause_of_death } = req.body;
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query(
+      `UPDATE ferret_qr005 SET dead = '1', death_date = ? WHERE Ferret_QR005_id = ?`,
+      [death_date || null, req.params.id]
+    );
+    const [[ferret]] = await conn.query(
+      'SELECT medical_info_id, ferret_name FROM ferret_qr005 WHERE Ferret_QR005_id = ?',
+      [req.params.id]
+    );
+    if (ferret) {
+      await conn.query(
+        'UPDATE medical_info SET cause_of_death = ?, date_of_death = ?, dead = ? WHERE medical_info_id = ?',
+        [cause_of_death || null, death_date || null, 'y', ferret.medical_info_id]
+      );
+    }
+    await conn.commit();
+    await log_activity(req.user.user_id, 'UPDATE', 'ferret_qr005', req.params.id,
+      `Marked deceased: ferret #${req.params.id}${cause_of_death ? ' — ' + cause_of_death : ''}`);
+    res.json({ message: 'Ferret marked as deceased' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
 });
 
 // Upload photo for a ferret

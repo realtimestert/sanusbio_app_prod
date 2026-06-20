@@ -1608,6 +1608,33 @@
     </div>
   </div>
 
+  <!-- Mark Deceased Modal -->
+  <div class="modal fade" id="deceasedModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-heartbreak me-2 text-danger"></i>Mark as Deceased</h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="deceasedFerretId">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Date of Death</label>
+            <input id="deceasedDate" type="date" class="form-control">
+          </div>
+          <div class="mb-2">
+            <label class="form-label fw-semibold">Cause of Death <span class="text-muted fw-normal">(optional)</span></label>
+            <input id="deceasedCause" class="form-control" placeholder="e.g. Insulinoma, old age…">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-danger" onclick="submitMarkDeceased()"><i class="bi bi-heartbreak me-1"></i>Mark Deceased</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Photo Upload Modal (for existing ferrets) -->
   <div class="modal fade" id="photoModal" tabindex="-1">
     <div class="modal-dialog modal-sm">
@@ -1934,7 +1961,10 @@
             <h3 class="mb-0 fw-bold">${f.ferret_name}</h3>
             ${f.distributed == 1 ? `<span class="badge" style="background:#7c3aed">Distributed</span>` : f.dead === '1' ? `<span class="badge bg-danger">Deceased</span>` : `<span class="badge bg-success">Active</span>`}
             <div class="ms-auto d-flex gap-2 flex-wrap">
-              ${canUpdate() && !f.distributed ? `<button class="btn btn-sm btn-outline-secondary" onclick="toggleDead(${id},'${f.dead}')">${f.dead === '1' ? 'Mark Active' : 'Mark Deceased'}</button>` : ''}
+              ${canUpdate() && !f.distributed ? (f.dead === '1'
+                ? `<button class="btn btn-sm btn-outline-secondary" onclick="toggleDead(${id},'1')">Mark Active</button>`
+                : `<button class="btn btn-sm btn-outline-danger" onclick="openDeceasedModal(${id})"><i class="bi bi-heartbreak me-1"></i>Mark Deceased</button>`
+              ) : ''}
               ${canUpdate() && f.dead !== '1' && !f.distributed ? `<button class="btn btn-sm btn-outline-primary" onclick="openDistributeModal(${id}, '${f.ferret_name.replace(/'/g, "\\'")}')"><i class="bi bi-box-arrow-right me-1"></i>Distribute</button>` : ''}
               ${canUpdate() && f.distributed ? `<button class="btn btn-sm btn-outline-secondary" onclick="undoDistribute(${id})">Undo Distribution</button>` : ''}
               ${isAdmin ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteFerret(${id})">Delete</button>` : ''}
@@ -2112,6 +2142,20 @@
             <button class="btn btn-sm btn-outline-primary ms-auto" onclick="openMedModal(${id},${f.medical_info_id})"><i class="bi bi-pencil me-1"></i>Edit Medical Info</button>
             <button class="btn btn-sm btn-primary" onclick="openProcedureModal(${id})"><i class="bi bi-plus-lg me-1"></i>Log Procedure</button>
           </div>
+          <h6 class="fw-semibold text-muted small text-uppercase mb-2">Current Status</h6>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4"><span class="text-muted small d-block">Vital Status</span>
+              <strong>${f.dead === '1'
+                ? '<span class="badge bg-danger fs-6 px-3 py-2">Deceased</span>'
+                : '<span class="badge bg-success fs-6 px-3 py-2">Alive</span>'}</strong></div>
+            ${f.dead === '1' ? `
+            <div class="col-md-4"><span class="text-muted small d-block">Date of Death</span>
+              <strong>${fmtDate(f.death_date)}</strong></div>
+            <div class="col-md-4"><span class="text-muted small d-block">Cause of Death</span>
+              <strong>${f.cause_of_death || '<span class="text-muted">Not recorded</span>'}</strong></div>
+            ` : ''}
+          </div>
+          <hr class="my-3">
           <h6 class="fw-semibold text-muted small text-uppercase mb-2">Spay / Castration</h6>
           <div class="row g-3 mb-3">
             <div class="col-md-4"><span class="text-muted small d-block">Status</span>
@@ -2694,9 +2738,32 @@
       } catch (err) { alert(err.message); }
     }
 
+    function openDeceasedModal(ferretId) {
+      document.getElementById('deceasedFerretId').value = ferretId;
+      document.getElementById('deceasedDate').value = today();
+      document.getElementById('deceasedCause').value = '';
+      new bootstrap.Modal(document.getElementById('deceasedModal')).show();
+    }
+
+    async function submitMarkDeceased() {
+      const id = document.getElementById('deceasedFerretId').value;
+      const death_date = document.getElementById('deceasedDate').value;
+      const cause_of_death = document.getElementById('deceasedCause').value.trim();
+      if (!death_date) return alert('Please enter a date of death.');
+      try {
+        await api(`/ferrets/${id}/deceased`, { method: 'PUT', body: { death_date, cause_of_death: cause_of_death || null } });
+        bootstrap.Modal.getInstance(document.getElementById('deceasedModal')).hide();
+        loadFerretDetail(id);
+      } catch (err) { alert(err.message); }
+    }
+
     async function toggleDead(id, current) {
-      try { await api(`/ferrets/${id}`, { method: 'PUT', body: { dead: current === '1' ? '0' : '1' } }); loadFerretDetail(id); }
-      catch (err) { alert(err.message); }
+      // Only called now for "Mark Active" (reverting deceased status)
+      if (!confirm('Mark this ferret as active? This will clear the deceased status.')) return;
+      try {
+        await api(`/ferrets/${id}`, { method: 'PUT', body: { dead: '0', death_date: null } });
+        loadFerretDetail(id);
+      } catch (err) { alert(err.message); }
     }
 
     async function deleteFerret(id) {
