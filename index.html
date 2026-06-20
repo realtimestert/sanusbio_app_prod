@@ -165,7 +165,7 @@
     }
 
     .role-cleaner {
-      background: #d97706;
+      background: #0d9488;
     }
 
     .status-dot {
@@ -357,6 +357,7 @@
             <option value="age">Sort: Age</option>
             <option value="sex">Sort: Sex</option>
             <option value="room">Sort: Room</option>
+            <option value="supplier">Sort: Supplier</option>
           </select>
           <div class="ms-auto d-flex gap-2 flex-wrap">
             <button id="btnAddLocation" class="btn btn-outline-secondary d-none"
@@ -1617,23 +1618,11 @@
         </div>
         <div class="modal-body">
           <input type="hidden" id="photoFerretId">
-          <div class="d-flex gap-2 mb-3">
-            <button type="button" class="btn btn-outline-primary flex-fill"
-              onclick="document.getElementById('photoCameraInput').click()">
-              <i class="bi bi-camera fs-5 d-block mb-1"></i>
-              <span class="small">Take Photo</span>
-            </button>
-            <button type="button" class="btn btn-outline-secondary flex-fill"
-              onclick="document.getElementById('photoFileInput').click()">
-              <i class="bi bi-folder2-open fs-5 d-block mb-1"></i>
-              <span class="small">Choose File</span>
-            </button>
+          <div class="photo-upload-zone" onclick="document.getElementById('photoFileInput').click()">
+            <i class="bi bi-camera text-muted fs-3 d-block mb-1"></i>
+            <span class="text-muted small">Click to choose a photo (max 5MB)</span>
+            <div id="photoPreviewBox" class="mt-2"></div>
           </div>
-          <div id="photoPreviewBox" class="mt-2 text-center"></div>
-          <!-- Camera capture (opens camera app directly on tablets/phones) -->
-          <input type="file" id="photoCameraInput" accept="image/*" capture="environment" style="display:none"
-            onchange="previewPhoto(this,'photoPreviewBox')">
-          <!-- File picker (gallery / file browser) -->
           <input type="file" id="photoFileInput" accept="image/*" style="display:none"
             onchange="previewPhoto(this,'photoPreviewBox')">
         </div>
@@ -1867,6 +1856,7 @@
         if (sortBy === 'age') return new Date(a.birth_date || 0) - new Date(b.birth_date || 0);
         if (sortBy === 'sex') return (a.sex || 'zzz').localeCompare(b.sex || 'zzz');
         if (sortBy === 'room') return (a.room_id || 0) - (b.room_id || 0);
+        if (sortBy === 'supplier') return (a.supplier_name || 'zzz').localeCompare(b.supplier_name || 'zzz');
         return (a.name || '').localeCompare(b.name || '');
       });
       const sexIcon = s => s === 'male' ? '<span class="badge bg-primary badge-pill small">♂ M</span>'
@@ -2672,15 +2662,13 @@
       document.getElementById('photoFerretId').value = ferretId;
       document.getElementById('photoPreviewBox').innerHTML = '';
       document.getElementById('photoFileInput').value = '';
-      document.getElementById('photoCameraInput').value = '';
       new bootstrap.Modal(document.getElementById('photoModal')).show();
     }
 
     async function submitPhoto() {
       const ferretId = document.getElementById('photoFerretId').value;
-      const file = document.getElementById('photoCameraInput').files[0]
-        || document.getElementById('photoFileInput').files[0];
-      if (!file) return alert('Please take or select a photo first.');
+      const file = document.getElementById('photoFileInput').files[0];
+      if (!file) return alert('Please select a photo first.');
       const fd = new FormData();
       fd.append('photo', file);
       try {
@@ -3222,7 +3210,7 @@
     async function loadUsers() {
       try {
         const data = await api('/users');
-        const roleColors = { admin: 'danger', research: 'primary', maternity: 'success', caretaker: 'secondary', cleaner: 'warning' };
+        const roleColors = { admin: 'danger', research: 'primary', maternity: 'success', caretaker: 'secondary', cleaner: 'teal' };
         document.getElementById('userTable').innerHTML = data.map(u => `
       <tr>
         <td><strong>${u.username}</strong></td>
