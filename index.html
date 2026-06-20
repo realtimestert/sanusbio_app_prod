@@ -357,7 +357,6 @@
             <option value="age">Sort: Age</option>
             <option value="sex">Sort: Sex</option>
             <option value="room">Sort: Room</option>
-            <option value="supplier">Sort: Supplier</option>
           </select>
           <div class="ms-auto d-flex gap-2 flex-wrap">
             <button id="btnAddLocation" class="btn btn-outline-secondary d-none"
@@ -1856,7 +1855,6 @@
         if (sortBy === 'age') return new Date(a.birth_date || 0) - new Date(b.birth_date || 0);
         if (sortBy === 'sex') return (a.sex || 'zzz').localeCompare(b.sex || 'zzz');
         if (sortBy === 'room') return (a.room_id || 0) - (b.room_id || 0);
-        if (sortBy === 'supplier') return (a.supplier_name || 'zzz').localeCompare(b.supplier_name || 'zzz');
         return (a.name || '').localeCompare(b.name || '');
       });
       const sexIcon = s => s === 'male' ? '<span class="badge bg-primary badge-pill small">♂ M</span>'
@@ -1973,7 +1971,7 @@
             <div class="col-6 col-md-4"><span class="text-muted">Weight</span><br><strong>${f.weight ? f.weight + ' g' : '—'}</strong></div>
             <div class="col-6 col-md-4"><span class="text-muted">Location</span><br>
               <strong>Room ${f.room_id || '?'} · ${f.cage_address || '?'}</strong>
-              <button class="btn btn-link btn-sm p-0 ms-1" onclick="openMoveModal(${id})"><i class="bi bi-arrow-left-right"></i></button></div>
+              ${canUpdate() && f.dead !== '1' && !f.distributed ? `<button class="btn btn-link btn-sm p-0 ms-1" onclick="openMoveModal(${id})"><i class="bi bi-arrow-left-right"></i></button>` : ''}</div>
             <div class="col-6 col-md-4"><span class="text-muted">Supplier</span><br><strong>${f.supplier_name || '—'}</strong></div>
             <div class="col-6 col-md-4"><span class="text-muted">Mother</span><br><strong>${f.mother_name || '—'}</strong></div>
             <div class="col-6 col-md-4"><span class="text-muted">Father</span><br><strong>${f.father_name || '—'}</strong></div>

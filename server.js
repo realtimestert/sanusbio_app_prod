@@ -193,7 +193,6 @@ app.get('/api/ferrets/:id', authenticate, require_perm('read'), async (req, res)
              mi.castrated_or_spayed, mi.castration_or_spay_date,
              mi.treatments, mi.last_exam_date, mi.orders, mi.performed_by,
              mi.weight_loss_or_gain, mi.exam_log, mi.surgical_procedure_log,
-             mi.cause_of_death,
              ecl.estrus_status, ecl.in_estrus, ecl.vulva_description,
              ecl.formed_observation, ecl.comments AS estrus_comments
       FROM ferret_qr005 f
@@ -291,36 +290,6 @@ app.put('/api/ferrets/:id', authenticate, require_perm('update'), async (req, re
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Mark ferret deceased (sets dead flag, death_date, and cause_of_death atomically)
-app.put('/api/ferrets/:id/deceased', authenticate, require_perm('update'), async (req, res) => {
-  const { death_date, cause_of_death } = req.body;
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    await conn.query(
-      `UPDATE ferret_qr005 SET dead = '1', death_date = ? WHERE Ferret_QR005_id = ?`,
-      [death_date || null, req.params.id]
-    );
-    const [[ferret]] = await conn.query(
-      'SELECT medical_info_id, ferret_name FROM ferret_qr005 WHERE Ferret_QR005_id = ?',
-      [req.params.id]
-    );
-    if (ferret) {
-      await conn.query(
-        'UPDATE medical_info SET cause_of_death = ?, date_of_death = ?, dead = ? WHERE medical_info_id = ?',
-        [cause_of_death || null, death_date || null, 'y', ferret.medical_info_id]
-      );
-    }
-    await conn.commit();
-    await log_activity(req.user.user_id, 'UPDATE', 'ferret_qr005', req.params.id,
-      `Marked deceased: ferret #${req.params.id}${cause_of_death ? ' — ' + cause_of_death : ''}`);
-    res.json({ message: 'Ferret marked as deceased' });
-  } catch (err) {
-    await conn.rollback();
-    res.status(500).json({ error: err.message });
-  } finally { conn.release(); }
-});
-
 // Upload photo for a ferret
 app.post('/api/ferrets/:id/photo', authenticate, require_perm('update'), upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -343,8 +312,13 @@ app.put('/api/ferrets/:id/location', authenticate, async (req, res) => {
   const { address_id, position } = req.body;
   if (!address_id) return res.status(400).json({ error: 'address_id required' });
   try {
+    const [[ferret]] = await pool.query(
+      'SELECT dead, distributed FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]
+    );
+    if (!ferret) return res.status(404).json({ error: 'Ferret not found' });
+    if (ferret.dead === '1') return res.status(400).json({ error: 'Cannot change location of a deceased ferret' });
+    if (ferret.distributed) return res.status(400).json({ error: 'Cannot change location of a distributed ferret' });
     await pool.query('UPDATE ferret_qr005 SET address_id = ? WHERE Ferret_QR005_id = ?', [address_id, req.params.id]);
-    // Store cage position (Top/Middle/Bottom/null) in address.room_lighting for this address
     if (position !== undefined) {
       await pool.query('UPDATE address SET room_lighting = ? WHERE address_id = ?', [position || null, address_id]);
     }
@@ -726,7 +700,7 @@ app.get('/api/addresses/:id/ferrets', authenticate, require_perm('read'), async 
              f.dead, f.sex, f.weight, f.birth_date, a.cage_address, a.room_id
       FROM ferret_qr005 f
       JOIN address a ON f.address_id = a.address_id
-      WHERE f.address_id = ? AND (f.dead = '0' OR f.dead IS NULL)
+      WHERE f.address_id = ? AND (f.dead = '0' OR f.dead IS NULL) AND (f.distributed = 0 OR f.distributed IS NULL)
       ORDER BY f.ferret_name
     `, [req.params.id]);
     res.json(rows);
