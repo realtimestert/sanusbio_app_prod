@@ -165,7 +165,7 @@
     }
 
     .role-cleaner {
-      background: #0d9488;
+      background: #d97706;
     }
 
     .status-dot {
@@ -357,6 +357,7 @@
             <option value="age">Sort: Age</option>
             <option value="sex">Sort: Sex</option>
             <option value="room">Sort: Room</option>
+            <option value="supplier">Sort: Supplier</option>
           </select>
           <div class="ms-auto d-flex gap-2 flex-wrap">
             <button id="btnAddLocation" class="btn btn-outline-secondary d-none"
@@ -604,6 +605,31 @@
       <div id="page-activity" class="page admin-only">
         <div class="page-header">
           <h4><i class="bi bi-journal-text me-2"></i>Activity Log</h4>
+          <span id="actTotalBadge" class="badge bg-secondary ms-2" style="font-size:.85rem"></span>
+        </div>
+        <!-- Filter bar -->
+        <div class="card mb-3 p-3">
+          <div class="d-flex flex-wrap gap-3 align-items-end">
+            <div>
+              <label class="form-label small fw-semibold mb-1">From</label>
+              <input type="date" id="actDateFrom" class="form-control form-control-sm" style="max-width:150px">
+            </div>
+            <div>
+              <label class="form-label small fw-semibold mb-1">To</label>
+              <input type="date" id="actDateTo" class="form-control form-control-sm" style="max-width:150px">
+            </div>
+            <div>
+              <label class="form-label small fw-semibold mb-1">User</label>
+              <select id="actUserFilter" class="form-select form-select-sm" style="max-width:180px">
+                <option value="">All Users</option>
+              </select>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary btn-sm" onclick="applyActFilters()"><i
+                  class="bi bi-search me-1"></i>Apply</button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="clearActFilters()">Clear</button>
+            </div>
+          </div>
         </div>
         <div class="card">
           <div class="table-responsive">
@@ -619,6 +645,11 @@
               </thead>
               <tbody id="actTable"></tbody>
             </table>
+          </div>
+          <div class="d-flex align-items-center justify-content-between px-3 py-2 border-top" id="actPagination"
+            style="display:none">
+            <span class="text-muted small" id="actPageInfo"></span>
+            <div class="d-flex gap-1" id="actPageBtns"></div>
           </div>
         </div>
       </div>
@@ -1608,6 +1639,35 @@
     </div>
   </div>
 
+  <!-- Mark Deceased Modal -->
+  <div class="modal fade" id="deceasedModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-heartbreak me-2 text-danger"></i>Mark as Deceased</h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="deceasedFerretId">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Date of Death</label>
+            <input id="deceasedDate" type="date" class="form-control">
+          </div>
+          <div class="mb-2">
+            <label class="form-label fw-semibold">Cause of Death <span
+                class="text-muted fw-normal">(optional)</span></label>
+            <input id="deceasedCause" class="form-control" placeholder="e.g. Insulinoma, old age…">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-danger" onclick="submitMarkDeceased()"><i class="bi bi-heartbreak me-1"></i>Mark
+            Deceased</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Photo Upload Modal (for existing ferrets) -->
   <div class="modal fade" id="photoModal" tabindex="-1">
     <div class="modal-dialog modal-sm">
@@ -1617,11 +1677,21 @@
         </div>
         <div class="modal-body">
           <input type="hidden" id="photoFerretId">
-          <div class="photo-upload-zone" onclick="document.getElementById('photoFileInput').click()">
-            <i class="bi bi-camera text-muted fs-3 d-block mb-1"></i>
-            <span class="text-muted small">Click to choose a photo (max 5MB)</span>
-            <div id="photoPreviewBox" class="mt-2"></div>
+          <div class="d-flex gap-2 mb-3">
+            <button type="button" class="btn btn-outline-primary flex-fill"
+              onclick="document.getElementById('photoCameraInput').click()">
+              <i class="bi bi-camera fs-5 d-block mb-1"></i>
+              <span class="small">Take Photo</span>
+            </button>
+            <button type="button" class="btn btn-outline-secondary flex-fill"
+              onclick="document.getElementById('photoFileInput').click()">
+              <i class="bi bi-folder2-open fs-5 d-block mb-1"></i>
+              <span class="small">Choose File</span>
+            </button>
           </div>
+          <div id="photoPreviewBox" class="mt-2 text-center"></div>
+          <input type="file" id="photoCameraInput" accept="image/*" capture="environment" style="display:none"
+            onchange="previewPhoto(this,'photoPreviewBox')">
           <input type="file" id="photoFileInput" accept="image/*" style="display:none"
             onchange="previewPhoto(this,'photoPreviewBox')">
         </div>
@@ -1855,6 +1925,7 @@
         if (sortBy === 'age') return new Date(a.birth_date || 0) - new Date(b.birth_date || 0);
         if (sortBy === 'sex') return (a.sex || 'zzz').localeCompare(b.sex || 'zzz');
         if (sortBy === 'room') return (a.room_id || 0) - (b.room_id || 0);
+        if (sortBy === 'supplier') return (a.supplier_name || 'zzz').localeCompare(b.supplier_name || 'zzz');
         return (a.name || '').localeCompare(b.name || '');
       });
       const sexIcon = s => s === 'male' ? '<span class="badge bg-primary badge-pill small">♂ M</span>'
@@ -1934,7 +2005,10 @@
             <h3 class="mb-0 fw-bold">${f.ferret_name}</h3>
             ${f.distributed == 1 ? `<span class="badge" style="background:#7c3aed">Distributed</span>` : f.dead === '1' ? `<span class="badge bg-danger">Deceased</span>` : `<span class="badge bg-success">Active</span>`}
             <div class="ms-auto d-flex gap-2 flex-wrap">
-              ${canUpdate() && !f.distributed ? `<button class="btn btn-sm btn-outline-secondary" onclick="toggleDead(${id},'${f.dead}')">${f.dead === '1' ? 'Mark Active' : 'Mark Deceased'}</button>` : ''}
+              \${canUpdate() && !f.distributed ? (f.dead === '1'
+                ? `< button class="btn btn-sm btn-outline-secondary" onclick = "toggleDead(\${id},'1')" > Mark Active</button > `
+                : `< button class="btn btn-sm btn-outline-danger" onclick = "openDeceasedModal(\${id})" > <i class="bi bi-heartbreak me-1"></i>Mark Deceased</button > `
+              ) : ''}
               ${canUpdate() && f.dead !== '1' && !f.distributed ? `<button class="btn btn-sm btn-outline-primary" onclick="openDistributeModal(${id}, '${f.ferret_name.replace(/'/g, "\\'")}')"><i class="bi bi-box-arrow-right me-1"></i>Distribute</button>` : ''}
               ${canUpdate() && f.distributed ? `<button class="btn btn-sm btn-outline-secondary" onclick="undoDistribute(${id})">Undo Distribution</button>` : ''}
               ${isAdmin ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteFerret(${id})">Delete</button>` : ''}
@@ -2112,6 +2186,20 @@
             <button class="btn btn-sm btn-outline-primary ms-auto" onclick="openMedModal(${id},${f.medical_info_id})"><i class="bi bi-pencil me-1"></i>Edit Medical Info</button>
             <button class="btn btn-sm btn-primary" onclick="openProcedureModal(${id})"><i class="bi bi-plus-lg me-1"></i>Log Procedure</button>
           </div>
+          <h6 class="fw-semibold text-muted small text-uppercase mb-2">Current Status</h6>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4"><span class="text-muted small d-block">Vital Status</span>
+              <strong>${f.dead === '1'
+              ? '<span class=\"badge bg-danger fs-6 px-3 py-2\">Deceased</span>'
+              : '<span class=\"badge bg-success fs-6 px-3 py-2\">Alive</span>'}</strong></div>
+            ${f.dead === '1' ? `
+            <div class="col-md-4"><span class="text-muted small d-block">Date of Death</span>
+              <strong>${fmtDate(f.death_date)}</strong></div>
+            <div class="col-md-4"><span class="text-muted small d-block">Cause of Death</span>
+              <strong>${f.cause_of_death || '<span class=\"text-muted\">Not recorded</span>'}</strong></div>
+            ` : ''}
+          </div>
+          <hr class="my-3">
           <h6 class="fw-semibold text-muted small text-uppercase mb-2">Spay / Castration</h6>
           <div class="row g-3 mb-3">
             <div class="col-md-4"><span class="text-muted small d-block">Status</span>
@@ -2660,13 +2748,15 @@
       document.getElementById('photoFerretId').value = ferretId;
       document.getElementById('photoPreviewBox').innerHTML = '';
       document.getElementById('photoFileInput').value = '';
+      document.getElementById('photoCameraInput').value = '';
       new bootstrap.Modal(document.getElementById('photoModal')).show();
     }
 
     async function submitPhoto() {
       const ferretId = document.getElementById('photoFerretId').value;
-      const file = document.getElementById('photoFileInput').files[0];
-      if (!file) return alert('Please select a photo first.');
+      const file = document.getElementById('photoCameraInput').files[0]
+        || document.getElementById('photoFileInput').files[0];
+      if (!file) return alert('Please take or select a photo first.');
       const fd = new FormData();
       fd.append('photo', file);
       try {
@@ -2694,9 +2784,31 @@
       } catch (err) { alert(err.message); }
     }
 
+    function openDeceasedModal(ferretId) {
+      document.getElementById('deceasedFerretId').value = ferretId;
+      document.getElementById('deceasedDate').value = today();
+      document.getElementById('deceasedCause').value = '';
+      new bootstrap.Modal(document.getElementById('deceasedModal')).show();
+    }
+
+    async function submitMarkDeceased() {
+      const id = document.getElementById('deceasedFerretId').value;
+      const death_date = document.getElementById('deceasedDate').value;
+      const cause_of_death = document.getElementById('deceasedCause').value.trim();
+      if (!death_date) return alert('Please enter a date of death.');
+      try {
+        await api(`/ferrets/${id}/deceased`, { method: 'PUT', body: { death_date, cause_of_death: cause_of_death || null } });
+        bootstrap.Modal.getInstance(document.getElementById('deceasedModal')).hide();
+        loadFerretDetail(id);
+      } catch (err) { alert(err.message); }
+    }
+
     async function toggleDead(id, current) {
-      try { await api(`/ferrets/${id}`, { method: 'PUT', body: { dead: current === '1' ? '0' : '1' } }); loadFerretDetail(id); }
-      catch (err) { alert(err.message); }
+      if (!confirm('Mark this ferret as active? This will clear the deceased status.')) return;
+      try {
+        await api(`/ferrets/${id}`, { method: 'PUT', body: { dead: '0', death_date: null } });
+        loadFerretDetail(id);
+      } catch (err) { alert(err.message); }
     }
 
     async function deleteFerret(id) {
@@ -3208,7 +3320,7 @@
     async function loadUsers() {
       try {
         const data = await api('/users');
-        const roleColors = { admin: 'danger', research: 'primary', maternity: 'success', caretaker: 'secondary', cleaner: 'teal' };
+        const roleColors = { admin: 'danger', research: 'primary', maternity: 'success', caretaker: 'secondary', cleaner: 'warning' };
         document.getElementById('userTable').innerHTML = data.map(u => `
       <tr>
         <td><strong>${u.username}</strong></td>
@@ -3280,25 +3392,101 @@
     }
 
     // ─── Activity Log ─────────────────────────────────────────────────────────────
+    let _actPage = 1, _actUserId = null, _actDateFrom = null, _actDateTo = null;
+
     async function loadActivity() {
+      // Populate user filter on first load
+      const filterEl = document.getElementById('actUserFilter');
+      if (filterEl && filterEl.options.length === 1) {
+        try {
+          const users = await api('/users');
+          users.forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u.user_id;
+            opt.textContent = u.full_name || u.username;
+            filterEl.appendChild(opt);
+          });
+        } catch { /* non-fatal */ }
+      }
+      await fetchActPage(1);
+    }
+
+    async function fetchActPage(page) {
+      _actPage = page;
+      const params = new URLSearchParams({ page });
+      if (_actUserId) params.set('user_id', _actUserId);
+      if (_actDateFrom) params.set('date_from', _actDateFrom);
+      if (_actDateTo) params.set('date_to', _actDateTo);
+
+      const tbody = document.getElementById('actTable');
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading\u2026</td></tr>';
+
       try {
-        const data = await api('/activity-log');
+        const { rows, total, pages } = await api('/activity-log?' + params.toString());
         const actionColors = {
           CREATE: 'success', UPDATE: 'primary', DELETE: 'danger', MOVE: 'info',
           LOGIN: 'secondary', COMPLETE: 'success', PHOTO_UPLOAD: 'secondary',
           PROCEDURE: 'warning', CREATE_USER: 'success', UPDATE_USER: 'primary',
           CREATE_LOCATION: 'info', DELETE_LOCATION: 'danger'
         };
-        document.getElementById('actTable').innerHTML = data.map(a => `
-      <tr>
-        <td class="text-muted small">${fmtDT(a.created_at)}</td>
-        <td><strong>${a.username}</strong></td>
-        <td><span class="badge bg-${actionColors[a.action] || 'secondary'} action-type">${a.action}</span></td>
-        <td class="text-muted small">${a.table_name || '—'}</td>
-        <td class="small">${a.details || '—'}</td>
-      </tr>`).join('') || '<tr><td colspan="5" class="text-muted text-center py-4">No activity</td></tr>';
-      } catch (err) { console.error(err); }
+        tbody.innerHTML = rows.map(a =>
+          `<tr>
+            <td class="text-muted small">${fmtDT(a.created_at)}</td>
+            <td><strong>${a.username}</strong></td>
+            <td><span class="badge bg-${actionColors[a.action] || 'secondary'} action-type">${a.action}</span></td>
+            <td class="text-muted small">${a.table_name || '\u2014'}</td>
+            <td class="small">${a.details || '\u2014'}</td>
+          </tr>`
+        ).join('') || '<tr><td colspan="5" class="text-muted text-center py-4">No activity found</td></tr>';
+
+        // Total badge
+        const badge = document.getElementById('actTotalBadge');
+        if (badge) badge.textContent = total + ' record' + (total !== 1 ? 's' : '');
+
+        // Pagination bar
+        const pageInfo = document.getElementById('actPageInfo');
+        const pageBtns = document.getElementById('actPageBtns');
+        const pagingBar = document.getElementById('actPagination');
+        const start = (page - 1) * 100 + 1;
+        const end = Math.min(page * 100, total);
+        if (pageInfo) pageInfo.textContent = total ? `Showing ${start}\u2013${end} of ${total}` : '';
+        if (pagingBar) pagingBar.style.display = total > 100 ? '' : 'none';
+
+        if (pageBtns) {
+          const btn = (label, pg, active = false, disabled = false) =>
+            `<button class="btn btn-sm ${active ? 'btn-primary' : 'btn-outline-secondary'}"
+              ${disabled ? 'disabled' : ''} onclick="fetchActPage(${pg})">${label}</button>`;
+          const range = 3;
+          const lo = Math.max(1, page - range);
+          const hi = Math.min(pages, page + range);
+          let html = btn('\u2039', page - 1, false, page === 1);
+          if (lo > 1) html += btn('1', 1) + (lo > 2 ? '<span class="px-1 text-muted">\u2026</span>' : '');
+          for (let p = lo; p <= hi; p++) html += btn(p, p, p === page);
+          if (hi < pages) html += (hi < pages - 1 ? '<span class="px-1 text-muted">\u2026</span>' : '') + btn(pages, pages);
+          html += btn('\u203a', page + 1, false, page === pages);
+          pageBtns.innerHTML = html;
+        }
+      } catch (err) {
+        console.error(err);
+        tbody.innerHTML = '<tr><td colspan="5" class="text-danger text-center py-3">Failed to load activity</td></tr>';
+      }
     }
+
+    function applyActFilters() {
+      _actUserId = document.getElementById('actUserFilter').value || null;
+      _actDateFrom = document.getElementById('actDateFrom').value || null;
+      _actDateTo = document.getElementById('actDateTo').value || null;
+      fetchActPage(1);
+    }
+
+    function clearActFilters() {
+      document.getElementById('actUserFilter').value = '';
+      document.getElementById('actDateFrom').value = '';
+      document.getElementById('actDateTo').value = '';
+      _actUserId = _actDateFrom = _actDateTo = null;
+      fetchActPage(1);
+    }
+
 
     // ─── Medical Info ─────────────────────────────────────────────────────────────
     function openMedModal(ferretId, medInfoId) {
