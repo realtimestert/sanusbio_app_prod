@@ -2005,10 +2005,10 @@
             <h3 class="mb-0 fw-bold">${f.ferret_name}</h3>
             ${f.distributed == 1 ? `<span class="badge" style="background:#7c3aed">Distributed</span>` : f.dead === '1' ? `<span class="badge bg-danger">Deceased</span>` : `<span class="badge bg-success">Active</span>`}
             <div class="ms-auto d-flex gap-2 flex-wrap">
-              \${canUpdate() && !f.distributed ? (f.dead === '1'
-                ? `< button class="btn btn-sm btn-outline-secondary" onclick = "toggleDead(\${id},'1')" > Mark Active</button > `
-                : `< button class="btn btn-sm btn-outline-danger" onclick = "openDeceasedModal(\${id})" > <i class="bi bi-heartbreak me-1"></i>Mark Deceased</button > `
-              ) : ''}
+              ${canUpdate() && !f.distributed ? (f.dead === '1'
+            ? `<button class="btn btn-sm btn-outline-secondary" onclick="toggleDead(${id},'1')">Mark Active</button>`
+            : `<button class="btn btn-sm btn-outline-danger" onclick="openDeceasedModal(${id})"><i class="bi bi-heartbreak me-1"></i>Mark Deceased</button>`
+          ) : ''}
               ${canUpdate() && f.dead !== '1' && !f.distributed ? `<button class="btn btn-sm btn-outline-primary" onclick="openDistributeModal(${id}, '${f.ferret_name.replace(/'/g, "\\'")}')"><i class="bi bi-box-arrow-right me-1"></i>Distribute</button>` : ''}
               ${canUpdate() && f.distributed ? `<button class="btn btn-sm btn-outline-secondary" onclick="undoDistribute(${id})">Undo Distribution</button>` : ''}
               ${isAdmin ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteFerret(${id})">Delete</button>` : ''}
