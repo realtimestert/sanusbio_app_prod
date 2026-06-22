@@ -154,7 +154,7 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
                f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
                f.next_rabies_vaccine_due, f.sex, f.eight_hour_light,
                f.distributed, f.distributor_id,
-               a.cage_address, a.room_id,
+               a.cage_address, a.room_id, a.room_name, a.room_lighting,
                s.supplier_name,
                d.distributor_name
         FROM ferret_qr005 f
@@ -171,7 +171,7 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
                f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
                f.next_rabies_vaccine_due, f.sex, 0 AS eight_hour_light,
                0 AS distributed, NULL AS distributor_id,
-               a.cage_address, a.room_id,
+               a.cage_address, a.room_id, a.room_name, a.room_lighting,
                s.supplier_name, NULL AS distributor_name
         FROM ferret_qr005 f
         LEFT JOIN address  a ON f.address_id  = a.address_id
@@ -721,6 +721,23 @@ app.post('/api/addresses', authenticate, admin_or_research, async (req, res) => 
       [room_id, room_name || null, cage_address || null, room_lighting || null, maintenance || null]
     );
     res.json({ id: r.insertId, message: 'Address added' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/addresses/:id', authenticate, admin_only, async (req, res) => {
+  try {
+    // Block delete if any ferrets (including deceased/distributed) are still assigned here
+    const [[{ cnt }]] = await pool.query(
+      'SELECT COUNT(*) AS cnt FROM ferret_qr005 WHERE address_id = ?', [req.params.id]
+    );
+    if (cnt > 0)
+      return res.status(400).json({ error: `Cannot delete — ${cnt} ferret(s) are still assigned to this location. Move or delete them first.` });
+    const [[addr]] = await pool.query('SELECT room_id, cage_address FROM address WHERE address_id = ?', [req.params.id]);
+    if (!addr) return res.status(404).json({ error: 'Location not found' });
+    await pool.query('DELETE FROM address WHERE address_id = ?', [req.params.id]);
+    await log_activity(req.user.user_id, 'DELETE_LOCATION', 'address', req.params.id,
+      `Deleted Room ${addr.room_id} · Cage ${addr.cage_address || '?'}`);
+    res.json({ message: 'Location deleted' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

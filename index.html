@@ -1955,7 +1955,7 @@
                 style="${isDistributed(f) ? 'background:#7c3aed' : ''}"></span>
             </div>
             <div class="text-muted small mt-1">ID: ${f.animal_id || '—'}</div>
-            <div class="small">Room ${f.room_id || '?'} · Cage ${f.cage_address || '?'}</div>
+            <div class="small">Room ${f.room_id || '?'} · Cage ${f.cage_address || '?'}${f.room_lighting ? ' · ' + f.room_lighting : ''}</div>
             <div class="mt-1 d-flex flex-wrap gap-1">
               ${sexIcon(f.sex)}
               ${isDistributed(f) ? `<span class="badge badge-pill small" style="background:#7c3aed;color:#fff">Distributed</span>` : ''}
@@ -2044,7 +2044,7 @@
             <div class="col-6 col-md-4"><span class="text-muted">Sex</span><br><strong>${f.sex ? f.sex.charAt(0).toUpperCase() + f.sex.slice(1) : '—'}</strong></div>
             <div class="col-6 col-md-4"><span class="text-muted">Weight</span><br><strong>${f.weight ? f.weight + ' g' : '—'}</strong></div>
             <div class="col-6 col-md-4"><span class="text-muted">Location</span><br>
-              <strong>Room ${f.room_id || '?'} · ${f.cage_address || '?'}</strong>
+              <strong>Room ${f.room_id || '?'} · ${f.cage_address || '?'}${f.room_lighting ? ' · ' + f.room_lighting : ''}</strong>
               ${canUpdate() && f.dead !== '1' && !f.distributed ? `<button class="btn btn-link btn-sm p-0 ms-1" onclick="openMoveModal(${id})"><i class="bi bi-arrow-left-right"></i></button>` : ''}</div>
             <div class="col-6 col-md-4"><span class="text-muted">Supplier</span><br><strong>${f.supplier_name || '—'}</strong></div>
             <div class="col-6 col-md-4"><span class="text-muted">Mother</span><br><strong>${f.mother_name || '—'}</strong></div>
@@ -2823,7 +2823,7 @@
         const [addresses, suppliers] = await Promise.all([api('/addresses'), api('/suppliers')]);
         document.getElementById('fAddrId').innerHTML =
           '<option value="">— Unassigned —</option>' +
-          addresses.map(a => `<option value="${a.address_id}">Room ${a.room_id} · ${a.cage_address || '?'}</option>`).join('');
+          addresses.map(a => `<option value="${a.address_id}">Room ${a.room_id}${a.room_name ? ' ' + a.room_name : ''} · ${a.cage_address || '?'}${a.room_lighting ? ' · ' + a.room_lighting : ''}</option>`).join('');
         document.getElementById('fSupplierId').innerHTML =
           '<option value="">— Unknown —</option>' +
           suppliers.map(s => `<option value="${s.supplier_id}">${s.supplier_name}</option>`).join('');
@@ -3107,14 +3107,19 @@
         const addresses = await api('/addresses');
         const accordion = document.getElementById('locationAccordion');
         if (!addresses.length) { accordion.innerHTML = '<div class="text-muted mt-2">No locations yet.</div>'; return; }
+        const canDeleteLoc = roleIs('admin');
         accordion.innerHTML = addresses.map((a, i) => `
       <div class="accordion-item">
-        <h2 class="accordion-header">
-          <button class="accordion-button ${i === 0 ? '' : 'collapsed'}" type="button"
+        <h2 class="accordion-header d-flex align-items-center">
+          <button class="accordion-button flex-grow-1 ${i === 0 ? '' : 'collapsed'}" type="button"
             data-bs-toggle="collapse" data-bs-target="#loc${a.address_id}">
-            Room ${a.room_id} · Cage ${a.cage_address || '—'}
+            Room ${a.room_id}${a.room_name ? ' ' + a.room_name : ''} · Cage ${a.cage_address || '—'}
             ${a.room_lighting ? `<span class="text-muted small ms-2">(${a.room_lighting})</span>` : ''}
           </button>
+          ${canDeleteLoc ? `<button class="btn btn-sm btn-outline-danger me-2 flex-shrink-0" style="z-index:1"
+            onclick="deleteLocation(${a.address_id}, 'Room ${a.room_id} · Cage ${a.cage_address || '?'}')">
+            <i class="bi bi-trash"></i>
+          </button>` : ''}
         </h2>
         <div id="loc${a.address_id}" class="accordion-collapse collapse ${i === 0 ? 'show' : ''}">
           <div class="accordion-body p-2">
@@ -3144,13 +3149,21 @@
       } catch (err) { console.error(err); }
     }
 
+    async function deleteLocation(id, label) {
+      if (!confirm(`Delete "${label}"?\n\nThis will fail if any ferrets are assigned here.`)) return;
+      try {
+        await api(`/addresses/${id}`, { method: 'DELETE' });
+        loadLocations();
+      } catch (err) { alert(err.message); }
+    }
+
     async function openMoveModal(ferretId) {
       document.getElementById('moveFerretId').value = ferretId;
       document.getElementById('movePosNone').checked = true;
       try {
         const addresses = await api('/addresses');
         document.getElementById('moveAddrId').innerHTML = addresses.map(a => {
-          const label = `Room ${a.room_id}${a.room_name ? ' ' + a.room_name : ''} · Cage ${a.cage_address || '?'}`;
+          const label = `Room ${a.room_id}${a.room_name ? ' ' + a.room_name : ''} · Cage ${a.cage_address || '?'}${a.room_lighting ? ' · ' + a.room_lighting : ''}`;
           return `<option value="${a.address_id}">${label}</option>`;
         }).join('');
         new bootstrap.Modal(document.getElementById('moveModal')).show();
