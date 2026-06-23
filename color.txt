@@ -27,3 +27,49 @@
   <color name="Tan" hex="d1b490" r="209" g="180" b="144" />
   <color name="Pumpkin Spice" hex="ee7b30" r="238" g="123" b="48" />
 </palette>
+
+/* CSS HEX */
+--space-indigo: #122754ff;
+--muted-teal: #8aa8a1ff;
+--pale-slate: #cbcbd4ff;
+--tan: #d1b490ff;
+--pumpkin-spice: #ee7b30ff;
+
+/* CSS HSL */
+--space-indigo: hsla(221, 65%, 20%, 1);
+--muted-teal: hsla(166, 15%, 60%, 1);
+--pale-slate: hsla(240, 9%, 81%, 1);
+--tan: hsla(33, 41%, 69%, 1);
+--pumpkin-spice: hsla(24, 85%, 56%, 1);
+
+/* SCSS HEX */
+$space-indigo: #122754ff;
+$muted-teal: #8aa8a1ff;
+$pale-slate: #cbcbd4ff;
+$tan: #d1b490ff;
+$pumpkin-spice: #ee7b30ff;
+
+/* SCSS HSL */
+$space-indigo: hsla(221, 65%, 20%, 1);
+$muted-teal: hsla(166, 15%, 60%, 1);
+$pale-slate: hsla(240, 9%, 81%, 1);
+$tan: hsla(33, 41%, 69%, 1);
+$pumpkin-spice: hsla(24, 85%, 56%, 1);
+
+/* SCSS RGB */
+$space-indigo: rgba(18, 39, 84, 1);
+$muted-teal: rgba(138, 168, 161, 1);
+$pale-slate: rgba(203, 203, 212, 1);
+$tan: rgba(209, 180, 144, 1);
+$pumpkin-spice: rgba(238, 123, 48, 1);
+
+/* SCSS Gradient */
+$gradient-top: linear-gradient(0deg, #122754ff, #8aa8a1ff, #cbcbd4ff, #d1b490ff, #ee7b30ff);
+$gradient-right: linear-gradient(90deg, #122754ff, #8aa8a1ff, #cbcbd4ff, #d1b490ff, #ee7b30ff);
+$gradient-bottom: linear-gradient(180deg, #122754ff, #8aa8a1ff, #cbcbd4ff, #d1b490ff, #ee7b30ff);
+$gradient-left: linear-gradient(270deg, #122754ff, #8aa8a1ff, #cbcbd4ff, #d1b490ff, #ee7b30ff);
+$gradient-top-right: linear-gradient(45deg, #122754ff, #8aa8a1ff, #cbcbd4ff, #d1b490ff, #ee7b30ff);
+$gradient-bottom-right: linear-gradient(135deg, #122754ff, #8aa8a1ff, #cbcbd4ff, #d1b490ff, #ee7b30ff);
+$gradient-top-left: linear-gradient(225deg, #122754ff, #8aa8a1ff, #cbcbd4ff, #d1b490ff, #ee7b30ff);
+$gradient-bottom-left: linear-gradient(315deg, #122754ff, #8aa8a1ff, #cbcbd4ff, #d1b490ff, #ee7b30ff);
+$gradient-radial: radial-gradient(#122754ff, #8aa8a1ff, #cbcbd4ff, #d1b490ff, #ee7b30ff);
