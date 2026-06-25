@@ -1,4 +1,4 @@
-// SanusBio v1.6.0 | 2026-06-25 | server.js
+// SanusBio v1.7.0 | 2026-06-25 | server.js
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -8,6 +8,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const sharp = require('sharp');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -321,20 +322,53 @@ app.put('/api/ferrets/:id/deceased', authenticate, require_perm('update'), async
   } finally { conn.release(); }
 });
 
-// Upload photo for a ferret
+// Upload photo for a ferret — keeps original, generates 400×400 square thumbnail
 app.post('/api/ferrets/:id/photo', authenticate, require_perm('update'), upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   try {
-    const photoUrl = `/uploads/${req.file.filename}`;
-    // Delete old photo file if it exists locally
-    const [[ferret]] = await pool.query('SELECT photo_url FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]);
-    if (ferret?.photo_url?.startsWith('/uploads/')) {
-      const oldPath = path.join(__dirname, ferret.photo_url);
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    const originalUrl = `/uploads/${req.file.filename}`;
+    // Build thumbnail filename alongside original
+    const ext = path.extname(req.file.filename);
+    const base = path.basename(req.file.filename, ext);
+    const thumbFilename = `${base}-thumb.jpg`;
+    const thumbPath = path.join(UPLOADS_DIR, thumbFilename);
+    const thumbUrl = `/uploads/${thumbFilename}`;
+
+    // Generate 400×400 square thumbnail (cover crop, 80% JPEG quality ≈ 80-120 KB)
+    await sharp(req.file.path)
+      .resize(400, 400, { fit: 'cover', position: 'centre' })
+      .jpeg({ quality: 80 })
+      .toFile(thumbPath);
+
+    // Delete old files if they exist
+    const [[ferret]] = await pool.query('SELECT photo_url, photo_original_url FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]);
+    for (const url of [ferret?.photo_url, ferret?.photo_original_url]) {
+      if (url?.startsWith('/uploads/')) {
+        const p = path.join(__dirname, url);
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      }
     }
-    await pool.query('UPDATE ferret_qr005 SET photo_url = ? WHERE Ferret_QR005_id = ?', [photoUrl, req.params.id]);
+
+    await pool.query(
+      'UPDATE ferret_qr005 SET photo_url = ?, photo_original_url = ? WHERE Ferret_QR005_id = ?',
+      [thumbUrl, originalUrl, req.params.id]
+    );
     await log_activity(req.user.user_id, 'PHOTO_UPLOAD', 'ferret_qr005', req.params.id, `Photo updated for ferret #${req.params.id}`);
-    res.json({ photo_url: photoUrl, message: 'Photo uploaded' });
+    res.json({ photo_url: thumbUrl, photo_original_url: originalUrl, message: 'Photo uploaded' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Download original full-resolution photo
+app.get('/api/ferrets/:id/photo/original', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [[ferret]] = await pool.query(
+      'SELECT photo_original_url, ferret_name FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]
+    );
+    if (!ferret || !ferret.photo_original_url) return res.status(404).json({ error: 'No original photo found' });
+    const filePath = path.join(__dirname, ferret.photo_original_url);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Original photo file not found on disk' });
+    const safeName = ferret.ferret_name.replace(/[^a-z0-9]/gi, '_');
+    res.download(filePath, `${safeName}_original${path.extname(filePath)}`);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
