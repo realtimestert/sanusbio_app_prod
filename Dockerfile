@@ -1,11 +1,14 @@
 FROM node:20-alpine
 WORKDIR /app
+
+# Install dependencies first (cached layer)
 COPY package*.json ./
 RUN npm install --production
-COPY server.js ./
-COPY index.html ./
-COPY sanusbio_favicon.svg .
-# Uploads directory — mount as a volume in docker-compose to persist photos
+
+# Copy all app files in one step — no need to update this when adding new files
+COPY . .
+
 RUN mkdir -p /app/uploads
+
 EXPOSE 4000
 CMD ["node", "server.js"]

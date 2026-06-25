@@ -1,4 +1,4 @@
-<!-- SanusBio v1.6.0 | 2026-06-25 index.html -->
+<!-- SanusBio v1.2.0 | 2026-06-16 -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -14,1464 +14,1443 @@
 </head>
 
 <body>
-  </head>
 
-  <body>
-
-    <!-- LOGIN -->
-    <div id="loginWrap">
-      <div id="loginCard" class="card">
-        <div class="card-body p-4">
-          <div class="text-center mb-4">
-            <img src="/sanusbio_favicon.svg" style="width:48px;height:48px;" alt="SanusBio">
-            <h5 class="fw-bold mb-0">SanusBio</h5>
-            <small class="text-muted">Ferret Research Management</small>
-          </div>
-          <div id="loginErr" class="alert alert-danger py-2 d-none small"></div>
-          <div class="mb-3"><label class="form-label fw-semibold">Username</label>
-            <input id="iUser" type="text" class="form-control" placeholder="Enter username" autocomplete="username">
-          </div>
-          <div class="mb-3"><label class="form-label fw-semibold">Password</label>
-            <input id="iPass" type="password" class="form-control" placeholder="Enter password"
-              autocomplete="current-password">
-          </div>
-          <button class="btn btn-primary w-100 fw-semibold" onclick="doLogin()">Sign In</button>
+  <!-- LOGIN -->
+  <div id="loginWrap">
+    <div id="loginCard" class="card">
+      <div class="card-body p-4">
+        <div class="text-center mb-4">
+          <img src="/sanusbio_favicon.svg" style="width:48px;height:48px;" alt="SanusBio">
+          <h5 class="fw-bold mb-0">SanusBio</h5>
+          <small class="text-muted">Ferret Research Management</small>
         </div>
+        <div id="loginErr" class="alert alert-danger py-2 d-none small"></div>
+        <div class="mb-3"><label class="form-label fw-semibold">Username</label>
+          <input id="iUser" type="text" class="form-control" placeholder="Enter username" autocomplete="username">
+        </div>
+        <div class="mb-3"><label class="form-label fw-semibold">Password</label>
+          <input id="iPass" type="password" class="form-control" placeholder="Enter password"
+            autocomplete="current-password">
+        </div>
+        <button class="btn btn-primary w-100 fw-semibold" onclick="doLogin()">Sign In</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- APP SHELL -->
+  <div id="app" style="display:flex">
+    <div id="sidebar" class="d-flex flex-column">
+      <div class="brand">🐾 SanusBio</div>
+      <nav class="nav flex-column pt-2 px-1 gap-1" id="navLinks">
+        <a class="nav-link" href="#" data-page="dashboard"><i class="bi bi-speedometer2"></i>Dashboard</a>
+        <a class="nav-link" href="#" data-page="ferrets"><i class="bi bi-grid-3x3-gap"></i>Ferrets</a>
+        <a class="nav-link" href="#" data-page="rfid-lookup"><i class="bi bi-broadcast"></i>RFID Lookup</a>
+        <a class="nav-link" href="#" data-page="litters"><i class="bi bi-egg"></i>Litters</a>
+        <a class="nav-link" href="#" data-page="locations"><i class="bi bi-geo-alt"></i>Locations</a>
+        <a class="nav-link" href="#" data-page="suppliers"><i class="bi bi-truck"></i>Suppliers</a>
+        <a class="nav-link" href="#" data-page="distribution"><i class="bi bi-box-arrow-right"></i>Distribution</a>
+        <a class="nav-link" href="#" data-page="assignments"><i class="bi bi-clipboard-check"></i>Assignments</a>
+        <a class="nav-link admin-only" href="#" data-page="users"><i class="bi bi-people"></i>Users</a>
+        <a class="nav-link admin-only" href="#" data-page="activity"><i class="bi bi-journal-text"></i>Activity Log</a>
+        <a class="nav-link" href="#" data-page="cleaning-reports"><i class="bi bi-check2-square"></i>Cleaning
+          Reports</a>
+      </nav>
+      <div class="user-block">
+        <div id="userInfo" class="mb-2"></div>
+        <button class="btn btn-sm btn-outline-light w-100" onclick="doLogout()"><i
+            class="bi bi-box-arrow-right me-1"></i>Sign Out</button>
       </div>
     </div>
 
-    <!-- APP SHELL -->
-    <div id="app" style="display:flex">
-      <div id="sidebar" class="d-flex flex-column">
-        <div class="brand">🐾 SanusBio</div>
-        <nav class="nav flex-column pt-2 px-1 gap-1" id="navLinks">
-          <a class="nav-link" href="#" data-page="dashboard"><i class="bi bi-speedometer2"></i>Dashboard</a>
-          <a class="nav-link" href="#" data-page="ferrets"><i class="bi bi-grid-3x3-gap"></i>Ferrets</a>
-          <a class="nav-link" href="#" data-page="rfid-lookup"><i class="bi bi-broadcast"></i>RFID Lookup</a>
-          <a class="nav-link" href="#" data-page="litters"><i class="bi bi-egg"></i>Litters</a>
-          <a class="nav-link" href="#" data-page="locations"><i class="bi bi-geo-alt"></i>Locations</a>
-          <a class="nav-link" href="#" data-page="suppliers"><i class="bi bi-truck"></i>Suppliers</a>
-          <a class="nav-link" href="#" data-page="distribution"><i class="bi bi-box-arrow-right"></i>Distribution</a>
-          <a class="nav-link" href="#" data-page="assignments"><i class="bi bi-clipboard-check"></i>Assignments</a>
-          <a class="nav-link admin-only" href="#" data-page="users"><i class="bi bi-people"></i>Users</a>
-          <a class="nav-link admin-only" href="#" data-page="activity"><i class="bi bi-journal-text"></i>Activity
-            Log</a>
-          <a class="nav-link" href="#" data-page="cleaning-reports"><i class="bi bi-check2-square"></i>Cleaning
-            Reports</a>
-        </nav>
-        <div class="user-block">
-          <div id="userInfo" class="mb-2"></div>
-          <button class="btn btn-sm btn-outline-light w-100" onclick="doLogout()"><i
-              class="bi bi-box-arrow-right me-1"></i>Sign Out</button>
+    <div class="main">
+
+      <!-- Dashboard -->
+      <div id="page-dashboard" class="page">
+        <div class="page-header">
+          <h4><i class="bi bi-speedometer2 me-2"></i>Dashboard</h4>
+        </div>
+        <div id="statCards" class="row g-3 mb-4"></div>
+        <div class="card" id="dashActivityCard">
+          <div class="card-header bg-white fw-semibold py-3">Recent Activity</div>
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>User</th>
+                  <th>Action</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody id="dashActivity"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      <div class="main">
-
-        <!-- Dashboard -->
-        <div id="page-dashboard" class="page">
-          <div class="page-header">
-            <h4><i class="bi bi-speedometer2 me-2"></i>Dashboard</h4>
-          </div>
-          <div id="statCards" class="row g-3 mb-4"></div>
-          <div class="card" id="dashActivityCard">
-            <div class="card-header bg-white fw-semibold py-3">Recent Activity</div>
-            <div class="table-responsive">
-              <table class="table table-hover mb-0">
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>User</th>
-                    <th>Action</th>
-                    <th>Details</th>
-                  </tr>
-                </thead>
-                <tbody id="dashActivity"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Ferrets -->
-        <div id="page-ferrets" class="page">
-          <div class="page-header">
-            <h4><i class="bi bi-grid-3x3-gap me-2"></i>Ferrets</h4>
-            <input id="ferretSearch" type="search" class="form-control" style="max-width:240px"
-              placeholder="Search ferrets…">
-            <select id="ferretSort" class="form-select" style="max-width:160px" onchange="renderFerretGrid()">
-              <option value="name">Sort: Name</option>
-              <option value="age">Sort: Age</option>
-              <option value="sex">Sort: Sex</option>
-              <option value="room">Sort: Room</option>
-              <option value="supplier">Sort: Supplier</option>
-            </select>
-            <div class="ms-auto d-flex gap-2 flex-wrap">
-              <button id="btnAddLocation" class="btn btn-outline-secondary d-none"
-                onclick="new bootstrap.Modal(document.getElementById('addrModal')).show()"><i
-                  class="bi bi-geo-alt me-1"></i>Add Location</button>
-              <button id="btnAddSupplier" class="btn btn-outline-secondary d-none" onclick="openSupplierModal()"><i
-                  class="bi bi-truck me-1"></i>Add Supplier</button>
-              <button id="btnAddFerret" class="btn btn-primary d-none" onclick="openFerretModal()"><i
-                  class="bi bi-plus-lg me-1"></i>Add Ferret</button>
-            </div>
-          </div>
-          <ul class="nav nav-tabs mb-3" id="ferretTabs">
-            <li class="nav-item">
-              <button class="nav-link active" id="tabActive" onclick="switchFerretTab('active')">
-                <span class="status-dot dot-active me-1" style="display:inline-block"></span>
-                Active <span id="tabActiveCount" class="badge bg-secondary ms-1"></span>
-              </button>
-            </li>
-            <li class="nav-item">
-              <button class="nav-link" id="tabDeceased" onclick="switchFerretTab('deceased')">
-                <span class="status-dot dot-dead me-1" style="display:inline-block"></span>
-                Deceased <span id="tabDeceasedCount" class="badge bg-secondary ms-1"></span>
-              </button>
-            </li>
-            <li class="nav-item">
-              <button class="nav-link" id="tabDistributed" onclick="switchFerretTab('distributed')">
-                <i class="bi bi-box-arrow-right me-1"></i>
-                Distributed <span id="tabDistributedCount" class="badge bg-secondary ms-1"></span>
-              </button>
-            </li>
-          </ul>
-          <div id="ferretGrid" class="row g-3"></div>
-        </div>
-
-        <!-- Ferret Detail -->
-        <div id="page-ferret-detail" class="page">
-          <button class="btn btn-outline-secondary btn-sm mb-3" onclick="nav('ferrets')"><i
-              class="bi bi-arrow-left me-1"></i>Back</button>
-          <div id="ferretDetail"></div>
-        </div>
-
-        <!-- RFID Lookup -->
-        <div id="page-rfid-lookup" class="page">
-          <div class="page-header">
-            <h4><i class="bi bi-broadcast me-2"></i>RFID Lookup</h4>
-          </div>
-
-          <!-- NFC / manual input card -->
-          <div class="card mb-4 shadow-sm" style="border-radius:14px; max-width:560px;">
-            <div class="card-body p-4">
-
-              <!-- Web NFC status banner -->
-              <div id="nfcStatusBanner" class="alert alert-info py-2 small mb-3 d-none"></div>
-
-              <!-- Manual / USB wedge input -->
-              <div class="mb-3">
-                <label class="fw-bold fs-6 d-block mb-1"><i class="bi bi-upc-scan me-1"></i>Scan or Enter RFID</label>
-                <p class="text-muted small mb-2">
-                  Scan with a USB RFID wedge reader, type the chip value, or use the NFC button below on a supported
-                  device.
-                </p>
-                <div class="input-group">
-                  <input id="rfidLookupInput" class="form-control font-monospace" placeholder="e.g. 0A1B2C3D4E"
-                    autocomplete="off" onkeydown="if(event.key==='Enter') doRfidLookup()">
-                  <button class="btn btn-primary" onclick="doRfidLookup()">
-                    <i class="bi bi-search me-1"></i>Look Up
-                  </button>
-                </div>
-              </div>
-
-              <!-- Web NFC scan button (shown only on compatible browsers) -->
-              <div id="nfcScanWrap" class="d-none">
-                <hr class="my-3">
-                <div class="d-flex align-items-center gap-3">
-                  <button id="nfcScanBtn" class="btn btn-outline-primary" onclick="toggleNfcScan()">
-                    <i class="bi bi-broadcast me-1"></i>Start NFC Scan
-                  </button>
-                  <span id="nfcScanStatus" class="text-muted small"></span>
-                </div>
-                <div class="text-muted small mt-2">
-                  Hold an RFID/NFC chip near the reader. Supported on Android Chrome with an NFC-capable device.
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          <!-- Result area -->
-          <div id="rfidLookupResult"></div>
-        </div>
-
-        <!-- Litters -->
-        <div id="page-litters" class="page">
-          <div class="page-header">
-            <h4><i class="bi bi-egg me-2"></i>Litters</h4>
-            <button id="btnAddLitterMain" class="btn btn-primary ms-auto d-none" onclick="openGlobalLitterModal()"><i
-                class="bi bi-plus-lg me-1"></i>Add Litter</button>
-          </div>
-          <div class="card">
-            <div class="table-responsive">
-              <table class="table table-hover mb-0">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Litter ID</th>
-                    <th>Jill (Mother)</th>
-                    <th>Father</th>
-                    <th>Kits</th>
-                    <th>Stillborn</th>
-                    <th>Individuals Created</th>
-                    <th>Notes</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="litterTable"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Locations -->
-        <div id="page-locations" class="page">
-          <div class="page-header">
-            <h4><i class="bi bi-geo-alt me-2"></i>Locations</h4>
-            <button id="btnAddLocationMain" class="btn btn-outline-secondary ms-auto d-none"
+      <!-- Ferrets -->
+      <div id="page-ferrets" class="page">
+        <div class="page-header">
+          <h4><i class="bi bi-grid-3x3-gap me-2"></i>Ferrets</h4>
+          <input id="ferretSearch" type="search" class="form-control" style="max-width:240px"
+            placeholder="Search ferrets…">
+          <select id="ferretSort" class="form-select" style="max-width:160px" onchange="renderFerretGrid()">
+            <option value="name">Sort: Name</option>
+            <option value="age">Sort: Age</option>
+            <option value="sex">Sort: Sex</option>
+            <option value="room">Sort: Room</option>
+            <option value="supplier">Sort: Supplier</option>
+          </select>
+          <div class="ms-auto d-flex gap-2 flex-wrap">
+            <button id="btnAddLocation" class="btn btn-outline-secondary d-none"
               onclick="new bootstrap.Modal(document.getElementById('addrModal')).show()"><i
-                class="bi bi-plus-lg me-1"></i>Add Location</button>
-          </div>
-          <div id="locationAccordion" class="accordion"></div>
-        </div>
-
-        <!-- Suppliers -->
-        <div id="page-suppliers" class="page">
-          <div class="page-header">
-            <h4><i class="bi bi-truck me-2"></i>Suppliers</h4>
-            <button id="btnAddSupplierMain" class="btn btn-primary ms-auto d-none" onclick="openSupplierModal()"><i
-                class="bi bi-plus-lg me-1"></i>Add Supplier</button>
-          </div>
-          <div class="row g-3" id="supplierCards"></div>
-        </div>
-
-        <!-- Distribution -->
-        <div id="page-distribution" class="page">
-          <div class="page-header">
-            <h4><i class="bi bi-box-arrow-right me-2"></i>Distribution</h4>
-            <div class="ms-auto d-flex gap-2">
-              <button id="btnAddDistributor" class="btn btn-outline-secondary d-none" onclick="openDistributorModal()">
-                <i class="bi bi-plus-lg me-1"></i>Add Distributor
-              </button>
-            </div>
-          </div>
-
-          <!-- Distributor filter bar -->
-          <div class="card mb-3 p-3">
-            <div class="d-flex align-items-center gap-3 flex-wrap">
-              <span class="fw-semibold text-muted small">Filter by Distributor:</span>
-              <div id="distFilterBtns" class="d-flex flex-wrap gap-2"></div>
-            </div>
-          </div>
-
-          <!-- Summary cards per distributor -->
-          <div id="distSummaryCards" class="row g-3 mb-4"></div>
-
-          <!-- Events table -->
-          <div class="card">
-            <div class="card-header bg-white d-flex align-items-center py-3">
-              <span class="fw-semibold" id="distTableTitle">All Distribution Records</span>
-              <span id="distTableCount" class="badge bg-secondary ms-2"></span>
-            </div>
-            <div class="table-responsive">
-              <table class="table table-hover mb-0">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Ferret</th>
-                    <th>Animal ID</th>
-                    <th>Sex</th>
-                    <th>Distributor</th>
-                    <th>Price</th>
-                    <th>Notes</th>
-                    <th>Recorded By</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="distTable"></tbody>
-              </table>
-            </div>
+                class="bi bi-geo-alt me-1"></i>Add Location</button>
+            <button id="btnAddSupplier" class="btn btn-outline-secondary d-none" onclick="openSupplierModal()"><i
+                class="bi bi-truck me-1"></i>Add Supplier</button>
+            <button id="btnAddFerret" class="btn btn-primary d-none" onclick="openFerretModal()"><i
+                class="bi bi-plus-lg me-1"></i>Add Ferret</button>
           </div>
         </div>
+        <ul class="nav nav-tabs mb-3" id="ferretTabs">
+          <li class="nav-item">
+            <button class="nav-link active" id="tabActive" onclick="switchFerretTab('active')">
+              <span class="status-dot dot-active me-1" style="display:inline-block"></span>
+              Active <span id="tabActiveCount" class="badge bg-secondary ms-1"></span>
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" id="tabDeceased" onclick="switchFerretTab('deceased')">
+              <span class="status-dot dot-dead me-1" style="display:inline-block"></span>
+              Deceased <span id="tabDeceasedCount" class="badge bg-secondary ms-1"></span>
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" id="tabDistributed" onclick="switchFerretTab('distributed')">
+              <i class="bi bi-box-arrow-right me-1"></i>
+              Distributed <span id="tabDistributedCount" class="badge bg-secondary ms-1"></span>
+            </button>
+          </li>
+        </ul>
+        <div id="ferretGrid" class="row g-3"></div>
+      </div>
 
-        <!-- Assignments -->
-        <div id="page-assignments" class="page">
-          <div class="page-header">
-            <h4><i class="bi bi-clipboard-check me-2"></i>Assignments</h4>
-            <button id="btnAddAssign" class="btn btn-primary ms-auto d-none" onclick="openAssignModal()"><i
-                class="bi bi-plus-lg me-1"></i>Create</button>
-          </div>
-          <div class="card">
-            <div class="table-responsive">
-              <table class="table table-hover mb-0">
-                <thead>
-                  <tr>
-                    <th>Type</th>
-                    <th>Assigned To</th>
-                    <th>Description</th>
-                    <th>Due</th>
-                    <th>Status</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="assignTable"></tbody>
-              </table>
-            </div>
-          </div>
+      <!-- Ferret Detail -->
+      <div id="page-ferret-detail" class="page">
+        <button class="btn btn-outline-secondary btn-sm mb-3" onclick="nav('ferrets')"><i
+            class="bi bi-arrow-left me-1"></i>Back</button>
+        <div id="ferretDetail"></div>
+      </div>
+
+      <!-- RFID Lookup -->
+      <div id="page-rfid-lookup" class="page">
+        <div class="page-header">
+          <h4><i class="bi bi-broadcast me-2"></i>RFID Lookup</h4>
         </div>
 
-        <!-- Users -->
-        <div id="page-users" class="page admin-only">
-          <div class="page-header">
-            <h4><i class="bi bi-people me-2"></i>User Management</h4>
-            <button class="btn btn-primary ms-auto" onclick="openUserModal()"><i class="bi bi-plus-lg me-1"></i>Add
-              User</button>
-          </div>
-          <div class="card">
-            <div class="table-responsive">
-              <table class="table table-hover mb-0">
-                <thead>
-                  <tr>
-                    <th>Username</th>
-                    <th>Full Name</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Last Login</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="userTable"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <!-- NFC / manual input card -->
+        <div class="card mb-4 shadow-sm" style="border-radius:14px; max-width:560px;">
+          <div class="card-body p-4">
 
-        <!-- Activity Log -->
-        <div id="page-activity" class="page admin-only">
-          <div class="page-header">
-            <h4><i class="bi bi-journal-text me-2"></i>Activity Log</h4>
-            <span id="actTotalBadge" class="badge bg-secondary ms-2" style="font-size:.85rem"></span>
-          </div>
-          <!-- Filter bar -->
-          <div class="card mb-3 p-3">
-            <div class="d-flex flex-wrap gap-3 align-items-end">
-              <div>
-                <label class="form-label small fw-semibold mb-1">From</label>
-                <input type="date" id="actDateFrom" class="form-control form-control-sm" style="max-width:150px">
-              </div>
-              <div>
-                <label class="form-label small fw-semibold mb-1">To</label>
-                <input type="date" id="actDateTo" class="form-control form-control-sm" style="max-width:150px">
-              </div>
-              <div>
-                <label class="form-label small fw-semibold mb-1">User</label>
-                <select id="actUserFilter" class="form-select form-select-sm" style="max-width:180px">
-                  <option value="">All Users</option>
-                </select>
-              </div>
-              <div class="d-flex gap-2">
-                <button class="btn btn-primary btn-sm" onclick="applyActFilters()"><i
-                    class="bi bi-search me-1"></i>Apply</button>
-                <button class="btn btn-outline-secondary btn-sm" onclick="clearActFilters()">Clear</button>
-              </div>
-            </div>
-          </div>
-          <div class="card">
-            <div class="table-responsive">
-              <table class="table table-sm table-hover mb-0">
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>User</th>
-                    <th>Action</th>
-                    <th>Table</th>
-                    <th>Details</th>
-                  </tr>
-                </thead>
-                <tbody id="actTable"></tbody>
-              </table>
-            </div>
-            <div class="d-flex align-items-center justify-content-between px-3 py-2 border-top" id="actPagination"
-              style="display:none">
-              <span class="text-muted small" id="actPageInfo"></span>
-              <div class="d-flex gap-1" id="actPageBtns"></div>
-            </div>
-          </div>
-        </div>
+            <!-- Web NFC status banner -->
+            <div id="nfcStatusBanner" class="alert alert-info py-2 small mb-3 d-none"></div>
 
-        <!-- Cleaning Reports -->
-        <div id="page-cleaning-reports" class="page">
-          <div class="page-header">
-            <h4><i class="bi bi-check2-square me-2"></i>Cleaning Reports</h4>
-          </div>
-
-          <!-- Submit Form (all users) -->
-          <div id="crSubmitSection">
-            <div id="crSuccess" class="d-none mb-4">
-              <div class="card text-center p-5 shadow-sm" style="border-radius:16px;">
-                <div style="font-size:3.5rem; margin-bottom:1rem;">✅</div>
-                <h4 class="fw-bold text-success mb-2">Report Submitted!</h4>
-                <p class="text-muted mb-4">Your cleaning report has been recorded successfully.</p>
-                <button class="btn btn-primary px-5" onclick="resetCleaningForm()">
-                  <i class="bi bi-plus-lg me-2"></i>Submit Another Report
+            <!-- Manual / USB wedge input -->
+            <div class="mb-3">
+              <label class="fw-bold fs-6 d-block mb-1"><i class="bi bi-upc-scan me-1"></i>Scan or Enter RFID</label>
+              <p class="text-muted small mb-2">
+                Scan with a USB RFID wedge reader, type the chip value, or use the NFC button below on a supported
+                device.
+              </p>
+              <div class="input-group">
+                <input id="rfidLookupInput" class="form-control font-monospace" placeholder="e.g. 0A1B2C3D4E"
+                  autocomplete="off" onkeydown="if(event.key==='Enter') doRfidLookup()">
+                <button class="btn btn-primary" onclick="doRfidLookup()">
+                  <i class="bi bi-search me-1"></i>Look Up
                 </button>
               </div>
             </div>
-            <div id="crFormWrap">
-              <div class="card shadow-sm mb-4" style="border-radius:14px;">
-                <div class="card-body p-4">
 
-                  <!-- Reporter Name -->
-                  <div class="mb-4">
-                    <label class="fw-bold fs-6 d-block mb-1">
-                      <span class="text-danger me-1">●</span>Your Name
-                    </label>
-                    <p class="text-muted small mb-2">Enter your name so the report can be attributed to you.</p>
-                    <input id="crReporterName" class="form-control form-control-lg" placeholder="First and last name"
-                      style="max-width:400px;">
-                  </div>
-
-                  <hr class="my-3">
-
-                  <!-- Room Selection -->
-                  <div class="mb-4">
-                    <label class="fw-bold fs-6 d-block mb-1">
-                      <span class="text-danger me-1">●</span>What room(s) did you clean?
-                    </label>
-                    <p class="text-muted small mb-2">Select all rooms you cleaned during this session.</p>
-                    <div id="crRoomList" class="d-flex flex-wrap gap-2"></div>
-                  </div>
-
-                  <hr class="my-3">
-
-                  <!-- Inside Cage Cleaning -->
-                  <div class="mb-4">
-                    <div class="d-flex align-items-start gap-3 p-3 rounded-3 cr-check-box" id="crCageBox"
-                      style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
-                      onclick="toggleCrCheck('crCage','crCageBox')">
-                      <div style="margin-top:2px;">
-                        <div id="crCageCheck" class="cr-checkmark"></div>
-                      </div>
-                      <div>
-                        <div class="fw-bold"><span class="text-danger me-1">●</span>Inside Cage Cleaning</div>
-                        <div class="text-muted small mt-1">Check to confirm that you scraped or vacuumed inside the
-                          cages.
-                        </div>
-                      </div>
-                    </div>
-                    <input type="checkbox" id="crCage" style="display:none">
-                  </div>
-
-                  <!-- Tray Cleaning -->
-                  <div class="mb-4">
-                    <div class="d-flex align-items-start gap-3 p-3 rounded-3 cr-check-box" id="crTrayBox"
-                      style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
-                      onclick="toggleCrCheck('crTray','crTrayBox')">
-                      <div style="margin-top:2px;">
-                        <div id="crTrayCheck" class="cr-checkmark"></div>
-                      </div>
-                      <div>
-                        <div class="fw-bold"><span class="text-danger me-1">●</span>Tray Cleaning</div>
-                        <div class="text-muted small mt-1">Check to confirm that you scraped or vacuumed the trays under
-                          the cages.</div>
-                      </div>
-                    </div>
-                    <input type="checkbox" id="crTray" style="display:none">
-                  </div>
-
-                  <!-- Sweeping, Scraping, Mopping -->
-                  <div class="mb-4">
-                    <div class="d-flex align-items-start gap-3 p-3 rounded-3 cr-check-box" id="crFloorBox"
-                      style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
-                      onclick="toggleCrCheck('crFloor','crFloorBox')">
-                      <div style="margin-top:2px;">
-                        <div id="crFloorCheck" class="cr-checkmark"></div>
-                      </div>
-                      <div>
-                        <div class="fw-bold"><span class="text-danger me-1">●</span>Sweeping, Scraping, and Mopping
-                        </div>
-                        <div class="text-muted small mt-1">Check to confirm that you swept, scraped, and mopped the
-                          floors.</div>
-                      </div>
-                    </div>
-                    <input type="checkbox" id="crFloor" style="display:none">
-                  </div>
-
-                  <!-- Food and Water Check -->
-                  <div class="mb-4">
-                    <div class="d-flex align-items-start gap-3 p-3 rounded-3 cr-check-box" id="crFoodBox"
-                      style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
-                      onclick="toggleCrCheck('crFood','crFoodBox')">
-                      <div style="margin-top:2px;">
-                        <div id="crFoodCheck" class="cr-checkmark"></div>
-                      </div>
-                      <div>
-                        <div class="fw-bold"><span class="text-danger me-1">●</span>Food and Water Check</div>
-                        <div class="text-muted small mt-1">Check to confirm that you checked that every animal had
-                          access
-                          to food and water.</div>
-                      </div>
-                    </div>
-                    <input type="checkbox" id="crFood" style="display:none">
-                  </div>
-
-                  <hr class="my-3">
-
-                  <!-- Issues -->
-                  <div class="mb-4">
-                    <label class="fw-bold fs-6 d-block mb-1">Were there any issues when cleaning the room?</label>
-                    <p class="text-muted small mb-2">Such as animal fighting, broken cage, animals escaped the room, or
-                      other. If so, please describe what happened below.</p>
-                    <div class="d-flex gap-2 mb-2 flex-wrap">
-                      <button type="button" class="btn btn-outline-secondary btn-sm cr-issue-tag"
-                        onclick="toggleCrIssueTag(this, 'Animal fighting')">🐾 Animal Fighting</button>
-                      <button type="button" class="btn btn-outline-secondary btn-sm cr-issue-tag"
-                        onclick="toggleCrIssueTag(this, 'Broken cage')">🔧 Broken Cage</button>
-                      <button type="button" class="btn btn-outline-secondary btn-sm cr-issue-tag"
-                        onclick="toggleCrIssueTag(this, 'Animal escaped room')">🚨 Animal Escaped</button>
-                      <button type="button" class="btn btn-outline-secondary btn-sm cr-issue-tag"
-                        onclick="toggleCrIssueTag(this, 'Other')">📝 Other</button>
-                    </div>
-                    <div class="position-relative">
-                      <textarea id="crIssues" class="form-control" rows="3"
-                        placeholder="Type your answer or tap the microphone to speak…"
-                        style="padding-right:3rem; font-size:1rem;"></textarea>
-                      <button type="button" id="crMicBtn" onclick="toggleCrSpeech()" title="Tap to speak"
-                        style="position:absolute;right:10px;bottom:10px;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#6c757d;padding:4px;">🎤</button>
-                    </div>
-                    <div id="crMicStatus" class="text-muted small mt-1" style="display:none;">
-                      <span class="spinner-grow spinner-grow-sm text-danger me-1"></span>Listening… tap mic to stop.
-                    </div>
-                  </div>
-
-                  <hr class="my-3">
-
-                  <!-- Signature -->
-                  <div class="mb-2">
-                    <label class="fw-bold fs-6 d-block mb-1">
-                      <span class="text-danger me-1">●</span>Signature
-                    </label>
-                    <p class="text-muted small mb-2">Sign below to confirm that everything marked above was completed.
-                    </p>
-                    <div
-                      style="border:2px solid #dee2e6; border-radius:10px; background:#fff; position:relative; max-width:640px;">
-                      <canvas id="crSigCanvas"
-                        style="width:100%;height:180px;display:block;border-radius:8px;touch-action:none;"></canvas>
-                      <button type="button" onclick="clearCrSignature()"
-                        style="position:absolute;top:8px;right:10px;background:none;border:none;color:#adb5bd;font-size:.8rem;cursor:pointer;">
-                        <i class="bi bi-x-circle me-1"></i>Clear
-                      </button>
-                      <div id="crSigPlaceholder"
-                        style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#adb5bd;pointer-events:none;font-size:.95rem;">
-                        ✍️ Sign here</div>
-                    </div>
-                  </div>
-
-                </div>
+            <!-- Web NFC scan button (shown only on compatible browsers) -->
+            <div id="nfcScanWrap" class="d-none">
+              <hr class="my-3">
+              <div class="d-flex align-items-center gap-3">
+                <button id="nfcScanBtn" class="btn btn-outline-primary" onclick="toggleNfcScan()">
+                  <i class="bi bi-broadcast me-1"></i>Start NFC Scan
+                </button>
+                <span id="nfcScanStatus" class="text-muted small"></span>
               </div>
-
-              <div id="crFormError" class="alert alert-danger d-none mb-3"></div>
-
-              <button class="btn btn-success px-5 py-3 fw-bold fs-5 shadow-sm mb-5" onclick="submitCleaningReport()"
-                style="border-radius:12px;">
-                <i class="bi bi-check2-circle me-2"></i>Submit Cleaning Report
-              </button>
+              <div class="text-muted small mt-2">
+                Hold an RFID/NFC chip near the reader. Supported on Android Chrome with an NFC-capable device.
+              </div>
             </div>
+
           </div>
-
-          <!-- Report History (admin/research only) -->
-          <div id="crHistorySection" class="d-none">
-            <hr class="my-4">
-            <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
-              <h5 class="fw-bold mb-0"><i class="bi bi-clock-history me-2"></i>Report History</h5>
-              <div class="ms-auto d-flex gap-2 align-items-center">
-                <label class="form-label mb-0 text-muted small">Filter by Room:</label>
-                <select id="crRoomFilter" class="form-select form-select-sm" style="max-width:130px"
-                  onchange="loadCrHistory()">
-                  <option value="">All Rooms</option>
-                </select>
-              </div>
-            </div>
-            <div class="card">
-              <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                  <thead>
-                    <tr>
-                      <th>Date &amp; Time</th>
-                      <th>Name</th>
-                      <th>Rooms</th>
-                      <th>Cage</th>
-                      <th>Trays</th>
-                      <th>Floors</th>
-                      <th>Food/Water</th>
-                      <th>Issues</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody id="crTable"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
         </div>
 
-      </div><!-- /main -->
-    </div><!-- /app -->
+        <!-- Result area -->
+        <div id="rfidLookupResult"></div>
+      </div>
 
-    <!-- placeholder so kiosk references don't break during transition -->
-    <div id="cleanerKiosk" style="display:none;">
-      <div
-        style="background:var(--brand); padding:1rem 1.5rem; display:flex; align-items:center; justify-content:space-between;">
-        <div style="color:#fff; font-size:1.1rem; font-weight:700;">🐾 SanusBio &mdash; Room Cleaning Report</div>
-        <div style="display:flex; align-items:center; gap:1rem;">
-          <div id="kioskUserInfo" style="color:rgba(255,255,255,.8); font-size:.9rem;"></div>
-          <button class="btn btn-sm btn-outline-light" onclick="doLogout()"><i
-              class="bi bi-box-arrow-right me-1"></i>Sign
-            Out</button>
+      <!-- Litters -->
+      <div id="page-litters" class="page">
+        <div class="page-header">
+          <h4><i class="bi bi-egg me-2"></i>Litters</h4>
+          <button id="btnAddLitterMain" class="btn btn-primary ms-auto d-none" onclick="openGlobalLitterModal()"><i
+              class="bi bi-plus-lg me-1"></i>Add Litter</button>
+        </div>
+        <div class="card">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Litter ID</th>
+                  <th>Jill (Mother)</th>
+                  <th>Father</th>
+                  <th>Kits</th>
+                  <th>Stillborn</th>
+                  <th>Individuals Created</th>
+                  <th>Notes</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="litterTable"></tbody>
+            </table>
+          </div>
         </div>
       </div>
-      <div style="max-width:680px; margin:0 auto; padding:1.5rem;">
-        <div id="kioskSuccess" class="d-none">
-          <div class="card text-center p-5 shadow-sm" style="border-radius:16px;">
-            <div style="font-size:4rem; margin-bottom:1rem;">✅</div>
-            <h3 class="fw-bold text-success mb-2">Report Submitted!</h3>
-            <p class="text-muted mb-4">Your cleaning report has been recorded successfully.</p>
-            <button class="btn btn-primary btn-lg px-5" onclick="resetKioskForm()">
-              <i class="bi bi-plus-lg me-2"></i>Submit Another Report
+
+      <!-- Locations -->
+      <div id="page-locations" class="page">
+        <div class="page-header">
+          <h4><i class="bi bi-geo-alt me-2"></i>Locations</h4>
+          <button id="btnAddLocationMain" class="btn btn-outline-secondary ms-auto d-none"
+            onclick="new bootstrap.Modal(document.getElementById('addrModal')).show()"><i
+              class="bi bi-plus-lg me-1"></i>Add Location</button>
+        </div>
+        <div id="locationAccordion" class="accordion"></div>
+      </div>
+
+      <!-- Suppliers -->
+      <div id="page-suppliers" class="page">
+        <div class="page-header">
+          <h4><i class="bi bi-truck me-2"></i>Suppliers</h4>
+          <button id="btnAddSupplierMain" class="btn btn-primary ms-auto d-none" onclick="openSupplierModal()"><i
+              class="bi bi-plus-lg me-1"></i>Add Supplier</button>
+        </div>
+        <div class="row g-3" id="supplierCards"></div>
+      </div>
+
+      <!-- Distribution -->
+      <div id="page-distribution" class="page">
+        <div class="page-header">
+          <h4><i class="bi bi-box-arrow-right me-2"></i>Distribution</h4>
+          <div class="ms-auto d-flex gap-2">
+            <button id="btnAddDistributor" class="btn btn-outline-secondary d-none" onclick="openDistributorModal()">
+              <i class="bi bi-plus-lg me-1"></i>Add Distributor
             </button>
           </div>
         </div>
-        <div id="kioskForm">
-          <div class="card shadow-sm mb-3" style="border-radius:14px;">
-            <div class="card-body p-4">
 
-              <!-- Room Selection -->
-              <div class="mb-4">
-                <label class="fw-bold fs-6 d-block mb-1">
-                  <span class="text-danger me-1">●</span>What room(s) did you clean?
-                </label>
-                <p class="text-muted small mb-2">Select all rooms you cleaned during this session.</p>
-                <div id="kioskRoomList" class="d-flex flex-wrap gap-2"></div>
-              </div>
+        <!-- Distributor filter bar -->
+        <div class="card mb-3 p-3">
+          <div class="d-flex align-items-center gap-3 flex-wrap">
+            <span class="fw-semibold text-muted small">Filter by Distributor:</span>
+            <div id="distFilterBtns" class="d-flex flex-wrap gap-2"></div>
+          </div>
+        </div>
 
-              <hr class="my-3">
+        <!-- Summary cards per distributor -->
+        <div id="distSummaryCards" class="row g-3 mb-4"></div>
 
-              <!-- Inside Cage Cleaning -->
-              <div class="mb-4">
-                <div class="d-flex align-items-start gap-3 p-3 rounded-3" id="kioskCageBox"
-                  style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
-                  onclick="toggleKioskCheck('kioskCage','kioskCageBox')">
-                  <div style="margin-top:2px;">
-                    <div id="kioskCageCheck"
-                      style="width:28px;height:28px;border-radius:6px;border:2px solid #adb5bd;background:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">
-                    </div>
-                  </div>
-                  <div>
-                    <div class="fw-bold"><span class="text-danger me-1">●</span>Inside Cage Cleaning</div>
-                    <div class="text-muted small mt-1">Check to confirm that you scraped or vacuumed inside the cages.
-                    </div>
-                  </div>
-                </div>
-                <input type="checkbox" id="kioskCage" style="display:none">
-              </div>
+        <!-- Events table -->
+        <div class="card">
+          <div class="card-header bg-white d-flex align-items-center py-3">
+            <span class="fw-semibold" id="distTableTitle">All Distribution Records</span>
+            <span id="distTableCount" class="badge bg-secondary ms-2"></span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Ferret</th>
+                  <th>Animal ID</th>
+                  <th>Sex</th>
+                  <th>Distributor</th>
+                  <th>Price</th>
+                  <th>Notes</th>
+                  <th>Recorded By</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="distTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
-              <!-- Tray Cleaning -->
-              <div class="mb-4">
-                <div class="d-flex align-items-start gap-3 p-3 rounded-3" id="kioskTrayBox"
-                  style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
-                  onclick="toggleKioskCheck('kioskTray','kioskTrayBox')">
-                  <div style="margin-top:2px;">
-                    <div id="kioskTrayCheck"
-                      style="width:28px;height:28px;border-radius:6px;border:2px solid #adb5bd;background:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">
-                    </div>
-                  </div>
-                  <div>
-                    <div class="fw-bold"><span class="text-danger me-1">●</span>Tray Cleaning</div>
-                    <div class="text-muted small mt-1">Check to confirm that you scraped or vacuumed the trays under the
-                      cages.</div>
-                  </div>
-                </div>
-                <input type="checkbox" id="kioskTray" style="display:none">
-              </div>
+      <!-- Assignments -->
+      <div id="page-assignments" class="page">
+        <div class="page-header">
+          <h4><i class="bi bi-clipboard-check me-2"></i>Assignments</h4>
+          <button id="btnAddAssign" class="btn btn-primary ms-auto d-none" onclick="openAssignModal()"><i
+              class="bi bi-plus-lg me-1"></i>Create</button>
+        </div>
+        <div class="card">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Assigned To</th>
+                  <th>Description</th>
+                  <th>Due</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="assignTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
-              <!-- Sweeping, Scraping, and Mopping -->
-              <div class="mb-4">
-                <div class="d-flex align-items-start gap-3 p-3 rounded-3" id="kioskFloorBox"
-                  style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
-                  onclick="toggleKioskCheck('kioskFloor','kioskFloorBox')">
-                  <div style="margin-top:2px;">
-                    <div id="kioskFloorCheck"
-                      style="width:28px;height:28px;border-radius:6px;border:2px solid #adb5bd;background:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">
-                    </div>
-                  </div>
-                  <div>
-                    <div class="fw-bold"><span class="text-danger me-1">●</span>Sweeping, Scraping, and Mopping</div>
-                    <div class="text-muted small mt-1">Check to confirm that you swept, scraped, and mopped the floors.
-                    </div>
-                  </div>
-                </div>
-                <input type="checkbox" id="kioskFloor" style="display:none">
-              </div>
+      <!-- Users -->
+      <div id="page-users" class="page admin-only">
+        <div class="page-header">
+          <h4><i class="bi bi-people me-2"></i>User Management</h4>
+          <button class="btn btn-primary ms-auto" onclick="openUserModal()"><i class="bi bi-plus-lg me-1"></i>Add
+            User</button>
+        </div>
+        <div class="card">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Full Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Last Login</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="userTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
-              <!-- Food and Water Check -->
-              <div class="mb-4">
-                <div class="d-flex align-items-start gap-3 p-3 rounded-3" id="kioskFoodBox"
-                  style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
-                  onclick="toggleKioskCheck('kioskFood','kioskFoodBox')">
-                  <div style="margin-top:2px;">
-                    <div id="kioskFoodCheck"
-                      style="width:28px;height:28px;border-radius:6px;border:2px solid #adb5bd;background:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">
-                    </div>
-                  </div>
-                  <div>
-                    <div class="fw-bold"><span class="text-danger me-1">●</span>Food and Water Check</div>
-                    <div class="text-muted small mt-1">Check to confirm that you checked that every animal had access to
-                      food and water.</div>
-                  </div>
-                </div>
-                <input type="checkbox" id="kioskFood" style="display:none">
-              </div>
-
-              <hr class="my-3">
-
-              <!-- Issues -->
-              <div class="mb-4">
-                <label class="fw-bold fs-6 d-block mb-1">Were there any issues when cleaning the room?</label>
-                <p class="text-muted small mb-2">Such as animal fighting, broken cage, animals escaped the room, or
-                  other.
-                  If so, please describe what happened below.</p>
-                <div class="d-flex gap-2 mb-2 flex-wrap">
-                  <button type="button" class="btn btn-outline-secondary btn-sm issue-tag"
-                    onclick="toggleIssueTag(this, 'Animal fighting')">🐾 Animal Fighting</button>
-                  <button type="button" class="btn btn-outline-secondary btn-sm issue-tag"
-                    onclick="toggleIssueTag(this, 'Broken cage')">🔧 Broken Cage</button>
-                  <button type="button" class="btn btn-outline-secondary btn-sm issue-tag"
-                    onclick="toggleIssueTag(this, 'Animal escaped room')">🚨 Animal Escaped</button>
-                  <button type="button" class="btn btn-outline-secondary btn-sm issue-tag"
-                    onclick="toggleIssueTag(this, 'Other')">📝 Other</button>
-                </div>
-                <div class="position-relative">
-                  <textarea id="kioskIssues" class="form-control" rows="3"
-                    placeholder="Type your answer or tap the microphone to speak…"
-                    style="padding-right:3rem; font-size:1rem;"></textarea>
-                  <button type="button" id="kioskMicBtn" onclick="toggleSpeechInput()" title="Tap to speak"
-                    style="position:absolute;right:10px;bottom:10px;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#6c757d;padding:4px;">
-                    🎤
-                  </button>
-                </div>
-                <div id="kioskMicStatus" class="text-muted small mt-1" style="display:none;"><span
-                    class="spinner-grow spinner-grow-sm text-danger me-1"></span>Listening… tap mic to stop.</div>
-              </div>
-
-              <hr class="my-3">
-
-              <!-- Signature -->
-              <div class="mb-2">
-                <label class="fw-bold fs-6 d-block mb-1">
-                  <span class="text-danger me-1">●</span>Signature
-                </label>
-                <p class="text-muted small mb-2">Sign below to confirm that everything marked above was completed.</p>
-                <div style="border:2px solid #dee2e6; border-radius:10px; background:#fff; position:relative;">
-                  <canvas id="sigCanvas"
-                    style="width:100%;height:180px;display:block;border-radius:8px;touch-action:none;"></canvas>
-                  <button type="button" onclick="clearSignature()"
-                    style="position:absolute;top:8px;right:10px;background:none;border:none;color:#adb5bd;font-size:.8rem;cursor:pointer;">
-                    <i class="bi bi-x-circle me-1"></i>Clear
-                  </button>
-                  <div id="sigPlaceholder"
-                    style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#adb5bd;pointer-events:none;font-size:.95rem;">
-                    ✍️ Sign here</div>
-                </div>
-              </div>
-
+      <!-- Activity Log -->
+      <div id="page-activity" class="page admin-only">
+        <div class="page-header">
+          <h4><i class="bi bi-journal-text me-2"></i>Activity Log</h4>
+          <span id="actTotalBadge" class="badge bg-secondary ms-2" style="font-size:.85rem"></span>
+        </div>
+        <!-- Filter bar -->
+        <div class="card mb-3 p-3">
+          <div class="d-flex flex-wrap gap-3 align-items-end">
+            <div>
+              <label class="form-label small fw-semibold mb-1">From</label>
+              <input type="date" id="actDateFrom" class="form-control form-control-sm" style="max-width:150px">
+            </div>
+            <div>
+              <label class="form-label small fw-semibold mb-1">To</label>
+              <input type="date" id="actDateTo" class="form-control form-control-sm" style="max-width:150px">
+            </div>
+            <div>
+              <label class="form-label small fw-semibold mb-1">User</label>
+              <select id="actUserFilter" class="form-select form-select-sm" style="max-width:180px">
+                <option value="">All Users</option>
+              </select>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary btn-sm" onclick="applyActFilters()"><i
+                  class="bi bi-search me-1"></i>Apply</button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="clearActFilters()">Clear</button>
             </div>
           </div>
+        </div>
+        <div class="card">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>User</th>
+                  <th>Action</th>
+                  <th>Table</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody id="actTable"></tbody>
+            </table>
+          </div>
+          <div class="d-flex align-items-center justify-content-between px-3 py-2 border-top" id="actPagination"
+            style="display:none">
+            <span class="text-muted small" id="actPageInfo"></span>
+            <div class="d-flex gap-1" id="actPageBtns"></div>
+          </div>
+        </div>
+      </div>
 
-          <div id="kioskError" class="alert alert-danger d-none mb-3"></div>
+      <!-- Cleaning Reports -->
+      <div id="page-cleaning-reports" class="page">
+        <div class="page-header">
+          <h4><i class="bi bi-check2-square me-2"></i>Cleaning Reports</h4>
+        </div>
 
-          <button class="btn btn-success w-100 py-3 fw-bold fs-5 shadow-sm" onclick="submitKioskReport()"
-            style="border-radius:12px;">
-            <i class="bi bi-check2-circle me-2"></i>Submit Cleaning Report
+        <!-- Submit Form (all users) -->
+        <div id="crSubmitSection">
+          <div id="crSuccess" class="d-none mb-4">
+            <div class="card text-center p-5 shadow-sm" style="border-radius:16px;">
+              <div style="font-size:3.5rem; margin-bottom:1rem;">✅</div>
+              <h4 class="fw-bold text-success mb-2">Report Submitted!</h4>
+              <p class="text-muted mb-4">Your cleaning report has been recorded successfully.</p>
+              <button class="btn btn-primary px-5" onclick="resetCleaningForm()">
+                <i class="bi bi-plus-lg me-2"></i>Submit Another Report
+              </button>
+            </div>
+          </div>
+          <div id="crFormWrap">
+            <div class="card shadow-sm mb-4" style="border-radius:14px;">
+              <div class="card-body p-4">
+
+                <!-- Reporter Name -->
+                <div class="mb-4">
+                  <label class="fw-bold fs-6 d-block mb-1">
+                    <span class="text-danger me-1">●</span>Your Name
+                  </label>
+                  <p class="text-muted small mb-2">Enter your name so the report can be attributed to you.</p>
+                  <input id="crReporterName" class="form-control form-control-lg" placeholder="First and last name"
+                    style="max-width:400px;">
+                </div>
+
+                <hr class="my-3">
+
+                <!-- Room Selection -->
+                <div class="mb-4">
+                  <label class="fw-bold fs-6 d-block mb-1">
+                    <span class="text-danger me-1">●</span>What room(s) did you clean?
+                  </label>
+                  <p class="text-muted small mb-2">Select all rooms you cleaned during this session.</p>
+                  <div id="crRoomList" class="d-flex flex-wrap gap-2"></div>
+                </div>
+
+                <hr class="my-3">
+
+                <!-- Inside Cage Cleaning -->
+                <div class="mb-4">
+                  <div class="d-flex align-items-start gap-3 p-3 rounded-3 cr-check-box" id="crCageBox"
+                    style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
+                    onclick="toggleCrCheck('crCage','crCageBox')">
+                    <div style="margin-top:2px;">
+                      <div id="crCageCheck" class="cr-checkmark"></div>
+                    </div>
+                    <div>
+                      <div class="fw-bold"><span class="text-danger me-1">●</span>Inside Cage Cleaning</div>
+                      <div class="text-muted small mt-1">Check to confirm that you scraped or vacuumed inside the cages.
+                      </div>
+                    </div>
+                  </div>
+                  <input type="checkbox" id="crCage" style="display:none">
+                </div>
+
+                <!-- Tray Cleaning -->
+                <div class="mb-4">
+                  <div class="d-flex align-items-start gap-3 p-3 rounded-3 cr-check-box" id="crTrayBox"
+                    style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
+                    onclick="toggleCrCheck('crTray','crTrayBox')">
+                    <div style="margin-top:2px;">
+                      <div id="crTrayCheck" class="cr-checkmark"></div>
+                    </div>
+                    <div>
+                      <div class="fw-bold"><span class="text-danger me-1">●</span>Tray Cleaning</div>
+                      <div class="text-muted small mt-1">Check to confirm that you scraped or vacuumed the trays under
+                        the cages.</div>
+                    </div>
+                  </div>
+                  <input type="checkbox" id="crTray" style="display:none">
+                </div>
+
+                <!-- Sweeping, Scraping, Mopping -->
+                <div class="mb-4">
+                  <div class="d-flex align-items-start gap-3 p-3 rounded-3 cr-check-box" id="crFloorBox"
+                    style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
+                    onclick="toggleCrCheck('crFloor','crFloorBox')">
+                    <div style="margin-top:2px;">
+                      <div id="crFloorCheck" class="cr-checkmark"></div>
+                    </div>
+                    <div>
+                      <div class="fw-bold"><span class="text-danger me-1">●</span>Sweeping, Scraping, and Mopping</div>
+                      <div class="text-muted small mt-1">Check to confirm that you swept, scraped, and mopped the
+                        floors.</div>
+                    </div>
+                  </div>
+                  <input type="checkbox" id="crFloor" style="display:none">
+                </div>
+
+                <!-- Food and Water Check -->
+                <div class="mb-4">
+                  <div class="d-flex align-items-start gap-3 p-3 rounded-3 cr-check-box" id="crFoodBox"
+                    style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
+                    onclick="toggleCrCheck('crFood','crFoodBox')">
+                    <div style="margin-top:2px;">
+                      <div id="crFoodCheck" class="cr-checkmark"></div>
+                    </div>
+                    <div>
+                      <div class="fw-bold"><span class="text-danger me-1">●</span>Food and Water Check</div>
+                      <div class="text-muted small mt-1">Check to confirm that you checked that every animal had access
+                        to food and water.</div>
+                    </div>
+                  </div>
+                  <input type="checkbox" id="crFood" style="display:none">
+                </div>
+
+                <hr class="my-3">
+
+                <!-- Issues -->
+                <div class="mb-4">
+                  <label class="fw-bold fs-6 d-block mb-1">Were there any issues when cleaning the room?</label>
+                  <p class="text-muted small mb-2">Such as animal fighting, broken cage, animals escaped the room, or
+                    other. If so, please describe what happened below.</p>
+                  <div class="d-flex gap-2 mb-2 flex-wrap">
+                    <button type="button" class="btn btn-outline-secondary btn-sm cr-issue-tag"
+                      onclick="toggleCrIssueTag(this, 'Animal fighting')">🐾 Animal Fighting</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm cr-issue-tag"
+                      onclick="toggleCrIssueTag(this, 'Broken cage')">🔧 Broken Cage</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm cr-issue-tag"
+                      onclick="toggleCrIssueTag(this, 'Animal escaped room')">🚨 Animal Escaped</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm cr-issue-tag"
+                      onclick="toggleCrIssueTag(this, 'Other')">📝 Other</button>
+                  </div>
+                  <div class="position-relative">
+                    <textarea id="crIssues" class="form-control" rows="3"
+                      placeholder="Type your answer or tap the microphone to speak…"
+                      style="padding-right:3rem; font-size:1rem;"></textarea>
+                    <button type="button" id="crMicBtn" onclick="toggleCrSpeech()" title="Tap to speak"
+                      style="position:absolute;right:10px;bottom:10px;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#6c757d;padding:4px;">🎤</button>
+                  </div>
+                  <div id="crMicStatus" class="text-muted small mt-1" style="display:none;">
+                    <span class="spinner-grow spinner-grow-sm text-danger me-1"></span>Listening… tap mic to stop.
+                  </div>
+                </div>
+
+                <hr class="my-3">
+
+                <!-- Signature -->
+                <div class="mb-2">
+                  <label class="fw-bold fs-6 d-block mb-1">
+                    <span class="text-danger me-1">●</span>Signature
+                  </label>
+                  <p class="text-muted small mb-2">Sign below to confirm that everything marked above was completed.</p>
+                  <div
+                    style="border:2px solid #dee2e6; border-radius:10px; background:#fff; position:relative; max-width:640px;">
+                    <canvas id="crSigCanvas"
+                      style="width:100%;height:180px;display:block;border-radius:8px;touch-action:none;"></canvas>
+                    <button type="button" onclick="clearCrSignature()"
+                      style="position:absolute;top:8px;right:10px;background:none;border:none;color:#adb5bd;font-size:.8rem;cursor:pointer;">
+                      <i class="bi bi-x-circle me-1"></i>Clear
+                    </button>
+                    <div id="crSigPlaceholder"
+                      style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#adb5bd;pointer-events:none;font-size:.95rem;">
+                      ✍️ Sign here</div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <div id="crFormError" class="alert alert-danger d-none mb-3"></div>
+
+            <button class="btn btn-success px-5 py-3 fw-bold fs-5 shadow-sm mb-5" onclick="submitCleaningReport()"
+              style="border-radius:12px;">
+              <i class="bi bi-check2-circle me-2"></i>Submit Cleaning Report
+            </button>
+          </div>
+        </div>
+
+        <!-- Report History (admin/research only) -->
+        <div id="crHistorySection" class="d-none">
+          <hr class="my-4">
+          <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+            <h5 class="fw-bold mb-0"><i class="bi bi-clock-history me-2"></i>Report History</h5>
+            <div class="ms-auto d-flex gap-2 align-items-center">
+              <label class="form-label mb-0 text-muted small">Filter by Room:</label>
+              <select id="crRoomFilter" class="form-select form-select-sm" style="max-width:130px"
+                onchange="loadCrHistory()">
+                <option value="">All Rooms</option>
+              </select>
+            </div>
+          </div>
+          <div class="card">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th>Date &amp; Time</th>
+                    <th>Name</th>
+                    <th>Rooms</th>
+                    <th>Cage</th>
+                    <th>Trays</th>
+                    <th>Floors</th>
+                    <th>Food/Water</th>
+                    <th>Issues</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="crTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div><!-- /main -->
+  </div><!-- /app -->
+
+  <!-- placeholder so kiosk references don't break during transition -->
+  <div id="cleanerKiosk" style="display:none;">
+    <div
+      style="background:var(--brand); padding:1rem 1.5rem; display:flex; align-items:center; justify-content:space-between;">
+      <div style="color:#fff; font-size:1.1rem; font-weight:700;">🐾 SanusBio &mdash; Room Cleaning Report</div>
+      <div style="display:flex; align-items:center; gap:1rem;">
+        <div id="kioskUserInfo" style="color:rgba(255,255,255,.8); font-size:.9rem;"></div>
+        <button class="btn btn-sm btn-outline-light" onclick="doLogout()"><i class="bi bi-box-arrow-right me-1"></i>Sign
+          Out</button>
+      </div>
+    </div>
+    <div style="max-width:680px; margin:0 auto; padding:1.5rem;">
+      <div id="kioskSuccess" class="d-none">
+        <div class="card text-center p-5 shadow-sm" style="border-radius:16px;">
+          <div style="font-size:4rem; margin-bottom:1rem;">✅</div>
+          <h3 class="fw-bold text-success mb-2">Report Submitted!</h3>
+          <p class="text-muted mb-4">Your cleaning report has been recorded successfully.</p>
+          <button class="btn btn-primary btn-lg px-5" onclick="resetKioskForm()">
+            <i class="bi bi-plus-lg me-2"></i>Submit Another Report
           </button>
         </div>
       </div>
-    </div>
+      <div id="kioskForm">
+        <div class="card shadow-sm mb-3" style="border-radius:14px;">
+          <div class="card-body p-4">
 
-    <!-- Cleaning Report Detail Modal -->
-    <div class="modal fade" id="crDetailModal" tabindex="-1">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Cleaning Report Detail</h5><button class="btn-close"
-              data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body" id="crDetailBody"></div>
-        </div>
-      </div>
-    </div>
+            <!-- Room Selection -->
+            <div class="mb-4">
+              <label class="fw-bold fs-6 d-block mb-1">
+                <span class="text-danger me-1">●</span>What room(s) did you clean?
+              </label>
+              <p class="text-muted small mb-2">Select all rooms you cleaned during this session.</p>
+              <div id="kioskRoomList" class="d-flex flex-wrap gap-2"></div>
+            </div>
 
+            <hr class="my-3">
 
-    <!-- ─── MODALS ──────────────────────────────────────────────────────────────── -->
-
-    <!-- Ferret Modal -->
-    <div class="modal fade" id="ferretModal" tabindex="-1">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Add Ferret</h5><button class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <div class="row g-2">
-              <div class="col-md-6"><label class="form-label">Ferret Name <span
-                    class="text-danger">*</span></label><input id="fName" class="form-control"></div>
-              <div class="col-md-6"><label class="form-label">Animal ID</label><input id="fAnimalId"
-                  class="form-control">
-              </div>
-              <div class="col-md-6"><label class="form-label">Birth Date <span
-                    class="text-danger">*</span></label><input id="fBirthDate" type="date" class="form-control"></div>
-              <div class="col-md-6"><label class="form-label">Weight (g)</label><input id="fWeight" type="number"
-                  class="form-control" value="0"></div>
-              <div class="col-md-6"><label class="form-label">Sex</label>
-                <select id="fSex" class="form-select">
-                  <option value="">— Unknown —</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                </select>
-              </div>
-              <div class="col-md-6"><label class="form-label">Spayed / Neutered</label>
-                <select id="fSpayed" class="form-select">
-                  <option value="n">No</option>
-                  <option value="y">Yes</option>
-                </select>
-              </div>
-              <div class="col-md-6" id="fSpayDateRow" style="display:none"><label class="form-label">Procedure
-                  Date</label><input id="fSpayDate" type="date" class="form-control"></div>
-              <div class="col-md-6"><label class="form-label">Mother Name</label><input id="fMother"
-                  class="form-control">
-              </div>
-              <div class="col-md-6"><label class="form-label">Father Name</label><input id="fFather"
-                  class="form-control">
-              </div>
-              <div class="col-md-6"><label class="form-label">Next Rabies Vaccine</label><input id="fVaccine"
-                  type="date" class="form-control">
-                <div class="form-text">Leave blank — set after first vaccination is recorded.</div>
-              </div>
-              <div class="col-md-6"><label class="form-label">Acquired By</label><input id="fAcqBy"
-                  class="form-control">
-              </div>
-              <div class="col-12"><label class="form-label">Description</label><input id="fDesc" class="form-control">
-              </div>
-              <div class="col-md-6"><label class="form-label">Location (optional)</label>
-                <select id="fAddrId" class="form-select">
-                  <option value="">— Unassigned —</option>
-                </select>
-              </div>
-              <div class="col-md-6"><label class="form-label">Supplier (optional)</label>
-                <select id="fSupplierId" class="form-select">
-                  <option value="">— Unknown —</option>
-                </select>
-              </div>
-              <div class="col-12">
-                <label class="form-label">Photo</label>
-                <div class="photo-upload-zone" id="ferretPhotoZone"
-                  onclick="document.getElementById('fPhotoFile').click()">
-                  <i class="bi bi-camera text-muted fs-3 d-block mb-1"></i>
-                  <span class="text-muted small">Click to upload or drag & drop (max 5MB)</span>
-                  <div id="fPhotoPreview" class="mt-2"></div>
+            <!-- Inside Cage Cleaning -->
+            <div class="mb-4">
+              <div class="d-flex align-items-start gap-3 p-3 rounded-3" id="kioskCageBox"
+                style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
+                onclick="toggleKioskCheck('kioskCage','kioskCageBox')">
+                <div style="margin-top:2px;">
+                  <div id="kioskCageCheck"
+                    style="width:28px;height:28px;border-radius:6px;border:2px solid #adb5bd;background:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">
+                  </div>
                 </div>
-                <input type="file" id="fPhotoFile" accept="image/*" style="display:none"
-                  onchange="previewPhoto(this,'fPhotoPreview')">
+                <div>
+                  <div class="fw-bold"><span class="text-danger me-1">●</span>Inside Cage Cleaning</div>
+                  <div class="text-muted small mt-1">Check to confirm that you scraped or vacuumed inside the cages.
+                  </div>
+                </div>
               </div>
+              <input type="checkbox" id="kioskCage" style="display:none">
             </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="submitFerret()">Save Ferret</button>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Health Event Modal -->
-    <div class="modal fade" id="healthModal" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Record Health Event</h5><button class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <input type="hidden" id="heFerretId">
-            <div class="mb-2"><label class="form-label">Event Type</label>
-              <select id="heType" class="form-select" onchange="toggleWeightRow()">
-                <option value="weight">Weight Check</option>
-                <option value="bath">Bath</option>
-                <option value="nail_trim">Nail Trim</option>
-              </select>
-            </div>
-            <div id="heWeightRow" class="mb-2"><label class="form-label">Weight (g)</label>
-              <input id="heWeight" type="number" step="0.01" min="0" max="9999.99" class="form-control"
-                placeholder="e.g. 850.5">
-            </div>
-            <div class="row g-2 mb-2">
-              <div class="col-7"><label class="form-label">Date</label><input id="heDate" type="date"
-                  class="form-control"></div>
-              <div class="col-5"><label class="form-label">Time</label><input id="heTime" type="time"
-                  class="form-control"></div>
-            </div>
-            <div class="mb-2"><label class="form-label">Notes</label><textarea id="heNotes" class="form-control"
-                rows="2"></textarea></div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="submitHealthEvent()">Record</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Vaccination Modal -->
-    <div class="modal fade" id="vaccModal" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Record Vaccination</h5><button class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <input type="hidden" id="vFerretId">
-            <div class="mb-2"><label class="form-label">Vaccine Type</label>
-              <select id="vType" class="form-select" onchange="toggleRabiesDue()">
-                <option value="rabies">Rabies</option>
-                <option value="distemper">Distemper</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div class="mb-2"><label class="form-label">Vaccination Date</label><input id="vDate" type="date"
-                class="form-control"></div>
-            <div class="mb-2"><label class="form-label">Expiration Date</label><input id="vExpiry" type="date"
-                class="form-control"></div>
-            <div class="mb-2" id="vNextRabiesRow"><label class="form-label">Next Rabies Vaccine Due</label><input
-                id="vNextRabies" type="date" class="form-control"></div>
-            <div class="mb-2"><label class="form-label">Administered By <span class="text-danger">*</span></label>
-              <input id="vAdministeredBy" class="form-control" placeholder="Veterinarian or technician name">
-            </div>
-            <div class="mb-2"><label class="form-label">Notes</label><textarea id="vNotes" class="form-control"
-                rows="2"></textarea></div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="submitVaccination()">Record</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Litter Modal (ferret detail + global) -->
-    <div class="modal fade" id="litterModal" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Add Litter Record</h5><button class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <input type="hidden" id="litFerretId">
-            <div id="litJillRow" class="mb-2" style="display:none">
-              <label class="form-label">Jill (Mother) <span class="text-danger">*</span></label>
-              <select id="litJillSelect" class="form-select"></select>
-            </div>
-            <div class="row g-2">
-              <div class="col-6"><label class="form-label">Litter Date</label><input id="litDate" type="date"
-                  class="form-control"></div>
-              <div class="col-6"><label class="form-label">Litter ID</label><input id="litId" class="form-control"
-                  placeholder="e.g. LT-001"></div>
-              <div class="col-6"><label class="form-label">Kit Count</label><input id="litKits" type="number"
-                  class="form-control" min="0"></div>
-              <div class="col-6"><label class="form-label">Stillborn</label><input id="litStillborn" type="number"
-                  class="form-control" min="0" value="0"></div>
-              <div class="col-6"><label class="form-label">Father</label><input id="litFather" class="form-control">
+            <!-- Tray Cleaning -->
+            <div class="mb-4">
+              <div class="d-flex align-items-start gap-3 p-3 rounded-3" id="kioskTrayBox"
+                style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
+                onclick="toggleKioskCheck('kioskTray','kioskTrayBox')">
+                <div style="margin-top:2px;">
+                  <div id="kioskTrayCheck"
+                    style="width:28px;height:28px;border-radius:6px;border:2px solid #adb5bd;background:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">
+                  </div>
+                </div>
+                <div>
+                  <div class="fw-bold"><span class="text-danger me-1">●</span>Tray Cleaning</div>
+                  <div class="text-muted small mt-1">Check to confirm that you scraped or vacuumed the trays under the
+                    cages.</div>
+                </div>
               </div>
-              <div class="col-6"><label class="form-label">Mother</label><input id="litMother" class="form-control">
+              <input type="checkbox" id="kioskTray" style="display:none">
+            </div>
+
+            <!-- Sweeping, Scraping, and Mopping -->
+            <div class="mb-4">
+              <div class="d-flex align-items-start gap-3 p-3 rounded-3" id="kioskFloorBox"
+                style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
+                onclick="toggleKioskCheck('kioskFloor','kioskFloorBox')">
+                <div style="margin-top:2px;">
+                  <div id="kioskFloorCheck"
+                    style="width:28px;height:28px;border-radius:6px;border:2px solid #adb5bd;background:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">
+                  </div>
+                </div>
+                <div>
+                  <div class="fw-bold"><span class="text-danger me-1">●</span>Sweeping, Scraping, and Mopping</div>
+                  <div class="text-muted small mt-1">Check to confirm that you swept, scraped, and mopped the floors.
+                  </div>
+                </div>
               </div>
-              <div class="col-12"><label class="form-label">Anomalies / Notes</label><textarea id="litNotes"
-                  class="form-control" rows="2"></textarea></div>
+              <input type="checkbox" id="kioskFloor" style="display:none">
             </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="submitLitter()">Save</button>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Create Ferrets from Litter Modal -->
-    <div class="modal fade" id="createFromLitterModal" tabindex="-1">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Create Ferrets from Litter</h5><button class="btn-close"
-              data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <input type="hidden" id="cflLitterId">
-            <div id="cflLitterInfo" class="alert alert-info small mb-3"></div>
-            <div id="cflKitList"></div>
-            <button class="btn btn-outline-secondary btn-sm mt-2" onclick="addKitRow()"><i
-                class="bi bi-plus-lg me-1"></i>Add Kit</button>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-success" onclick="submitCreateFromLitter()"><i class="bi bi-egg me-1"></i>Create
-              Ferrets</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Move Location Modal -->
-    <div class="modal fade" id="moveModal" tabindex="-1">
-      <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Change Location</h5><button class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <input type="hidden" id="moveFerretId">
-            <div class="mb-3">
-              <label class="form-label">Select New Location</label>
-              <select id="moveAddrId" class="form-select"></select>
+            <!-- Food and Water Check -->
+            <div class="mb-4">
+              <div class="d-flex align-items-start gap-3 p-3 rounded-3" id="kioskFoodBox"
+                style="background:#f8f9fa; border:2px solid #dee2e6; cursor:pointer;"
+                onclick="toggleKioskCheck('kioskFood','kioskFoodBox')">
+                <div style="margin-top:2px;">
+                  <div id="kioskFoodCheck"
+                    style="width:28px;height:28px;border-radius:6px;border:2px solid #adb5bd;background:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">
+                  </div>
+                </div>
+                <div>
+                  <div class="fw-bold"><span class="text-danger me-1">●</span>Food and Water Check</div>
+                  <div class="text-muted small mt-1">Check to confirm that you checked that every animal had access to
+                    food and water.</div>
+                </div>
+              </div>
+              <input type="checkbox" id="kioskFood" style="display:none">
             </div>
+
+            <hr class="my-3">
+
+            <!-- Issues -->
+            <div class="mb-4">
+              <label class="fw-bold fs-6 d-block mb-1">Were there any issues when cleaning the room?</label>
+              <p class="text-muted small mb-2">Such as animal fighting, broken cage, animals escaped the room, or other.
+                If so, please describe what happened below.</p>
+              <div class="d-flex gap-2 mb-2 flex-wrap">
+                <button type="button" class="btn btn-outline-secondary btn-sm issue-tag"
+                  onclick="toggleIssueTag(this, 'Animal fighting')">🐾 Animal Fighting</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm issue-tag"
+                  onclick="toggleIssueTag(this, 'Broken cage')">🔧 Broken Cage</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm issue-tag"
+                  onclick="toggleIssueTag(this, 'Animal escaped room')">🚨 Animal Escaped</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm issue-tag"
+                  onclick="toggleIssueTag(this, 'Other')">📝 Other</button>
+              </div>
+              <div class="position-relative">
+                <textarea id="kioskIssues" class="form-control" rows="3"
+                  placeholder="Type your answer or tap the microphone to speak…"
+                  style="padding-right:3rem; font-size:1rem;"></textarea>
+                <button type="button" id="kioskMicBtn" onclick="toggleSpeechInput()" title="Tap to speak"
+                  style="position:absolute;right:10px;bottom:10px;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#6c757d;padding:4px;">
+                  🎤
+                </button>
+              </div>
+              <div id="kioskMicStatus" class="text-muted small mt-1" style="display:none;"><span
+                  class="spinner-grow spinner-grow-sm text-danger me-1"></span>Listening… tap mic to stop.</div>
+            </div>
+
+            <hr class="my-3">
+
+            <!-- Signature -->
             <div class="mb-2">
-              <label class="form-label">Position in Cage</label>
-              <div class="d-flex gap-3 flex-wrap mt-1">
-                <div class="form-check"><input class="form-check-input" type="radio" name="movePosition" id="movePosTop"
-                    value="Top"><label class="form-check-label" for="movePosTop">Top</label></div>
-                <div class="form-check"><input class="form-check-input" type="radio" name="movePosition" id="movePosMid"
-                    value="Middle"><label class="form-check-label" for="movePosMid">Middle</label></div>
-                <div class="form-check"><input class="form-check-input" type="radio" name="movePosition" id="movePosBot"
-                    value="Bottom"><label class="form-check-label" for="movePosBot">Bottom</label></div>
-                <div class="form-check"><input class="form-check-input" type="radio" name="movePosition"
-                    id="movePosNone" value="" checked><label class="form-check-label" for="movePosNone">None</label>
-                </div>
+              <label class="fw-bold fs-6 d-block mb-1">
+                <span class="text-danger me-1">●</span>Signature
+              </label>
+              <p class="text-muted small mb-2">Sign below to confirm that everything marked above was completed.</p>
+              <div style="border:2px solid #dee2e6; border-radius:10px; background:#fff; position:relative;">
+                <canvas id="sigCanvas"
+                  style="width:100%;height:180px;display:block;border-radius:8px;touch-action:none;"></canvas>
+                <button type="button" onclick="clearSignature()"
+                  style="position:absolute;top:8px;right:10px;background:none;border:none;color:#adb5bd;font-size:.8rem;cursor:pointer;">
+                  <i class="bi bi-x-circle me-1"></i>Clear
+                </button>
+                <div id="sigPlaceholder"
+                  style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#adb5bd;pointer-events:none;font-size:.95rem;">
+                  ✍️ Sign here</div>
               </div>
             </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="submitMove()">Move Ferret</button>
+
           </div>
         </div>
+
+        <div id="kioskError" class="alert alert-danger d-none mb-3"></div>
+
+        <button class="btn btn-success w-100 py-3 fw-bold fs-5 shadow-sm" onclick="submitKioskReport()"
+          style="border-radius:12px;">
+          <i class="bi bi-check2-circle me-2"></i>Submit Cleaning Report
+        </button>
       </div>
     </div>
+  </div>
 
-    <!-- Medical Info Modal -->
-    <div class="modal fade" id="medModal" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Update Medical Info</h5><button class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <input type="hidden" id="medFerretId">
-            <input type="hidden" id="medInfoId">
-            <h6 class="fw-semibold mb-2">Spay / Castration</h6>
-            <div class="row g-2 mb-3">
-              <div class="col-6"><label class="form-label">Status</label>
-                <select id="medSpayed" class="form-select">
-                  <option value="n">No</option>
-                  <option value="y">Yes</option>
-                </select>
-              </div>
-              <div class="col-6"><label class="form-label">Spay / Castration Date</label><input id="medSpayDate"
-                  type="date" class="form-control"></div>
-            </div>
-            <h6 class="fw-semibold mb-2">Last Exam</h6>
-            <div class="row g-2 mb-3">
-              <div class="col-6"><label class="form-label">Exam Date</label><input id="medExamDate" type="date"
-                  class="form-control"></div>
-              <div class="col-6"><label class="form-label">Performed By</label><input id="medPerformedBy"
-                  class="form-control"></div>
-              <div class="col-12"><label class="form-label">Exam Notes</label><textarea id="medExamLog"
-                  class="form-control" rows="2"></textarea></div>
-            </div>
-            <h6 class="fw-semibold mb-2">Orders / Treatments</h6>
-            <div class="row g-2">
-              <div class="col-12"><label class="form-label">Orders</label><input id="medOrders" class="form-control">
-              </div>
-              <div class="col-12"><label class="form-label">Treatments</label><input id="medTreatments"
-                  class="form-control"></div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="submitMedicalInfo()">Save</button>
-          </div>
+  <!-- Cleaning Report Detail Modal -->
+  <div class="modal fade" id="crDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Cleaning Report Detail</h5><button class="btn-close" data-bs-dismiss="modal"></button>
         </div>
+        <div class="modal-body" id="crDetailBody"></div>
       </div>
     </div>
+  </div>
 
-    <!-- Procedure Modal -->
-    <div class="modal fade" id="procedureModal" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Log Medical Procedure</h5><button class="btn-close"
-              data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <input type="hidden" id="procFerretId">
-            <div class="row g-2">
-              <div class="col-md-8"><label class="form-label">Procedure Name <span class="text-danger">*</span></label>
-                <input id="procName" class="form-control" placeholder="e.g. Adrenalectomy, Biopsy">
-              </div>
-              <div class="col-md-4"><label class="form-label">Date <span class="text-danger">*</span></label>
-                <input id="procDate" type="date" class="form-control">
-              </div>
-              <div class="col-12"><label class="form-label">Performed By</label><input id="procPerformedBy"
-                  class="form-control"></div>
-              <div class="col-12"><label class="form-label">Notes / Details</label><textarea id="procNotes"
-                  class="form-control" rows="3"></textarea></div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="submitProcedure()">Save Procedure</button>
-          </div>
+
+  <!-- ─── MODALS ──────────────────────────────────────────────────────────────── -->
+
+  <!-- Ferret Modal -->
+  <div class="modal fade" id="ferretModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Ferret</h5><button class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-      </div>
-    </div>
-
-    <!-- Assignment Modal -->
-    <div class="modal fade" id="assignModal" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Create Assignment</h5><button class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <div class="mb-2"><label class="form-label">Assign To</label><select id="aAssignTo"
-                class="form-select"></select></div>
-            <div class="mb-2"><label class="form-label">Type</label>
-              <select id="aType" class="form-select">
-                <option value="cleaning">Cleaning</option>
-                <option value="feeding">Feeding</option>
-                <option value="health_check">Health Check</option>
-                <option value="other">Other</option>
+        <div class="modal-body">
+          <div class="row g-2">
+            <div class="col-md-6"><label class="form-label">Ferret Name <span class="text-danger">*</span></label><input
+                id="fName" class="form-control"></div>
+            <div class="col-md-6"><label class="form-label">Animal ID</label><input id="fAnimalId" class="form-control">
+            </div>
+            <div class="col-md-6"><label class="form-label">Birth Date <span class="text-danger">*</span></label><input
+                id="fBirthDate" type="date" class="form-control"></div>
+            <div class="col-md-6"><label class="form-label">Weight (g)</label><input id="fWeight" type="number"
+                class="form-control" value="0"></div>
+            <div class="col-md-6"><label class="form-label">Sex</label>
+              <select id="fSex" class="form-select">
+                <option value="">— Unknown —</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
               </select>
             </div>
-            <div class="mb-2"><label class="form-label">Description</label><textarea id="aDesc" class="form-control"
-                rows="3"></textarea></div>
-            <div class="mb-2"><label class="form-label">Due Date</label><input id="aDue" type="date"
+            <div class="col-md-6"><label class="form-label">Spayed / Neutered</label>
+              <select id="fSpayed" class="form-select">
+                <option value="n">No</option>
+                <option value="y">Yes</option>
+              </select>
+            </div>
+            <div class="col-md-6" id="fSpayDateRow" style="display:none"><label class="form-label">Procedure
+                Date</label><input id="fSpayDate" type="date" class="form-control"></div>
+            <div class="col-md-6"><label class="form-label">Mother Name</label><input id="fMother" class="form-control">
+            </div>
+            <div class="col-md-6"><label class="form-label">Father Name</label><input id="fFather" class="form-control">
+            </div>
+            <div class="col-md-6"><label class="form-label">Next Rabies Vaccine</label><input id="fVaccine" type="date"
                 class="form-control">
+              <div class="form-text">Leave blank — set after first vaccination is recorded.</div>
             </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="submitAssign()">Create Assignment</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- User Modal -->
-    <div class="modal fade" id="userModal" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="userModalTitle">Add User</h5><button class="btn-close"
-              data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <div class="row g-2">
-              <div class="col-6"><label class="form-label">Username <span class="text-danger">*</span></label><input
-                  id="uUsername" class="form-control"></div>
-              <div class="col-6"><label class="form-label">Full Name</label><input id="uFullName" class="form-control">
-              </div>
-              <div class="col-12"><label class="form-label">Email <span class="text-danger">*</span></label><input
-                  id="uEmail" type="email" class="form-control"></div>
-              <div class="col-6"><label class="form-label">Role <span class="text-danger">*</span></label>
-                <select id="uRole" class="form-select">
-                  <option value="admin">Admin</option>
-                  <option value="research">Research</option>
-                  <option value="maternity">Maternity</option>
-                  <option value="caretaker" selected>Caretaker</option>
-                  <option value="cleaner">Cleaner</option>
-                </select>
-              </div>
-              <div class="col-6" id="uActiveWrap" style="display:none"><label class="form-label">Status</label>
-                <select id="uActive" class="form-select">
-                  <option value="1">Active</option>
-                  <option value="0">Inactive</option>
-                </select>
-              </div>
-              <div class="col-12"><label class="form-label">Password <span id="uPassReq"
-                    class="text-danger">*</span></label>
-                <input id="uPassword" type="password" class="form-control" placeholder="Min 8 characters">
-              </div>
+            <div class="col-md-6"><label class="form-label">Acquired By</label><input id="fAcqBy" class="form-control">
             </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="submitUser()">Save User</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- RFID Modal -->
-    <div class="modal fade" id="rfidModal" tabindex="-1">
-      <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Assign RFID Chip</h5><button class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <input type="hidden" id="rfidFerretId">
-            <div class="mb-3">
-              <label class="form-label fw-semibold">RFID Value <span class="text-danger">*</span></label>
-              <input id="rfidValue" class="form-control font-monospace" placeholder="e.g. 0A1B2C3D4E">
-              <div class="form-text">Scan the chip or enter the code manually. If this chip is currently assigned to
-                another ferret, it will be automatically unassigned from that ferret.</div>
+            <div class="col-12"><label class="form-label">Description</label><input id="fDesc" class="form-control">
             </div>
-            <div class="mb-2">
-              <label class="form-label fw-semibold">Reason</label>
-              <select id="rfidReason" class="form-select">
-                <option value="">— Optional —</option>
-                <option value="new_chip">New chip</option>
-                <option value="replacement">Replacement (lost/damaged)</option>
-                <option value="reuse">Reuse from deceased ferret</option>
+            <div class="col-md-6"><label class="form-label">Location (optional)</label>
+              <select id="fAddrId" class="form-select">
+                <option value="">— Unassigned —</option>
               </select>
             </div>
-            <div class="mb-2"><label class="form-label fw-semibold">Notes</label>
-              <input id="rfidNotes" class="form-control" placeholder="Optional notes">
+            <div class="col-md-6"><label class="form-label">Supplier (optional)</label>
+              <select id="fSupplierId" class="form-select">
+                <option value="">— Unknown —</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Photo</label>
+              <div class="photo-upload-zone" id="ferretPhotoZone"
+                onclick="document.getElementById('fPhotoFile').click()">
+                <i class="bi bi-camera text-muted fs-3 d-block mb-1"></i>
+                <span class="text-muted small">Click to upload or drag & drop (max 5MB)</span>
+                <div id="fPhotoPreview" class="mt-2"></div>
+              </div>
+              <input type="file" id="fPhotoFile" accept="image/*" style="display:none"
+                onchange="previewPhoto(this,'fPhotoPreview')">
             </div>
           </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="submitRfid()">Assign Chip</button>
-          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitFerret()">Save Ferret</button>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Distribute Ferret Modal -->
-    <div class="modal fade" id="distributeModal" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title"><i class="bi bi-box-arrow-right me-2"></i>Distribute Ferret</h5>
-            <button class="btn-close" data-bs-dismiss="modal"></button>
+  <!-- Health Event Modal -->
+  <div class="modal fade" id="healthModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Record Health Event</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="heFerretId">
+          <div class="mb-2"><label class="form-label">Event Type</label>
+            <select id="heType" class="form-select" onchange="toggleWeightRow()">
+              <option value="weight">Weight Check</option>
+              <option value="bath">Bath</option>
+              <option value="nail_trim">Nail Trim</option>
+            </select>
           </div>
-          <div class="modal-body">
-            <input type="hidden" id="distFerretId">
-            <div id="distFerretName" class="alert alert-info py-2 small mb-3"></div>
-            <div class="mb-3">
-              <label class="form-label fw-semibold">Distributor <span class="text-danger">*</span></label>
-              <select id="distDistributorId" class="form-select"></select>
-            </div>
-            <div class="mb-3">
-              <label class="form-label fw-semibold">Distribution Date <span class="text-danger">*</span></label>
-              <input id="distDate" type="date" class="form-control">
-            </div>
-            <div class="mb-3">
-              <label class="form-label fw-semibold">Price (optional)</label>
-              <div class="input-group">
-                <span class="input-group-text">$</span>
-                <input id="distPrice" type="number" step="0.01" min="0" class="form-control" placeholder="0.00">
-              </div>
-            </div>
-            <div class="mb-2">
-              <label class="form-label fw-semibold">Notes (optional)</label>
-              <textarea id="distNotes" class="form-control" rows="2"
-                placeholder="Any relevant notes about this distribution…"></textarea>
-            </div>
+          <div id="heWeightRow" class="mb-2"><label class="form-label">Weight (g)</label>
+            <input id="heWeight" type="number" step="0.01" min="0" max="9999.99" class="form-control"
+              placeholder="e.g. 850.5">
           </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="submitDistribute()"><i
-                class="bi bi-box-arrow-right me-1"></i>Distribute</button>
+          <div class="row g-2 mb-2">
+            <div class="col-7"><label class="form-label">Date</label><input id="heDate" type="date"
+                class="form-control"></div>
+            <div class="col-5"><label class="form-label">Time</label><input id="heTime" type="time"
+                class="form-control"></div>
           </div>
+          <div class="mb-2"><label class="form-label">Notes</label><textarea id="heNotes" class="form-control"
+              rows="2"></textarea></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitHealthEvent()">Record</button>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Add / Edit Distributor Modal -->
-    <div class="modal fade" id="distributorModal" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="distributorModalTitle">Add Distributor</h5>
-            <button class="btn-close" data-bs-dismiss="modal"></button>
+  <!-- Vaccination Modal -->
+  <div class="modal fade" id="vaccModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Record Vaccination</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="vFerretId">
+          <div class="mb-2"><label class="form-label">Vaccine Type</label>
+            <select id="vType" class="form-select" onchange="toggleRabiesDue()">
+              <option value="rabies">Rabies</option>
+              <option value="distemper">Distemper</option>
+              <option value="other">Other</option>
+            </select>
           </div>
-          <div class="modal-body">
-            <input type="hidden" id="distMgrId">
-            <div class="row g-2">
-              <div class="col-12">
-                <label class="form-label">Distributor Name <span class="text-danger">*</span></label>
-                <input id="distMgrName" class="form-control"
-                  placeholder="e.g. BIOLOGICAL SCIENCES, University of Georgia">
-              </div>
-              <div class="col-12">
-                <label class="form-label">Contact Info</label>
-                <input id="distMgrContact" class="form-control" placeholder="Contact person or email">
-              </div>
-              <div class="col-12">
-                <label class="form-label">Address</label>
-                <input id="distMgrAddr" class="form-control" placeholder="e.g. Athens, GA">
-              </div>
-              <div class="col-12">
-                <label class="form-label">Phone</label>
-                <input id="distMgrPhone" class="form-control" placeholder="e.g. 7065551234">
-              </div>
-              <div class="col-12">
-                <label class="form-label">Notes</label>
-                <textarea id="distMgrNotes" class="form-control" rows="2"></textarea>
-              </div>
-            </div>
+          <div class="mb-2"><label class="form-label">Vaccination Date</label><input id="vDate" type="date"
+              class="form-control"></div>
+          <div class="mb-2"><label class="form-label">Expiration Date</label><input id="vExpiry" type="date"
+              class="form-control"></div>
+          <div class="mb-2" id="vNextRabiesRow"><label class="form-label">Next Rabies Vaccine Due</label><input
+              id="vNextRabies" type="date" class="form-control"></div>
+          <div class="mb-2"><label class="form-label">Administered By <span class="text-danger">*</span></label>
+            <input id="vAdministeredBy" class="form-control" placeholder="Veterinarian or technician name">
           </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="submitDistributor()">Save</button>
-          </div>
+          <div class="mb-2"><label class="form-label">Notes</label><textarea id="vNotes" class="form-control"
+              rows="2"></textarea></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitVaccination()">Record</button>
         </div>
       </div>
     </div>
-    <!-- Add Address Modal -->
-    <div class="modal fade" id="addrModal" tabindex="-1">
-      <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Add Location</h5><button class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <div class="mb-2"><label class="form-label">Room ID <span class="text-danger">*</span></label><input
-                id="adRoom" type="number" class="form-control"></div>
-            <div class="mb-2"><label class="form-label">Room Name</label><input id="adRoomName" class="form-control"
-                placeholder="e.g. JB, Breeding, ISO"></div>
-            <div class="mb-2"><label class="form-label">Cage Address</label><input id="adCage" class="form-control"
-                maxlength="5" placeholder="e.g. A1"></div>
-            <div class="mb-2">
-              <label class="form-label">Position</label>
-              <div class="d-flex gap-3 flex-wrap mt-1">
-                <div class="form-check"><input class="form-check-input" type="radio" name="adPosition" id="adPosTop"
-                    value="Top"><label class="form-check-label" for="adPosTop">Top</label></div>
-                <div class="form-check"><input class="form-check-input" type="radio" name="adPosition" id="adPosMid"
-                    value="Middle"><label class="form-check-label" for="adPosMid">Middle</label></div>
-                <div class="form-check"><input class="form-check-input" type="radio" name="adPosition" id="adPosBot"
-                    value="Bottom"><label class="form-check-label" for="adPosBot">Bottom</label></div>
-                <div class="form-check"><input class="form-check-input" type="radio" name="adPosition" id="adPosNone"
-                    value="" checked><label class="form-check-label" for="adPosNone">None</label></div>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="submitAddress()">Add</button>
-          </div>
-        </div>
-      </div>
-    </div>
+  </div>
 
-    <!-- Supplier Modal -->
-    <div class="modal fade" id="supplierModal" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="supplierModalTitle">Add Supplier</h5><button class="btn-close"
-              data-bs-dismiss="modal"></button>
+  <!-- Litter Modal (ferret detail + global) -->
+  <div class="modal fade" id="litterModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Litter Record</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="litFerretId">
+          <div id="litJillRow" class="mb-2" style="display:none">
+            <label class="form-label">Jill (Mother) <span class="text-danger">*</span></label>
+            <select id="litJillSelect" class="form-select"></select>
           </div>
-          <div class="modal-body">
-            <input type="hidden" id="supId">
-            <div class="row g-2">
-              <div class="col-12"><label class="form-label">Supplier Name <span
-                    class="text-danger">*</span></label><input id="supName" class="form-control"></div>
-              <div class="col-12"><label class="form-label">Contact Info</label><input id="supContact"
-                  class="form-control" placeholder="Contact person or email"></div>
-              <div class="col-12"><label class="form-label">Address</label><input id="supAddr" class="form-control">
-              </div>
-              <div class="col-12"><label class="form-label">Phone</label><input id="supPhone" class="form-control"
-                  placeholder="e.g. 5551234567"></div>
-            </div>
+          <div class="row g-2">
+            <div class="col-6"><label class="form-label">Litter Date</label><input id="litDate" type="date"
+                class="form-control"></div>
+            <div class="col-6"><label class="form-label">Litter ID</label><input id="litId" class="form-control"
+                placeholder="e.g. LT-001"></div>
+            <div class="col-6"><label class="form-label">Kit Count</label><input id="litKits" type="number"
+                class="form-control" min="0"></div>
+            <div class="col-6"><label class="form-label">Stillborn</label><input id="litStillborn" type="number"
+                class="form-control" min="0" value="0"></div>
+            <div class="col-6"><label class="form-label">Father</label><input id="litFather" class="form-control"></div>
+            <div class="col-6"><label class="form-label">Mother</label><input id="litMother" class="form-control"></div>
+            <div class="col-12"><label class="form-label">Anomalies / Notes</label><textarea id="litNotes"
+                class="form-control" rows="2"></textarea></div>
           </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="submitSupplier()">Save</button>
-          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitLitter()">Save</button>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Mark Deceased Modal -->
-    <div class="modal fade" id="deceasedModal" tabindex="-1">
-      <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title"><i class="bi bi-heartbreak me-2 text-danger"></i>Mark as Deceased</h5>
-            <button class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <input type="hidden" id="deceasedFerretId">
-            <div class="mb-3">
-              <label class="form-label fw-semibold">Date of Death</label>
-              <input id="deceasedDate" type="date" class="form-control">
-            </div>
-            <div class="mb-2">
-              <label class="form-label fw-semibold">Cause of Death <span
-                  class="text-muted fw-normal">(optional)</span></label>
-              <input id="deceasedCause" class="form-control" placeholder="e.g. Insulinoma, old age…">
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-danger" onclick="submitMarkDeceased()"><i class="bi bi-heartbreak me-1"></i>Mark
-              Deceased</button>
-          </div>
+  <!-- Create Ferrets from Litter Modal -->
+  <div class="modal fade" id="createFromLitterModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Create Ferrets from Litter</h5><button class="btn-close"
+            data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="cflLitterId">
+          <div id="cflLitterInfo" class="alert alert-info small mb-3"></div>
+          <div id="cflKitList"></div>
+          <button class="btn btn-outline-secondary btn-sm mt-2" onclick="addKitRow()"><i
+              class="bi bi-plus-lg me-1"></i>Add Kit</button>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-success" onclick="submitCreateFromLitter()"><i class="bi bi-egg me-1"></i>Create
+            Ferrets</button>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Photo Upload Modal (for existing ferrets) -->
-    <div class="modal fade" id="photoModal" tabindex="-1">
-      <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Update Photo</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+  <!-- Move Location Modal -->
+  <div class="modal fade" id="moveModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Change Location</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="moveFerretId">
+          <div class="mb-3">
+            <label class="form-label">Select New Location</label>
+            <select id="moveAddrId" class="form-select"></select>
           </div>
-          <div class="modal-body">
-            <input type="hidden" id="photoFerretId">
-            <div class="d-flex gap-2 mb-3">
-              <button type="button" class="btn btn-outline-primary flex-fill"
-                onclick="document.getElementById('photoCameraInput').click()">
-                <i class="bi bi-camera fs-5 d-block mb-1"></i>
-                <span class="small">Take Photo</span>
-              </button>
-              <button type="button" class="btn btn-outline-secondary flex-fill"
-                onclick="document.getElementById('photoFileInput').click()">
-                <i class="bi bi-folder2-open fs-5 d-block mb-1"></i>
-                <span class="small">Choose File</span>
-              </button>
+          <div class="mb-2">
+            <label class="form-label">Position in Cage</label>
+            <div class="d-flex gap-3 flex-wrap mt-1">
+              <div class="form-check"><input class="form-check-input" type="radio" name="movePosition" id="movePosTop"
+                  value="Top"><label class="form-check-label" for="movePosTop">Top</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="movePosition" id="movePosMid"
+                  value="Middle"><label class="form-check-label" for="movePosMid">Middle</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="movePosition" id="movePosBot"
+                  value="Bottom"><label class="form-check-label" for="movePosBot">Bottom</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="movePosition" id="movePosNone"
+                  value="" checked><label class="form-check-label" for="movePosNone">None</label></div>
             </div>
-            <div id="photoPreviewBox" class="mt-2 text-center"></div>
-            <input type="file" id="photoCameraInput" accept="image/*" capture="environment" style="display:none"
-              onchange="previewPhoto(this,'photoPreviewBox')">
-            <input type="file" id="photoFileInput" accept="image/*" style="display:none"
-              onchange="previewPhoto(this,'photoPreviewBox')">
           </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="submitPhoto()">Upload Photo</button>
-          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitMove()">Move Ferret</button>
         </div>
       </div>
     </div>
+  </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/app-core.js"></script>
-    <script src="/app-ferrets.js"></script>
-    <script src="/app-medical.js"></script>
-    <script src="/app-admin.js"></script>
-    <script src="/app-cleaning.js"></script>
-  </body>
+  <!-- Medical Info Modal -->
+  <div class="modal fade" id="medModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Update Medical Info</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="medFerretId">
+          <input type="hidden" id="medInfoId">
+          <h6 class="fw-semibold mb-2">Spay / Castration</h6>
+          <div class="row g-2 mb-3">
+            <div class="col-6"><label class="form-label">Status</label>
+              <select id="medSpayed" class="form-select">
+                <option value="n">No</option>
+                <option value="y">Yes</option>
+              </select>
+            </div>
+            <div class="col-6"><label class="form-label">Spay / Castration Date</label><input id="medSpayDate"
+                type="date" class="form-control"></div>
+          </div>
+          <h6 class="fw-semibold mb-2">Last Exam</h6>
+          <div class="row g-2 mb-3">
+            <div class="col-6"><label class="form-label">Exam Date</label><input id="medExamDate" type="date"
+                class="form-control"></div>
+            <div class="col-6"><label class="form-label">Performed By</label><input id="medPerformedBy"
+                class="form-control"></div>
+            <div class="col-12"><label class="form-label">Exam Notes</label><textarea id="medExamLog"
+                class="form-control" rows="2"></textarea></div>
+          </div>
+          <h6 class="fw-semibold mb-2">Orders / Treatments</h6>
+          <div class="row g-2">
+            <div class="col-12"><label class="form-label">Orders</label><input id="medOrders" class="form-control">
+            </div>
+            <div class="col-12"><label class="form-label">Treatments</label><input id="medTreatments"
+                class="form-control"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitMedicalInfo()">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Procedure Modal -->
+  <div class="modal fade" id="procedureModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Log Medical Procedure</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="procFerretId">
+          <div class="row g-2">
+            <div class="col-md-8"><label class="form-label">Procedure Name <span class="text-danger">*</span></label>
+              <input id="procName" class="form-control" placeholder="e.g. Adrenalectomy, Biopsy">
+            </div>
+            <div class="col-md-4"><label class="form-label">Date <span class="text-danger">*</span></label>
+              <input id="procDate" type="date" class="form-control">
+            </div>
+            <div class="col-12"><label class="form-label">Performed By</label><input id="procPerformedBy"
+                class="form-control"></div>
+            <div class="col-12"><label class="form-label">Notes / Details</label><textarea id="procNotes"
+                class="form-control" rows="3"></textarea></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitProcedure()">Save Procedure</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assignment Modal -->
+  <div class="modal fade" id="assignModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Create Assignment</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-2"><label class="form-label">Assign To</label><select id="aAssignTo"
+              class="form-select"></select></div>
+          <div class="mb-2"><label class="form-label">Type</label>
+            <select id="aType" class="form-select">
+              <option value="cleaning">Cleaning</option>
+              <option value="feeding">Feeding</option>
+              <option value="health_check">Health Check</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="mb-2"><label class="form-label">Description</label><textarea id="aDesc" class="form-control"
+              rows="3"></textarea></div>
+          <div class="mb-2"><label class="form-label">Due Date</label><input id="aDue" type="date" class="form-control">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitAssign()">Create Assignment</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Modal -->
+  <div class="modal fade" id="userModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="userModalTitle">Add User</h5><button class="btn-close"
+            data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-2">
+            <div class="col-6"><label class="form-label">Username <span class="text-danger">*</span></label><input
+                id="uUsername" class="form-control"></div>
+            <div class="col-6"><label class="form-label">Full Name</label><input id="uFullName" class="form-control">
+            </div>
+            <div class="col-12"><label class="form-label">Email <span class="text-danger">*</span></label><input
+                id="uEmail" type="email" class="form-control"></div>
+            <div class="col-6"><label class="form-label">Role <span class="text-danger">*</span></label>
+              <select id="uRole" class="form-select">
+                <option value="admin">Admin</option>
+                <option value="research">Research</option>
+                <option value="maternity">Maternity</option>
+                <option value="caretaker" selected>Caretaker</option>
+                <option value="cleaner">Cleaner</option>
+              </select>
+            </div>
+            <div class="col-6" id="uActiveWrap" style="display:none"><label class="form-label">Status</label>
+              <select id="uActive" class="form-select">
+                <option value="1">Active</option>
+                <option value="0">Inactive</option>
+              </select>
+            </div>
+            <div class="col-12"><label class="form-label">Password <span id="uPassReq"
+                  class="text-danger">*</span></label>
+              <input id="uPassword" type="password" class="form-control" placeholder="Min 8 characters">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitUser()">Save User</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RFID Modal -->
+  <div class="modal fade" id="rfidModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Assign RFID Chip</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="rfidFerretId">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">RFID Value <span class="text-danger">*</span></label>
+            <input id="rfidValue" class="form-control font-monospace" placeholder="e.g. 0A1B2C3D4E">
+            <div class="form-text">Scan the chip or enter the code manually. If this chip is currently assigned to
+              another ferret, it will be automatically unassigned from that ferret.</div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label fw-semibold">Reason</label>
+            <select id="rfidReason" class="form-select">
+              <option value="">— Optional —</option>
+              <option value="new_chip">New chip</option>
+              <option value="replacement">Replacement (lost/damaged)</option>
+              <option value="reuse">Reuse from deceased ferret</option>
+            </select>
+          </div>
+          <div class="mb-2"><label class="form-label fw-semibold">Notes</label>
+            <input id="rfidNotes" class="form-control" placeholder="Optional notes">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitRfid()">Assign Chip</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Distribute Ferret Modal -->
+  <div class="modal fade" id="distributeModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-box-arrow-right me-2"></i>Distribute Ferret</h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="distFerretId">
+          <div id="distFerretName" class="alert alert-info py-2 small mb-3"></div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Distributor <span class="text-danger">*</span></label>
+            <select id="distDistributorId" class="form-select"></select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Distribution Date <span class="text-danger">*</span></label>
+            <input id="distDate" type="date" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Price (optional)</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input id="distPrice" type="number" step="0.01" min="0" class="form-control" placeholder="0.00">
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label fw-semibold">Notes (optional)</label>
+            <textarea id="distNotes" class="form-control" rows="2"
+              placeholder="Any relevant notes about this distribution…"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitDistribute()"><i
+              class="bi bi-box-arrow-right me-1"></i>Distribute</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / Edit Distributor Modal -->
+  <div class="modal fade" id="distributorModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="distributorModalTitle">Add Distributor</h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="distMgrId">
+          <div class="row g-2">
+            <div class="col-12">
+              <label class="form-label">Distributor Name <span class="text-danger">*</span></label>
+              <input id="distMgrName" class="form-control"
+                placeholder="e.g. BIOLOGICAL SCIENCES, University of Georgia">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Contact Info</label>
+              <input id="distMgrContact" class="form-control" placeholder="Contact person or email">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Address</label>
+              <input id="distMgrAddr" class="form-control" placeholder="e.g. Athens, GA">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Phone</label>
+              <input id="distMgrPhone" class="form-control" placeholder="e.g. 7065551234">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Notes</label>
+              <textarea id="distMgrNotes" class="form-control" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitDistributor()">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Add Address Modal -->
+  <div class="modal fade" id="addrModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Location</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-2"><label class="form-label">Room ID <span class="text-danger">*</span></label><input
+              id="adRoom" type="number" class="form-control"></div>
+          <div class="mb-2"><label class="form-label">Room Name</label><input id="adRoomName" class="form-control"
+              placeholder="e.g. JB, Breeding, ISO"></div>
+          <div class="mb-2"><label class="form-label">Cage Address</label><input id="adCage" class="form-control"
+              maxlength="5" placeholder="e.g. A1"></div>
+          <div class="mb-2">
+            <label class="form-label">Position</label>
+            <div class="d-flex gap-3 flex-wrap mt-1">
+              <div class="form-check"><input class="form-check-input" type="radio" name="adPosition" id="adPosTop"
+                  value="Top"><label class="form-check-label" for="adPosTop">Top</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="adPosition" id="adPosMid"
+                  value="Middle"><label class="form-check-label" for="adPosMid">Middle</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="adPosition" id="adPosBot"
+                  value="Bottom"><label class="form-check-label" for="adPosBot">Bottom</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="adPosition" id="adPosNone"
+                  value="" checked><label class="form-check-label" for="adPosNone">None</label></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitAddress()">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supplier Modal -->
+  <div class="modal fade" id="supplierModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="supplierModalTitle">Add Supplier</h5><button class="btn-close"
+            data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="supId">
+          <div class="row g-2">
+            <div class="col-12"><label class="form-label">Supplier Name <span class="text-danger">*</span></label><input
+                id="supName" class="form-control"></div>
+            <div class="col-12"><label class="form-label">Contact Info</label><input id="supContact"
+                class="form-control" placeholder="Contact person or email"></div>
+            <div class="col-12"><label class="form-label">Address</label><input id="supAddr" class="form-control"></div>
+            <div class="col-12"><label class="form-label">Phone</label><input id="supPhone" class="form-control"
+                placeholder="e.g. 5551234567"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitSupplier()">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mark Deceased Modal -->
+  <div class="modal fade" id="deceasedModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-heartbreak me-2 text-danger"></i>Mark as Deceased</h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="deceasedFerretId">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Date of Death</label>
+            <input id="deceasedDate" type="date" class="form-control">
+          </div>
+          <div class="mb-2">
+            <label class="form-label fw-semibold">Cause of Death <span
+                class="text-muted fw-normal">(optional)</span></label>
+            <input id="deceasedCause" class="form-control" placeholder="e.g. Insulinoma, old age…">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-danger" onclick="submitMarkDeceased()"><i class="bi bi-heartbreak me-1"></i>Mark
+            Deceased</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Photo Upload Modal (for existing ferrets) -->
+  <div class="modal fade" id="photoModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Update Photo</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="photoFerretId">
+          <div class="d-flex gap-2 mb-3">
+            <button type="button" class="btn btn-outline-primary flex-fill"
+              onclick="document.getElementById('photoCameraInput').click()">
+              <i class="bi bi-camera fs-5 d-block mb-1"></i>
+              <span class="small">Take Photo</span>
+            </button>
+            <button type="button" class="btn btn-outline-secondary flex-fill"
+              onclick="document.getElementById('photoFileInput').click()">
+              <i class="bi bi-folder2-open fs-5 d-block mb-1"></i>
+              <span class="small">Choose File</span>
+            </button>
+          </div>
+          <div id="photoPreviewBox" class="mt-2 text-center"></div>
+          <input type="file" id="photoCameraInput" accept="image/*" capture="environment" style="display:none"
+            onchange="previewPhoto(this,'photoPreviewBox')">
+          <input type="file" id="photoFileInput" accept="image/*" style="display:none"
+            onchange="previewPhoto(this,'photoPreviewBox')">
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitPhoto()">Upload Photo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/app-core.js"></script>
+  <script src="/app-ferrets.js"></script>
+  <script src="/app-medical.js"></script>
+  <script src="/app-admin.js"></script>
+  <script src="/app-cleaning.js"></script>
+</body>
 
 </html>
