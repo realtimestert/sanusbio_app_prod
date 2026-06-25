@@ -1,4 +1,4 @@
-// SanusBio v1.2.0 | app-admin.js
+// SanusBio v1.6.0 | 2026-06-25 app-admin.js
 // Locations, Suppliers, Assignments, Users, Activity Log, Distribution Page
 
 // ─── Locations ────────────────────────────────────────────────────────────────

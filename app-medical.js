@@ -1,4 +1,4 @@
-// SanusBio v1.2.0 | app-medical.js
+// SanusBio v1.6.0 | 2026-06-25 | app-medical.js
 // Health Events, Vaccinations, Litters, Medical Info, Procedures
 
 // ─── Health Event Modal ───────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-// SanusBio v1.2.0 | app-core.js
+// SanusBio v1.6.0 | 2026-06-25 | app-core.js
 // State, API, Auth, Init, Navigation, Dashboard, Helpers
 
 // ─── State ────────────────────────────────────────────────────────────────────

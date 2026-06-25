@@ -1,4 +1,4 @@
-// SanusBio v1.2.0 | app-ferrets.js
+// SanusBio v1.6.0 | 2026-06-25 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
@@ -157,9 +157,9 @@ async function loadFerretDetail(id) {
         ${f.distributed == 1 ? `<span class="badge" style="background:#7c3aed">Distributed</span>` : f.dead === '1' ? `<span class="badge bg-danger">Deceased</span>` : `<span class="badge bg-success">Active</span>`}
         <div class="ms-auto d-flex gap-2 flex-wrap">
           ${canUpdate() && !f.distributed ? (f.dead === '1'
-      ? `<button class="btn btn-sm btn-outline-secondary" onclick="toggleDead(${id},'1')">Mark Active</button>`
-      : `<button class="btn btn-sm btn-outline-danger" onclick="openDeceasedModal(${id})"><i class="bi bi-heartbreak me-1"></i>Mark Deceased</button>`
-    ) : ''}
+        ? `<button class="btn btn-sm btn-outline-secondary" onclick="toggleDead(${id},'1')">Mark Active</button>`
+        : `<button class="btn btn-sm btn-outline-danger" onclick="openDeceasedModal(${id})"><i class="bi bi-heartbreak me-1"></i>Mark Deceased</button>`
+      ) : ''}
           ${canUpdate() && f.dead !== '1' && !f.distributed ? `<button class="btn btn-sm btn-outline-primary" onclick="openDistributeModal(${id}, '${f.ferret_name.replace(/'/g, "\\'")}')"><i class="bi bi-box-arrow-right me-1"></i>Distribute</button>` : ''}
           ${canUpdate() && f.distributed ? `<button class="btn btn-sm btn-outline-secondary" onclick="undoDistribute(${id})">Undo Distribution</button>` : ''}
           ${isAdmin ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteFerret(${id})">Delete</button>` : ''}
@@ -169,7 +169,7 @@ async function loadFerretDetail(id) {
       <div class="row g-2 small">
         <div class="col-6 col-md-4"><span class="text-muted">Birth Date</span><br>
           ${canEdit
-      ? `<div class="d-flex align-items-center gap-2 mt-1">
+        ? `<div class="d-flex align-items-center gap-2 mt-1">
                 <input type="date" id="editBirthDate" class="form-control form-control-sm"
                   value="${f.birth_date ? String(f.birth_date).slice(0, 10) : ''}"
                   style="max-width:160px">
@@ -177,12 +177,12 @@ async function loadFerretDetail(id) {
                   <i class="bi bi-check2"></i> Save
                 </button>
                </div>`
-      : `<strong>${fmtDate(f.birth_date)}</strong>`}
+        : `<strong>${fmtDate(f.birth_date)}</strong>`}
         </div>
         ${f.dead === '1' ? `
         <div class="col-6 col-md-4"><span class="text-muted">Death Date</span><br>
           ${canEdit
-        ? `<div class="d-flex align-items-center gap-2 mt-1">
+          ? `<div class="d-flex align-items-center gap-2 mt-1">
                 <input type="date" id="editDeathDate" class="form-control form-control-sm"
                   value="${f.death_date ? String(f.death_date).slice(0, 10) : ''}"
                   style="max-width:160px">
@@ -190,7 +190,7 @@ async function loadFerretDetail(id) {
                   <i class="bi bi-check2"></i> Save
                 </button>
                </div>`
-        : `<strong>${fmtDate(f.death_date)}</strong>`}
+          : `<strong>${fmtDate(f.death_date)}</strong>`}
         </div>` : ''}
         <div class="col-6 col-md-4"><span class="text-muted">Sex</span><br><strong>${f.sex ? f.sex.charAt(0).toUpperCase() + f.sex.slice(1) : '—'}</strong></div>
         <div class="col-6 col-md-4"><span class="text-muted">Weight</span><br><strong>${f.weight ? f.weight + ' g' : '—'}</strong></div>
@@ -323,7 +323,7 @@ async function loadFerretDetail(id) {
             <td class="small">${l.anomalies_and_notes || '—'}</td>
             <td>
               ${canUpdate() && (!l.individuals_created || l.individuals_created < l.kit_count)
-          ? `<button class="btn btn-xs btn-outline-success btn-sm" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>` : ''}
+              ? `<button class="btn btn-xs btn-outline-success btn-sm" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>` : ''}
             </td>
           </tr>`).join('') : '<tr><td colspan="8" class="text-muted text-center py-3">No litter records</td></tr>'}
         </tbody>
@@ -341,8 +341,8 @@ async function loadFerretDetail(id) {
       <div class="row g-3 mb-3">
         <div class="col-md-4"><span class="text-muted small d-block">Vital Status</span>
           <strong>${f.dead === '1'
-      ? '<span class=\"badge bg-danger fs-6 px-3 py-2\">Deceased</span>'
-      : '<span class=\"badge bg-success fs-6 px-3 py-2\">Alive</span>'}</strong></div>
+          ? '<span class=\"badge bg-danger fs-6 px-3 py-2\">Deceased</span>'
+          : '<span class=\"badge bg-success fs-6 px-3 py-2\">Alive</span>'}</strong></div>
         ${f.dead === '1' ? `
         <div class="col-md-4"><span class="text-muted small d-block">Date of Death</span>
           <strong>${fmtDate(f.death_date)}</strong></div>
@@ -367,8 +367,8 @@ async function loadFerretDetail(id) {
       </div>
       <h6 class="fw-semibold text-muted small text-uppercase mb-2">Surgical Procedure Log</h6>
       ${f.surgical_procedure_log
-      ? `<div class="border rounded p-3 bg-light small" style="white-space:pre-wrap;line-height:1.7">${f.surgical_procedure_log}</div>`
-      : `<p class="text-muted small">No procedures logged yet.</p>`}
+          ? `<div class="border rounded p-3 bg-light small" style="white-space:pre-wrap;line-height:1.7">${f.surgical_procedure_log}</div>`
+          : `<p class="text-muted small">No procedures logged yet.</p>`}
     </div>` : ''}
 
     <!-- Distribution -->
@@ -382,8 +382,8 @@ async function loadFerretDetail(id) {
     <div id="tHistory" class="tab-pane">
       <div class="timeline ps-2">
         ${history.length ? history.map(h => {
-          const { icon, color } = historyMeta(h.action);
-          return `
+            const { icon, color } = historyMeta(h.action);
+            return `
         <div class="d-flex gap-3 mb-3 align-items-start">
           <div class="history-icon bg-${color} bg-opacity-10 text-${color}">${icon}</div>
           <div class="flex-grow-1">
@@ -395,7 +395,7 @@ async function loadFerretDetail(id) {
             ${h.details ? `<div class="text-muted small mt-1">${h.details}</div>` : ''}
           </div>
         </div>`;
-        }).join('') : '<p class="text-muted small">No history yet.</p>'}
+          }).join('') : '<p class="text-muted small">No history yet.</p>'}
       </div>
     </div>
 

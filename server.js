@@ -1,4 +1,4 @@
-// SanusBio v1.2.0 | 2026-06-16
+// SanusBio v1.6.0 | 2026-06-25 | server.js
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
