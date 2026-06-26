@@ -1,4 +1,4 @@
-// SanusBio v1.6.0 | 2026-06-25 | app-ferrets.js
+// SanusBio v1.7.0 | 2026-06-25 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ function renderFerretGrid() {
   <div class="col-md-4 col-lg-3">
     <div class="card ferret-card" onclick="loadFerretDetail(${f.id})">
       ${f.photo_url
-        ? `<img src="${f.photo_url}" class="ferret-avatar w-100">`
+        ? `<img src="${f.photo_url}" class="ferret-avatar w-100" style="height:130px;object-fit:cover">`
         : `<div class="ferret-placeholder">🐾</div>`}
       <div class="card-body p-2">
         <div class="d-flex align-items-start justify-content-between">
@@ -146,9 +146,10 @@ async function loadFerretDetail(id) {
     <div class="col-md-3">
       <div class="position-relative">
         ${f.photo_url
-        ? `<img src="${f.photo_url}" class="img-fluid rounded-3 shadow-sm w-100" style="max-height:220px;object-fit:cover">`
+        ? `<img src="${f.photo_url}" class="img-fluid rounded-3 shadow-sm w-100" style="height:220px;object-fit:cover">`
         : `<div class="bg-light rounded-3 d-flex align-items-center justify-content-center" style="height:160px;font-size:3.5rem">🐾</div>`}
         ${canUpdate() ? `<button class="btn btn-sm btn-dark position-absolute bottom-0 end-0 m-2 opacity-75" onclick="openPhotoModal(${id})"><i class="bi bi-camera"></i></button>` : ''}
+        ${f.photo_url ? `<a class="btn btn-sm btn-outline-light position-absolute bottom-0 start-0 m-2 opacity-75" href="/api/ferrets/${id}/photo/original" download title="Download original photo"><i class="bi bi-download"></i></a>` : ''}
       </div>
     </div>
     <div class="col-md-9">
