@@ -1,4 +1,4 @@
-// SanusBio v1.7.0 | 2026-06-25 | server.js
+// SanusBio v1.8.0 | 2026-06-27 | server.js
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -154,7 +154,7 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
                f.birth_date, f.death_date, f.weight, f.dead, f.description, f.color, f.litter_id,
                f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
                f.next_rabies_vaccine_due, f.sex, f.eight_hour_light,
-               f.distributed, f.distributor_id,
+               f.distributed, f.distributor_id, f.female_status,
                a.cage_address, a.room_id, a.room_name, a.room_lighting,
                s.supplier_name,
                d.distributor_name
@@ -1205,6 +1205,141 @@ app.get('/api/ferrets/:id/distribution', authenticate, require_perm('read'), asy
       ORDER BY de.distribution_date DESC
     `, [req.params.id]);
     res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Reproductive Events ──────────────────────────────────────────────────────
+
+// Derive current female status from most recent reproductive event
+function deriveStatus(events) {
+  if (!events.length) return 'baseline';
+  const last = events[0]; // already sorted DESC
+  if (last.event_type === 'no_litter') return 'baseline';
+  if (last.event_type === 'weaned') return 'baseline';
+  return last.event_type; // estrus | mated | littered
+}
+
+// Get all reproductive events for a ferret
+app.get('/api/ferrets/:id/reproductive', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT re.*,
+             p.ferret_name AS partner_name
+      FROM reproductive_event re
+      LEFT JOIN ferret_qr005 p ON re.partner_id = p.Ferret_QR005_id
+      WHERE re.ferret_id = ?
+      ORDER BY re.event_date DESC, re.event_id DESC
+    `, [req.params.id]);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Record a reproductive event (updates female_status automatically)
+app.post('/api/ferrets/:id/reproductive', authenticate, require_perm('update'), async (req, res) => {
+  const { event_type, event_date, partner_id, notes } = req.body;
+  const VALID = ['estrus', 'mated', 'littered', 'weaned', 'no_litter'];
+  if (!VALID.includes(event_type)) return res.status(400).json({ error: 'Invalid event_type' });
+  if (!event_date) return res.status(400).json({ error: 'event_date is required' });
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Verify ferret is female
+    const [[ferret]] = await conn.query(
+      'SELECT ferret_name, sex FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]
+    );
+    if (!ferret) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Ferret not found' }); }
+    if (ferret.sex !== 'female') { await conn.rollback(); conn.release(); return res.status(400).json({ error: 'Reproductive events can only be recorded for female ferrets' }); }
+
+    const [r] = await conn.query(
+      'INSERT INTO reproductive_event (ferret_id, event_type, event_date, partner_id, notes, recorded_by) VALUES (?,?,?,?,?,?)',
+      [req.params.id, event_type, event_date, partner_id || null, notes || null, req.user.username]
+    );
+
+    // Recompute status from all events
+    const [events] = await conn.query(
+      'SELECT event_type FROM reproductive_event WHERE ferret_id = ? ORDER BY event_date DESC, event_id DESC',
+      [req.params.id]
+    );
+    const newStatus = deriveStatus(events);
+    await conn.query(
+      'UPDATE ferret_qr005 SET female_status = ? WHERE Ferret_QR005_id = ?',
+      [newStatus, req.params.id]
+    );
+
+    await conn.commit();
+    await log_activity(req.user.user_id, 'REPRO_EVENT', 'reproductive_event', req.params.id,
+      `${event_type} recorded for ${ferret.ferret_name}`);
+    res.json({ id: r.insertId, status: newStatus, message: 'Reproductive event recorded' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
+});
+
+// Delete a reproductive event (admin only — with status recompute)
+app.delete('/api/ferrets/:id/reproductive/:eid', authenticate, admin_only, async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query('DELETE FROM reproductive_event WHERE event_id = ? AND ferret_id = ?',
+      [req.params.eid, req.params.id]);
+    const [events] = await conn.query(
+      'SELECT event_type FROM reproductive_event WHERE ferret_id = ? ORDER BY event_date DESC, event_id DESC',
+      [req.params.id]
+    );
+    const newStatus = deriveStatus(events);
+    await conn.query(
+      'UPDATE ferret_qr005 SET female_status = ? WHERE Ferret_QR005_id = ?',
+      [newStatus === 'baseline' ? null : newStatus, req.params.id]
+    );
+    await conn.commit();
+    res.json({ status: newStatus, message: 'Event deleted' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
+});
+
+// All females currently in estrus (for estrus board)
+app.get('/api/females/estrus', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
+             f.birth_date, f.weight, f.female_status, f.color, f.photo_url,
+             a.room_id, a.room_name, a.cage_address, a.room_lighting,
+             re.event_date AS status_since,
+             re.notes AS status_notes
+      FROM ferret_qr005 f
+      LEFT JOIN address a ON f.address_id = a.address_id
+      LEFT JOIN reproductive_event re ON re.ferret_id = f.Ferret_QR005_id
+        AND re.event_id = (
+          SELECT MAX(r2.event_id) FROM reproductive_event r2 WHERE r2.ferret_id = f.Ferret_QR005_id
+        )
+      WHERE f.sex = 'female'
+        AND (f.dead = '0' OR f.dead IS NULL)
+        AND (f.distributed = 0 OR f.distributed IS NULL)
+        AND f.female_status IS NOT NULL
+      ORDER BY
+        FIELD(f.female_status, 'estrus', 'mated', 'littered', 'weaned', 'baseline'),
+        re.event_date ASC
+    `);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Update mating restriction for a ferret
+app.put('/api/ferrets/:id/mating-restriction', authenticate, require_perm('update'), async (req, res) => {
+  const { mating_restriction } = req.body;
+  try {
+    await pool.query(
+      'UPDATE ferret_qr005 SET mating_restriction = ? WHERE Ferret_QR005_id = ?',
+      [mating_restriction || null, req.params.id]
+    );
+    await log_activity(req.user.user_id, 'UPDATE', 'ferret_qr005', req.params.id,
+      `Mating restriction updated for ferret #${req.params.id}`);
+    res.json({ message: 'Mating restriction updated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

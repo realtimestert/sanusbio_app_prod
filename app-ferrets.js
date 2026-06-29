@@ -1,4 +1,4 @@
-// SanusBio v1.7.0 | 2026-06-25 | app-ferrets.js
+// SanusBio v1.8.0 | 2026-06-27 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
@@ -113,6 +113,12 @@ function renderFerretGrid() {
           ${f.dead === '1' && !isDistributed(f) ? `<span class="badge bg-danger badge-pill small">Deceased</span>` : ''}
           ${vaccDue ? `<span class="badge bg-warning text-dark badge-pill small">Vaccine Due</span>` : ''}
           ${f.eight_hour_light && !isDistributed(f) ? `<span class="badge bg-info text-dark badge-pill small">💡 8hr Light</span>` : ''}
+          ${f.sex === 'female' && f.female_status && f.female_status !== 'baseline' && !isDistributed(f) && f.dead !== '1' ? (
+        f.female_status === 'estrus' ? `<span class="badge bg-danger badge-pill small">♥ Estrus</span>` :
+          f.female_status === 'mated' ? `<span class="badge bg-warning text-dark badge-pill small">Mated</span>` :
+            f.female_status === 'littered' ? `<span class="badge bg-success badge-pill small">Littered</span>` :
+              f.female_status === 'weaned' ? `<span class="badge bg-info text-dark badge-pill small">Weaned</span>` : ''
+      ) : ''}
         </div>
         ${isDistributed(f) && f.distributor_name ? `<div class="text-muted small mt-1" style="font-size:.75rem">→ ${f.distributor_name}</div>` : ''}
         ${f.color ? `<div class="text-muted small mt-1" style="font-size:.75rem">🎨 ${f.color}</div>` : ''}
@@ -131,12 +137,13 @@ async function loadFerretDetail(id) {
   const el = document.getElementById('ferretDetail');
   el.innerHTML = '<div class="text-center py-5 text-muted"><div class="spinner-border" role="status"></div></div>';
   try {
-    const [f, health, vacc, litters, history] = await Promise.all([
+    const [f, health, vacc, litters, history, repro] = await Promise.all([
       api(`/ferrets/${id}`),
       api(`/ferrets/${id}/health`),
       api(`/ferrets/${id}/vaccinations`),
       api(`/ferrets/${id}/litters`),
-      api(`/ferrets/${id}/history`)
+      api(`/ferrets/${id}/history`),
+      api(`/ferrets/${id}/reproductive`).catch(() => [])
     ]);
     const isAdmin = roleIs('admin');
     const isMat = roleIs('admin', 'maternity');
@@ -254,6 +261,8 @@ async function loadFerretDetail(id) {
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tVacc">Vaccinations</button></li>
     ${isMat ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tLitter">Litters</button></li>` : ''}
     ${canUpdate() ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMed">Medical Info</button></li>` : ''}
+    ${f.sex === 'female' ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tRepro"><i class="bi bi-heart me-1"></i>Reproductive</button></li>` : ''}
+    ${f.sex === 'female' && canUpdate() ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMatingRestriction">Mating Restrictions</button></li>` : ''}
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tDist">Distribution</button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tHistory">History</button></li>
   </ul>
@@ -379,12 +388,68 @@ async function loadFerretDetail(id) {
       </div>
     </div>
 
+    <!-- Reproductive (females only) -->
+    ${f.sex === 'female' ? `
+    <div id="tRepro" class="tab-pane">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        ${canUpdate() ? `<button class="btn btn-sm btn-primary ms-auto" onclick="openReproModal(${id})"><i class="bi bi-plus-lg me-1"></i>Record Event</button>` : ''}
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-12">
+          <div class="card p-3" style="border-left:4px solid ${f.female_status && f.female_status !== 'baseline' ? '#dc3545' : '#dee2e6'}">
+            <div class="d-flex align-items-center gap-3">
+              <div>
+                <div class="text-muted small mb-1">Current Reproductive Status</div>
+                ${(function () {
+          const s = f.female_status || 'baseline';
+          const meta = { baseline: { label: 'Baseline', color: 'secondary' }, estrus: { label: 'In Estrus', color: 'danger' }, mated: { label: 'Mated', color: 'warning' }, littered: { label: 'Littered', color: 'success' }, weaned: { label: 'Weaned', color: 'info' } };
+          const m = meta[s] || meta.baseline;
+          return `<span class="badge bg-${m.color} fs-6 px-3 py-2">${m.label}</span>`;
+        })()}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      ${repro.length ? `
+      <table class="table table-sm table-hover">
+        <thead><tr><th>Date</th><th>Event</th><th>Partner</th><th>Notes</th><th>Recorded By</th>${roleIs('admin') ? '<th></th>' : ''}</tr></thead>
+        <tbody>${repro.map(e => {
+          const meta = { estrus: { label: 'In Estrus', color: 'danger' }, mated: { label: 'Mated', color: 'warning' }, littered: { label: 'Littered', color: 'success' }, weaned: { label: 'Weaned', color: 'info' }, no_litter: { label: 'No Litter', color: 'secondary' } };
+          const m = meta[e.event_type] || { label: e.event_type, color: 'secondary' };
+          return `<tr>
+            <td>${fmtDate(e.event_date)}</td>
+            <td><span class="badge bg-${m.color}">${m.label}</span></td>
+            <td>${e.partner_name ? `<strong>${e.partner_name}</strong>` : '—'}</td>
+            <td class="small">${e.notes || '—'}</td>
+            <td class="text-muted small">${e.recorded_by || '—'}</td>
+            ${roleIs('admin') ? `<td><button class="btn btn-sm btn-outline-danger" onclick="deleteReproEvent(${id},${e.event_id})"><i class="bi bi-trash"></i></button></td>` : ''}
+          </tr>`;
+        }).join('')}</tbody>
+      </table>` : '<p class="text-muted small">No reproductive events recorded.</p>'}
+    </div>` : ''}
+
+    <!-- Mating Restrictions (females only) -->
+    ${f.sex === 'female' && canUpdate() ? `
+    <div id="tMatingRestriction" class="tab-pane">
+      <div class="card p-4" style="max-width:640px">
+        <h6 class="fw-semibold mb-1">Mating Restrictions</h6>
+        <p class="text-muted small mb-3">Document any restrictions on mating this female (e.g. genetic concerns, health status, pairing exclusions).</p>
+        <textarea id="matingRestrictionText" class="form-control mb-3" rows="6"
+          placeholder="Describe any mating restrictions…">${f.mating_restriction || ''}</textarea>
+        <div class="d-flex align-items-center gap-3">
+          <button class="btn btn-primary" onclick="saveMatingRestriction(${id})"><i class="bi bi-floppy me-1"></i>Save</button>
+          <span id="matingRestrictionSaved" class="text-success small" style="display:none"><i class="bi bi-check2 me-1"></i>Saved</span>
+        </div>
+      </div>
+    </div>` : ''}
+
     <!-- History -->
     <div id="tHistory" class="tab-pane">
       <div class="timeline ps-2">
         ${history.length ? history.map(h => {
-            const { icon, color } = historyMeta(h.action);
-            return `
+          const { icon, color } = historyMeta(h.action);
+          return `
         <div class="d-flex gap-3 mb-3 align-items-start">
           <div class="history-icon bg-${color} bg-opacity-10 text-${color}">${icon}</div>
           <div class="flex-grow-1">
@@ -396,7 +461,7 @@ async function loadFerretDetail(id) {
             ${h.details ? `<div class="text-muted small mt-1">${h.details}</div>` : ''}
           </div>
         </div>`;
-          }).join('') : '<p class="text-muted small">No history yet.</p>'}
+        }).join('') : '<p class="text-muted small">No history yet.</p>'}
       </div>
     </div>
 

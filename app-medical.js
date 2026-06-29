@@ -1,4 +1,4 @@
-// SanusBio v1.6.0 | 2026-06-25 | app-medical.js
+// SanusBio v1.8.0 | 2026-06-27 | app-medical.js
 // Health Events, Vaccinations, Litters, Medical Info, Procedures
 
 // ─── Health Event Modal ───────────────────────────────────────────────────────
@@ -108,8 +108,17 @@ async function openGlobalLitterModal() {
   try {
     const ferrets = await api('/ferrets');
     const females = ferrets.filter(f => f.sex === 'female' && f.dead !== '1');
+    // Sort: mated females first, then by name
+    const mated = females.filter(f => f.female_status === 'mated');
+    const others = females.filter(f => f.female_status !== 'mated');
+    const sorted = [...mated, ...others];
     document.getElementById('litJillSelect').innerHTML =
-      females.map(f => `<option value="${f.id}">${f.name} (ID: ${f.animal_id || '—'})</option>`).join('');
+      (mated.length ? `<optgroup label="── Mated (priority) ──">` +
+        mated.map(f => `<option value="${f.id}">${f.name} (ID: ${f.animal_id || '—'}) ★ Mated</option>`).join('') +
+        `</optgroup>` : '') +
+      (others.length ? `<optgroup label="── Other Females ──">` +
+        others.map(f => `<option value="${f.id}">${f.name} (ID: ${f.animal_id || '—'})${f.female_status && f.female_status !== 'baseline' ? ' [' + f.female_status + ']' : ''}</option>`).join('') +
+        `</optgroup>` : '');
     document.getElementById('litJillRow').style.display = '';
     document.getElementById('litFerretId').value = '';
     document.getElementById('litDate').value = today();
@@ -282,5 +291,83 @@ async function submitProcedure() {
     });
     bootstrap.Modal.getInstance(document.getElementById('procedureModal')).hide();
     loadFerretDetail(ferretId);
+  } catch (err) { alert(err.message); }
+}
+
+// ─── Reproductive Events ──────────────────────────────────────────────────────
+const REPRO_STATUS_META = {
+  baseline: { label: 'Baseline', color: 'secondary', icon: 'bi-circle' },
+  estrus: { label: 'In Estrus', color: 'danger', icon: 'bi-heart-fill' },
+  mated: { label: 'Mated', color: 'warning', icon: 'bi-arrow-through-heart-fill' },
+  littered: { label: 'Littered', color: 'success', icon: 'bi-egg-fill' },
+  weaned: { label: 'Weaned', color: 'info', icon: 'bi-check-circle-fill' },
+};
+
+function reproStatusBadge(status) {
+  if (!status || status === 'baseline') return '';
+  const m = REPRO_STATUS_META[status] || { label: status, color: 'secondary', icon: 'bi-circle' };
+  return `<span class="badge bg-${m.color} badge-pill small"><i class="bi ${m.icon} me-1"></i>${m.label}</span>`;
+}
+
+function openReproModal(ferretId) {
+  document.getElementById('reproFerretId').value = ferretId;
+  document.getElementById('reproDate').value = today();
+  document.getElementById('reproType').value = 'estrus';
+  document.getElementById('reproPartnerRow').style.display = 'none';
+  document.getElementById('reproNotes').value = '';
+  document.getElementById('reproPartnerSelect').innerHTML = '<option value="">— None —</option>';
+  new bootstrap.Modal(document.getElementById('reproModal')).show();
+}
+
+async function onReproTypeChange() {
+  const type = document.getElementById('reproType').value;
+  const partnerRow = document.getElementById('reproPartnerRow');
+  if (type === 'mated') {
+    partnerRow.style.display = '';
+    try {
+      const ferrets = await api('/ferrets');
+      const males = ferrets.filter(f => f.sex === 'male' && f.dead !== '1');
+      document.getElementById('reproPartnerSelect').innerHTML =
+        '<option value="">— Unknown / Not recorded —</option>' +
+        males.map(m => `<option value="${m.id}">${m.name} (ID: ${m.animal_id || '—'})</option>`).join('');
+    } catch { /* non-fatal */ }
+  } else {
+    partnerRow.style.display = 'none';
+  }
+}
+
+async function submitReproEvent() {
+  const ferretId = document.getElementById('reproFerretId').value;
+  const event_type = document.getElementById('reproType').value;
+  const event_date = document.getElementById('reproDate').value;
+  const partner_id = document.getElementById('reproPartnerSelect').value || null;
+  const notes = document.getElementById('reproNotes').value.trim();
+  if (!event_date) return alert('Date is required.');
+  try {
+    const r = await api(`/ferrets/${ferretId}/reproductive`, {
+      method: 'POST', body: { event_type, event_date, partner_id: partner_id ? parseInt(partner_id) : null, notes: notes || null }
+    });
+    bootstrap.Modal.getInstance(document.getElementById('reproModal')).hide();
+    loadFerretDetail(ferretId);
+  } catch (err) { alert(err.message); }
+}
+
+async function deleteReproEvent(ferretId, eventId) {
+  if (!confirm('Delete this reproductive event? The ferret status will be recalculated.')) return;
+  try {
+    await api(`/ferrets/${ferretId}/reproductive/${eventId}`, { method: 'DELETE' });
+    loadFerretDetail(ferretId);
+  } catch (err) { alert(err.message); }
+}
+
+// ─── Mating Restrictions ──────────────────────────────────────────────────────
+async function saveMatingRestriction(ferretId) {
+  const text = document.getElementById('matingRestrictionText').value;
+  try {
+    await api(`/ferrets/${ferretId}/mating-restriction`, {
+      method: 'PUT', body: { mating_restriction: text || null }
+    });
+    document.getElementById('matingRestrictionSaved').style.display = '';
+    setTimeout(() => { const el = document.getElementById('matingRestrictionSaved'); if (el) el.style.display = 'none'; }, 2500);
   } catch (err) { alert(err.message); }
 }

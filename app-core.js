@@ -1,4 +1,4 @@
-// SanusBio v1.6.0 | 2026-06-25 | app-core.js
+// SanusBio v1.8.0 | 2026-06-27 | app-core.js
 // State, API, Auth, Init, Navigation, Dashboard, Helpers
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -121,6 +121,44 @@ async function loadDashboard() {
     </tr>`).join('') || '<tr><td colspan="4" class="text-muted text-center py-3">No activity yet</td></tr>';
     } else { activityCard.style.display = 'none'; }
   } catch (err) { console.error(err); }
+
+  // Estrus board — show to maternity, admin, research
+  const estrusCard = document.getElementById('dashEstrусCard');
+  if (estrusCard && roleIs('admin', 'research', 'maternity')) {
+    estrusCard.style.display = '';
+    try {
+      const females = await api('/females/estrus');
+      const tbody = document.getElementById('dashEstrusList');
+      if (!females.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-3">No females currently tracked</td></tr>';
+      } else {
+        const statusMeta = {
+          estrus: { label: 'In Estrus', color: 'danger' },
+          mated: { label: 'Mated', color: 'warning' },
+          littered: { label: 'Littered', color: 'success' },
+          weaned: { label: 'Weaned', color: 'info' },
+          baseline: { label: 'Baseline', color: 'secondary' },
+        };
+        tbody.innerHTML = females.map(f => {
+          const m = statusMeta[f.female_status] || statusMeta.baseline;
+          const daysSince = f.status_since
+            ? Math.floor((Date.now() - new Date(f.status_since)) / 864e5)
+            : null;
+          const urgency = f.female_status === 'estrus' && daysSince !== null && daysSince >= 8;
+          return `<tr class="${urgency ? 'table-danger' : ''}" style="cursor:pointer" onclick="loadFerretDetail(${f.id}); nav('ferrets');">
+            <td><strong>${f.name}</strong><br><span class="text-muted small">${f.animal_id || '—'}</span></td>
+            <td><span class="badge bg-${m.color}">${m.label}</span></td>
+            <td>${f.status_since ? fmtDate(f.status_since) : '—'}</td>
+            <td>${daysSince !== null ? daysSince + 'd' : '—'}${urgency ? ' <i class="bi bi-exclamation-triangle-fill text-danger ms-1"></i>' : ''}</td>
+            <td class="small text-muted">Room ${f.room_id || '?'} · ${f.cage_address || '?'}</td>
+            <td class="small text-muted">${f.status_notes || '—'}</td>
+          </tr>`;
+        }).join('');
+      }
+    } catch (err) { console.error('Estrus board:', err); }
+  } else if (estrusCard) {
+    estrusCard.style.display = 'none';
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
