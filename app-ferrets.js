@@ -1,4 +1,4 @@
-// SanusBio v1.8.0 | 2026-06-27 | app-ferrets.js
+// SanusBio v1.8.1 | 2026-06-30 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
@@ -261,8 +261,8 @@ async function loadFerretDetail(id) {
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tVacc">Vaccinations</button></li>
     ${isMat ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tLitter">Litters</button></li>` : ''}
     ${canUpdate() ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMed">Medical Info</button></li>` : ''}
-    ${f.sex === 'female' ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tRepro"><i class="bi bi-heart me-1"></i>Reproductive</button></li>` : ''}
-    ${f.sex === 'female' && canUpdate() ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMatingRestriction">Mating Restrictions</button></li>` : ''}
+    ${f.sex === 'female' ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tRepro"><i class="bi bi-heart me-1"></i>Estrus Status</button></li>` : ''}
+    ${canUpdate() ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMatingRestriction">Mating Restrictions</button></li>` : ''}
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tDist">Distribution</button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tHistory">History</button></li>
   </ul>
@@ -399,7 +399,7 @@ async function loadFerretDetail(id) {
           <div class="card p-3" style="border-left:4px solid ${f.female_status && f.female_status !== 'baseline' ? '#dc3545' : '#dee2e6'}">
             <div class="d-flex align-items-center gap-3">
               <div>
-                <div class="text-muted small mb-1">Current Reproductive Status</div>
+                <div class="text-muted small mb-1">Current Estrus Status</div>
                 ${(function () {
           const s = f.female_status || 'baseline';
           const meta = { baseline: { label: 'Baseline', color: 'secondary' }, estrus: { label: 'In Estrus', color: 'danger' }, mated: { label: 'Mated', color: 'warning' }, littered: { label: 'Littered', color: 'success' }, weaned: { label: 'Weaned', color: 'info' } };
@@ -429,12 +429,12 @@ async function loadFerretDetail(id) {
       </table>` : '<p class="text-muted small">No reproductive events recorded.</p>'}
     </div>` : ''}
 
-    <!-- Mating Restrictions (females only) -->
-    ${f.sex === 'female' && canUpdate() ? `
+    <!-- Mating Restrictions -->
+    ${canUpdate() ? `
     <div id="tMatingRestriction" class="tab-pane">
       <div class="card p-4" style="max-width:640px">
         <h6 class="fw-semibold mb-1">Mating Restrictions</h6>
-        <p class="text-muted small mb-3">Document any restrictions on mating this female (e.g. genetic concerns, health status, pairing exclusions).</p>
+        <p class="text-muted small mb-3">Document any restrictions on mating this ferret (e.g. genetic concerns, health status, pairing exclusions).</p>
         <textarea id="matingRestrictionText" class="form-control mb-3" rows="6"
           placeholder="Describe any mating restrictions…">${f.mating_restriction || ''}</textarea>
         <div class="d-flex align-items-center gap-3">
