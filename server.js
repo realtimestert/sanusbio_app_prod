@@ -1,4 +1,4 @@
-// SanusBio v1.8.0 | 2026-06-27 | server.js
+// SanusBio v1.8.2 | 2026-07-01 | server.js
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -392,13 +392,45 @@ app.put('/api/ferrets/:id/location', authenticate, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Delete ferret
+// Delete ferret (cleans up all dependent records first to avoid FK constraint errors)
 app.delete('/api/ferrets/:id', authenticate, admin_only, async (req, res) => {
+  const id = req.params.id;
+  const conn = await pool.getConnection();
   try {
-    await pool.query('DELETE FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]);
-    await log_activity(req.user.user_id, 'DELETE', 'ferret_qr005', req.params.id, `Deleted ferret #${req.params.id}`);
+    await conn.beginTransaction();
+
+    const [[ferret]] = await conn.query('SELECT ferret_name FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [id]);
+    if (!ferret) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Ferret not found' }); }
+
+    // Clear self-referencing parent links (in case this ferret is listed as another's mother/father)
+    await conn.query('UPDATE ferret_qr005 SET mother_id = NULL WHERE mother_id = ?', [id]);
+    await conn.query('UPDATE ferret_qr005 SET father_id = NULL WHERE father_id = ?', [id]);
+
+    // Clear reproductive_event partner references
+    await conn.query('UPDATE reproductive_event SET partner_id = NULL WHERE partner_id = ?', [id]);
+
+    // Delete all dependent child records
+    await conn.query('DELETE FROM assignments WHERE ferret_id = ?', [id]);
+    await conn.query('DELETE FROM ferret_location_history WHERE ferret_id = ?', [id]);
+    await conn.query('DELETE FROM health_event WHERE ferret_id = ?', [id]);
+    await conn.query('DELETE FROM litter_log WHERE Ferret_QR005_id = ?', [id]);
+    await conn.query('DELETE FROM rfid_assignment WHERE ferret_id = ?', [id]);
+    await conn.query('DELETE FROM vaccination_event WHERE ferret_id = ?', [id]);
+    await conn.query('DELETE FROM distribution_event WHERE ferret_id = ?', [id]);
+    await conn.query('DELETE FROM reproductive_event WHERE ferret_id = ?', [id]);
+    try {
+      await conn.query('DELETE FROM `estrus_&_mating_summary` WHERE Ferret_QR005_id = ?', [id]);
+    } catch { /* table may not exist on every deployment — non-fatal */ }
+
+    await conn.query('DELETE FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [id]);
+
+    await conn.commit();
+    await log_activity(req.user.user_id, 'DELETE', 'ferret_qr005', id, `Deleted ferret: ${ferret.ferret_name} (#${id})`);
     res.json({ message: 'Ferret deleted' });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
 });
 
 // Ferret activity history

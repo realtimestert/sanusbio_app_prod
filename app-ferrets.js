@@ -1,4 +1,4 @@
-// SanusBio v1.8.1 | 2026-06-30 | app-ferrets.js
+// SanusBio v1.8.2 | 2026-07-01 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
@@ -200,7 +200,20 @@ async function loadFerretDetail(id) {
                </div>`
           : `<strong>${fmtDate(f.death_date)}</strong>`}
         </div>` : ''}
-        <div class="col-6 col-md-4"><span class="text-muted">Sex</span><br><strong>${f.sex ? f.sex.charAt(0).toUpperCase() + f.sex.slice(1) : '—'}</strong></div>
+        <div class="col-6 col-md-4"><span class="text-muted">Sex</span><br>
+          ${canEdit
+        ? `<div class="d-flex align-items-center gap-2 mt-1">
+              <select id="editSex" class="form-select form-select-sm" style="max-width:140px">
+                <option value="" ${!f.sex ? 'selected' : ''}>— Unknown —</option>
+                <option value="male" ${f.sex === 'male' ? 'selected' : ''}>Male</option>
+                <option value="female" ${f.sex === 'female' ? 'selected' : ''}>Female</option>
+              </select>
+              <button class="btn btn-sm btn-outline-primary" onclick="saveSex(${id})">
+                <i class="bi bi-check2"></i> Save
+              </button>
+            </div>`
+        : `<strong>${f.sex ? f.sex.charAt(0).toUpperCase() + f.sex.slice(1) : '—'}</strong>`}
+        </div>
         <div class="col-6 col-md-4"><span class="text-muted">Weight</span><br><strong>${f.weight ? f.weight + ' g' : '—'}</strong></div>
         <div class="col-6 col-md-4"><span class="text-muted">Location</span><br>
           <strong>Room ${f.room_id || '?'} · ${f.cage_address || '?'}${f.room_lighting ? ' · ' + f.room_lighting : ''}</strong>
@@ -333,7 +346,7 @@ async function loadFerretDetail(id) {
             <td class="small">${l.anomalies_and_notes || '—'}</td>
             <td>
               ${canUpdate() && (!l.individuals_created || l.individuals_created < l.kit_count)
-              ? `<button class="btn btn-xs btn-outline-success btn-sm" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>` : ''}
+            ? `<button class="btn btn-xs btn-outline-success btn-sm" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>` : ''}
             </td>
           </tr>`).join('') : '<tr><td colspan="8" class="text-muted text-center py-3">No litter records</td></tr>'}
         </tbody>
@@ -830,6 +843,14 @@ async function saveDeathDate(id) {
   const val = document.getElementById('editDeathDate').value;
   try {
     await api(`/ferrets/${id}`, { method: 'PUT', body: { death_date: val || null } });
+    loadFerretDetail(id);
+  } catch (err) { alert(err.message); }
+}
+
+async function saveSex(id) {
+  const val = document.getElementById('editSex').value;
+  try {
+    await api(`/ferrets/${id}`, { method: 'PUT', body: { sex: val || null } });
     loadFerretDetail(id);
   } catch (err) { alert(err.message); }
 }
