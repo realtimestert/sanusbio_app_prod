@@ -10,3 +10,4 @@
 backups/
 node_modules/
 dist/
+copy.sh
