@@ -154,7 +154,7 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
                f.birth_date, f.death_date, f.weight, f.dead, f.description, f.color, f.litter_id,
                f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
                f.next_rabies_vaccine_due, f.sex, f.eight_hour_light,
-               f.distributed, f.distributor_id, f.female_status,
+               f.distributed, f.distributor_id, f.female_status, f.breeding_retired,
                a.cage_address, a.room_id, a.room_name, a.room_lighting,
                s.supplier_name,
                d.distributor_name
@@ -171,7 +171,7 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
                f.birth_date, f.death_date, f.weight, f.dead, f.description, f.color, f.litter_id,
                f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
                f.next_rabies_vaccine_due, f.sex, 0 AS eight_hour_light,
-               0 AS distributed, NULL AS distributor_id,
+               0 AS distributed, NULL AS distributor_id, 0 AS breeding_retired,
                a.cage_address, a.room_id, a.room_name, a.room_lighting,
                s.supplier_name, NULL AS distributor_name
         FROM ferret_qr005 f
@@ -1352,6 +1352,7 @@ app.get('/api/females/estrus', authenticate, require_perm('read'), async (req, r
       WHERE f.sex = 'female'
         AND (f.dead = '0' OR f.dead IS NULL)
         AND (f.distributed = 0 OR f.distributed IS NULL)
+        AND (f.breeding_retired = 0 OR f.breeding_retired IS NULL)
         AND f.female_status IS NOT NULL
       ORDER BY
         FIELD(f.female_status, 'estrus', 'mated', 'littered', 'weaned', 'baseline'),
@@ -1372,6 +1373,19 @@ app.put('/api/ferrets/:id/mating-restriction', authenticate, require_perm('updat
     await log_activity(req.user.user_id, 'UPDATE', 'ferret_qr005', req.params.id,
       `Mating restriction updated for ferret #${req.params.id}`);
     res.json({ message: 'Mating restriction updated' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Toggle breeding-retired status (excludes female from Reproductive Status Board)
+app.put('/api/ferrets/:id/breeding-retired', authenticate, require_perm('update'), async (req, res) => {
+  const { breeding_retired } = req.body;
+  try {
+    const [[ferret]] = await pool.query('SELECT ferret_name, sex FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]);
+    if (!ferret) return res.status(404).json({ error: 'Ferret not found' });
+    await pool.query('UPDATE ferret_qr005 SET breeding_retired = ? WHERE Ferret_QR005_id = ?', [breeding_retired ? 1 : 0, req.params.id]);
+    await log_activity(req.user.user_id, 'UPDATE', 'ferret_qr005', req.params.id,
+      `${breeding_retired ? 'Retired from breeding' : 'Reinstated to breeding tracking'}: ${ferret.ferret_name}`);
+    res.json({ message: 'Breeding retired status updated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

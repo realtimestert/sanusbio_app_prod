@@ -113,12 +113,14 @@ function renderFerretGrid() {
           ${f.dead === '1' && !isDistributed(f) ? `<span class="badge bg-danger badge-pill small">Deceased</span>` : ''}
           ${vaccDue ? `<span class="badge bg-warning text-dark badge-pill small">Vaccine Due</span>` : ''}
           ${f.eight_hour_light && !isDistributed(f) ? `<span class="badge bg-info text-dark badge-pill small">💡 8hr Light</span>` : ''}
-          ${f.sex === 'female' && f.female_status && f.female_status !== 'baseline' && !isDistributed(f) && f.dead !== '1' ? (
-        f.female_status === 'estrus' ? `<span class="badge bg-danger badge-pill small">♥ Estrus</span>` :
-          f.female_status === 'mated' ? `<span class="badge bg-warning text-dark badge-pill small">Mated</span>` :
-            f.female_status === 'littered' ? `<span class="badge bg-success badge-pill small">Littered</span>` :
-              f.female_status === 'weaned' ? `<span class="badge bg-info text-dark badge-pill small">Weaned</span>` : ''
-      ) : ''}
+          ${f.sex === 'female' && !isDistributed(f) && f.dead !== '1' && f.breeding_retired
+        ? `<span class="badge bg-secondary badge-pill small">Retired (Breeding)</span>`
+        : (f.sex === 'female' && f.female_status && f.female_status !== 'baseline' && !isDistributed(f) && f.dead !== '1' ? (
+          f.female_status === 'estrus' ? `<span class="badge bg-danger badge-pill small">♥ Estrus</span>` :
+            f.female_status === 'mated' ? `<span class="badge bg-warning text-dark badge-pill small">Mated</span>` :
+              f.female_status === 'littered' ? `<span class="badge bg-success badge-pill small">Littered</span>` :
+                f.female_status === 'weaned' ? `<span class="badge bg-info text-dark badge-pill small">Weaned</span>` : ''
+        ) : '')}
         </div>
         ${isDistributed(f) && f.distributor_name ? `<div class="text-muted small mt-1" style="font-size:.75rem">→ ${f.distributor_name}</div>` : ''}
         ${f.color ? `<div class="text-muted small mt-1" style="font-size:.75rem">🎨 ${f.color}</div>` : ''}
@@ -413,6 +415,24 @@ async function loadFerretDetail(id) {
             <div class="d-flex align-items-center gap-3">
               <div>
                 <div class="text-muted small mb-1">Current Estrus Status</div>
+                <div class="row g-3 mb-3">
+                  <div class="col-12">
+                    <div class="card p-3 d-flex flex-row align-items-center justify-content-between">
+                      <div>
+                        <span class="fw-semibold"><i class="bi bi-slash-circle me-1 text-secondary"></i>Retired from Breeding</span>
+                        <div class="text-muted small mt-1">Excludes this female from the Dashboard Reproductive Status Board (e.g. over-aged, retired breeder).</div>
+                      </div>
+                      ${canUpdate() ? `
+                      <div class="form-check form-switch ms-3">
+                        <input class="form-check-input" type="checkbox" id="breedingRetiredToggle"
+                          ${f.breeding_retired ? 'checked' : ''}
+                          onchange="toggleBreedingRetired(${id}, this.checked)"
+                          style="width:2.5em;height:1.4em;cursor:pointer;">
+                      </div>` : `
+                      <span class="badge ${f.breeding_retired ? 'bg-secondary' : 'bg-success'}">${f.breeding_retired ? 'Retired' : 'Active'}</span>`}
+                    </div>
+                  </div>
+                </div>
                 ${(function () {
           const s = f.female_status || 'baseline';
           const meta = { baseline: { label: 'Baseline', color: 'secondary' }, estrus: { label: 'In Estrus', color: 'danger' }, mated: { label: 'Mated', color: 'warning' }, littered: { label: 'Littered', color: 'success' }, weaned: { label: 'Weaned', color: 'info' } };
@@ -791,6 +811,17 @@ async function toggleEightHourLight(ferretId, enabled) {
   } catch (err) {
     alert(err.message);
     const toggle = document.getElementById('eightHourLightToggle');
+    if (toggle) toggle.checked = !enabled;
+  }
+}
+
+async function toggleBreedingRetired(ferretId, enabled) {
+  try {
+    await api(`/ferrets/${ferretId}/breeding-retired`, { method: 'PUT', body: { breeding_retired: enabled } });
+    loadFerretDetail(ferretId);
+  } catch (err) {
+    alert(err.message);
+    const toggle = document.getElementById('breedingRetiredToggle');
     if (toggle) toggle.checked = !enabled;
   }
 }
