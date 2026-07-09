@@ -40,7 +40,7 @@
   <!-- APP SHELL -->
   <div id="app" style="display:flex">
     <div id="sidebar" class="d-flex flex-column">
-      <div class="brand">🐾 SanusBio</div>
+      <div class="brand">SanusBio</div>
       <nav class="nav flex-column pt-2 px-1 gap-1" id="navLinks">
         <a class="nav-link" href="#" data-page="dashboard"><i class="bi bi-speedometer2"></i>Dashboard</a>
         <a class="nav-link" href="#" data-page="ferrets"><i class="bi bi-grid-3x3-gap"></i>Ferrets</a>
@@ -50,7 +50,7 @@
         <a class="nav-link" href="#" data-page="suppliers"><i class="bi bi-truck"></i>Suppliers</a>
         <a class="nav-link" href="#" data-page="distribution"><i class="bi bi-box-arrow-right"></i>Distribution</a>
         <a class="nav-link" href="#" data-page="assignments"><i class="bi bi-clipboard-check"></i>Assignments</a>
-        <a class="nav-link admin-only" href="#" data-page="users"><i class="bi bi-people"></i>Users</a>
+        <a class="nav-link admin-research-only" href="#" data-page="users"><i class="bi bi-people"></i>Users</a>
         <a class="nav-link admin-only" href="#" data-page="activity"><i class="bi bi-journal-text"></i>Activity Log</a>
         <a class="nav-link" href="#" data-page="cleaning-reports"><i class="bi bi-check2-square"></i>Cleaning
           Reports</a>
@@ -374,7 +374,7 @@
       </div>
 
       <!-- Activity Log -->
-      <div id="page-activity" class="page admin-only">
+      <div id="page-activity" class="page admin-research-only">
         <div class="page-header">
           <h4><i class="bi bi-journal-text me-2"></i>Activity Log</h4>
           <span id="actTotalBadge" class="badge bg-secondary ms-2" style="font-size:.85rem"></span>

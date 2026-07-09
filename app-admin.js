@@ -8,7 +8,7 @@ async function loadLocations() {
     const addresses = await api('/addresses');
     const accordion = document.getElementById('locationAccordion');
     if (!addresses.length) { accordion.innerHTML = '<div class="text-muted mt-2">No locations yet.</div>'; return; }
-    const canDeleteLoc = roleIs('admin');
+    const canDeleteLoc = roleIs('admin', 'research');
     accordion.innerHTML = addresses.map((a, i) => `
   <div class="accordion-item">
     <h2 class="accordion-header d-flex align-items-center">
@@ -178,7 +178,7 @@ async function submitSupplier() {
 
 // ─── Assignments ──────────────────────────────────────────────────────────────
 async function loadAssignments() {
-  if (roleIs('admin')) document.getElementById('btnAddAssign').classList.remove('d-none');
+  if (roleIs('admin', 'research')) document.getElementById('btnAddAssign').classList.remove('d-none');
   try {
     const data = await api('/assignments');
     const tbody = document.getElementById('assignTable');
@@ -443,7 +443,7 @@ async function loadDistribution() {
                 ${canManage ? `
                 <div class="d-flex flex-column gap-1">
                   <button class="btn btn-sm btn-outline-primary" onclick="openEditDistributor(${d.distributor_id})"><i class="bi bi-pencil"></i></button>
-                  ${roleIs('admin') ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteDistributor(${d.distributor_id})"><i class="bi bi-trash"></i></button>` : ''}
+                  ${roleIs('admin', 'research') ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteDistributor(${d.distributor_id})"><i class="bi bi-trash"></i></button>` : ''}
                 </div>` : ''}
               </div>
               <div class="d-flex gap-2 flex-wrap mt-2">

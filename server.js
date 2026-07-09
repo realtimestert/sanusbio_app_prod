@@ -1,4 +1,4 @@
-// SanusBio v1.8.4 | 2026-07-08 | server.js
+// SanusBio v1.8.5 | 2026-07-08 | server.js
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -459,7 +459,6 @@ app.get('/api/ferrets/:id/health', authenticate, require_perm('read'), async (re
 });
 
 app.post('/api/health-events', authenticate, require_perm('write'), async (req, res) => {
-  if (req.user.role === 'research') return res.status(403).json({ error: 'Research role is read-only for health events' });
   const { ferret_id, event_type, weight, event_date, event_time, notes } = req.body;
   const conn = await pool.getConnection();
   try {

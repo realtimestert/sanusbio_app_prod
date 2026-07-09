@@ -147,7 +147,7 @@ async function loadFerretDetail(id) {
       api(`/ferrets/${id}/history`),
       api(`/ferrets/${id}/reproductive`).catch(() => [])
     ]);
-    const isAdmin = roleIs('admin');
+    const isAdmin = roleIs('admin', 'research');
     const isMat = roleIs('admin', 'maternity');
     const canEdit = roleIs('admin', 'research');
     el.innerHTML = `
@@ -446,7 +446,7 @@ async function loadFerretDetail(id) {
       </div>
       ${repro.length ? `
       <table class="table table-sm table-hover">
-        <thead><tr><th>Date</th><th>Event</th><th>Partner</th><th>Notes</th><th>Recorded By</th>${roleIs('admin') ? '<th></th>' : ''}</tr></thead>
+        <thead><tr><th>Date</th><th>Event</th><th>Partner</th><th>Notes</th><th>Recorded By</th>${roleIs('admin', 'research') ? '<th></th>' : ''}</tr></thead>
         <tbody>${repro.map(e => {
           const meta = { estrus: { label: 'In Estrus', color: 'danger' }, mated: { label: 'Mated', color: 'warning' }, littered: { label: 'Littered', color: 'success' }, weaned: { label: 'Weaned', color: 'info' }, no_litter: { label: 'No Litter', color: 'secondary' } };
           const m = meta[e.event_type] || { label: e.event_type, color: 'secondary' };
@@ -456,7 +456,7 @@ async function loadFerretDetail(id) {
             <td>${e.partner_name ? `<strong>${e.partner_name}</strong>` : '—'}</td>
             <td class="small">${e.notes || '—'}</td>
             <td class="text-muted small">${e.recorded_by || '—'}</td>
-            ${roleIs('admin') ? `<td><button class="btn btn-sm btn-outline-danger" onclick="deleteReproEvent(${id},${e.event_id})"><i class="bi bi-trash"></i></button></td>` : ''}
+            ${roleIs('admin', 'research') ? `<td><button class="btn btn-sm btn-outline-danger" onclick="deleteReproEvent(${id},${e.event_id})"><i class="bi bi-trash"></i></button></td>` : ''}
           </tr>`;
         }).join('')}</tbody>
       </table>` : '<p class="text-muted small">No reproductive events recorded.</p>'}
