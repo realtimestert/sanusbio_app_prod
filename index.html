@@ -1,4 +1,4 @@
-<!-- SanusBio v1.8.0 | 2026-06-27 -->
+<!-- SanusBio v1.8.4 | 2026-07-08 -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -184,13 +184,15 @@
 
             <!-- Manual / USB wedge input -->
             <div class="mb-3">
-              <label class="fw-bold fs-6 d-block mb-1"><i class="bi bi-upc-scan me-1"></i>Scan or Enter RFID</label>
+              <label class="fw-bold fs-6 d-block mb-1"><i class="bi bi-upc-scan me-1"></i>Enter Last 6 Digits of
+                RFID</label>
               <p class="text-muted small mb-2">
-                Scan with a USB RFID wedge reader, type the chip value, or use the NFC button below on a supported
-                device.
+                All 15 digits of each chip are still stored — but you only need to type the
+                <strong>last 6 digits</strong> to find a ferret. A full scan from a USB RFID wedge reader or the
+                NFC button below also works.
               </p>
               <div class="input-group">
-                <input id="rfidLookupInput" class="form-control font-monospace" placeholder="e.g. 0A1B2C3D4E"
+                <input id="rfidLookupInput" class="form-control font-monospace" placeholder="e.g. 3C4D5E" maxlength="15"
                   autocomplete="off" onkeydown="if(event.key==='Enter') doRfidLookup()">
                 <button class="btn btn-primary" onclick="doRfidLookup()">
                   <i class="bi bi-search me-1"></i>Look Up

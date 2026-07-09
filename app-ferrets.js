@@ -1,4 +1,4 @@
-// SanusBio v1.8.2 | 2026-07-01 | app-ferrets.js
+// SanusBio v1.8.4 | 2026-07-08 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
@@ -643,38 +643,9 @@ async function doRfidLookup(rfidOverride) {
   resultEl.innerHTML = '<div class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm me-2"></div>Looking up…</div>';
   try {
     const f = await api(`/rfid/lookup/${encodeURIComponent(val)}`);
-    const isDeceased = f.dead === '1';
-    const isDistributed = f.distributed == 1;
-    resultEl.innerHTML = `
-      <div class="card shadow-sm" style="border-radius:14px; max-width:560px; border-left:5px solid ${isDeceased ? '#dc3545' : isDistributed ? '#7c3aed' : '#198754'}">
-        <div class="card-body p-4">
-          <div class="d-flex align-items-center gap-3 mb-3">
-            ${f.photo_url
-        ? `<img src="${f.photo_url}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;">`
-        : `<div style="width:72px;height:72px;background:#e3eaf2;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2rem;">🐾</div>`}
-            <div>
-              <h4 class="fw-bold mb-0">${f.name}</h4>
-              <div class="text-muted small">Animal ID: ${f.animal_id || '—'}</div>
-              ${isDeceased ? '<span class="badge bg-danger">Deceased</span>' : isDistributed ? '<span class="badge" style="background:#7c3aed">Distributed</span>' : '<span class="badge bg-success">Active</span>'}
-            </div>
-          </div>
-          <div class="row g-2 small mb-3">
-            <div class="col-6"><span class="text-muted">Sex</span><br><strong>${f.sex ? f.sex.charAt(0).toUpperCase() + f.sex.slice(1) : '—'}</strong></div>
-            <div class="col-6"><span class="text-muted">Weight</span><br><strong>${f.weight ? f.weight + ' g' : '—'}</strong></div>
-            <div class="col-6"><span class="text-muted">Birth Date</span><br><strong>${fmtDate(f.birth_date)}</strong></div>
-            ${isDeceased ? `<div class="col-6"><span class="text-muted">Death Date</span><br><strong>${fmtDate(f.death_date)}</strong></div>` : ''}
-            <div class="col-6"><span class="text-muted">Location</span><br><strong>Room ${f.room_id || '?'}${f.room_name ? ' ' + f.room_name : ''} · ${f.cage_address || '?'}${f.room_lighting ? ' · ' + f.room_lighting : ''}</strong></div>
-            ${f.color ? `<div class="col-6"><span class="text-muted">Color</span><br><strong>${f.color}</strong></div>` : ''}
-            ${f.description ? `<div class="col-12"><span class="text-muted">Description</span><br><div class="mt-1 p-2 bg-light rounded" style="white-space:pre-wrap;line-height:1.6">${f.description}</div></div>` : ''}
-          </div>
-          <div class="d-flex align-items-center gap-2">
-            <span class="text-muted small font-monospace">RFID: ${f.rfid}</span>
-            <button class="btn btn-primary ms-auto" onclick="loadFerretDetail(${f.id}); nav('ferrets');">
-              <i class="bi bi-arrow-right-circle me-1"></i>Go to Full Profile
-            </button>
-          </div>
-        </div>
-      </div>`;
+    // Go straight to the ferret's actual profile card — no intermediate summary.
+    resultEl.innerHTML = '';
+    loadFerretDetail(f.id);
   } catch (err) {
     if (err.message === 'unassigned' || err.message.includes('404') || err.message.includes('not found')) {
       resultEl.innerHTML = `
@@ -682,7 +653,16 @@ async function doRfidLookup(rfidOverride) {
           <i class="bi bi-exclamation-octagon-fill fs-3"></i>
           <div>
             <div class="fw-bold">Unassigned</div>
-            <div class="small">No ferret is currently assigned to chip <code>${val}</code>.</div>
+            <div class="small">No ferret is currently assigned to a chip ending in <code>${val}</code>.</div>
+          </div>
+        </div>`;
+    } else if (err.message.includes('Multiple active chips')) {
+      resultEl.innerHTML = `
+        <div class="alert alert-warning d-flex align-items-center gap-3" style="max-width:560px;border-radius:12px;">
+          <i class="bi bi-exclamation-triangle-fill fs-3"></i>
+          <div>
+            <div class="fw-bold">Multiple Matches</div>
+            <div class="small">${err.message}</div>
           </div>
         </div>`;
     } else {

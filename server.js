@@ -1,4 +1,4 @@
-// SanusBio v1.8.2 | 2026-07-01 | server.js
+// SanusBio v1.8.4 | 2026-07-08 | server.js
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -903,8 +903,13 @@ app.listen(PORT, () => {
 });
 // ─── RFID ─────────────────────────────────────────────────────────────────────
 
-// Lookup ferret by RFID chip value
+// Lookup ferret by RFID chip value.
+// All 15 digits are still stored internally (rfid_assignment.rfid), but a person only
+// needs to enter/scan the last 6 digits to find the ferret — we match on that suffix so
+// a full 15-digit scan (USB wedge / NFC) and a manually-typed 6-digit lookup both work.
 app.get('/api/rfid/lookup/:rfid', authenticate, require_perm('read'), async (req, res) => {
+  const input = req.params.rfid.trim();
+  if (input.length < 6) return res.status(400).json({ error: 'Please enter at least the last 6 digits of the RFID chip.' });
   try {
     const [rows] = await pool.query(`
       SELECT ra.rfid, ra.assigned_date, ra.reason, ra.notes,
@@ -917,10 +922,13 @@ app.get('/api/rfid/lookup/:rfid', authenticate, require_perm('read'), async (req
       JOIN ferret_qr005 f ON ra.ferret_id = f.Ferret_QR005_id
       LEFT JOIN address  a ON f.address_id  = a.address_id
       LEFT JOIN supplier s ON f.supplier_id = s.supplier_id
-      WHERE ra.rfid = ? AND ra.unassigned_date IS NULL
-      LIMIT 1
-    `, [req.params.rfid.trim()]);
+      WHERE RIGHT(ra.rfid, 6) = RIGHT(?, 6) AND ra.unassigned_date IS NULL
+    `, [input]);
     if (!rows.length) return res.status(404).json({ error: 'unassigned' });
+    const distinctFerretIds = [...new Set(rows.map(r => r.id))];
+    if (distinctFerretIds.length > 1) {
+      return res.status(409).json({ error: 'Multiple active chips share those last 6 digits. Please enter more digits of the RFID chip.' });
+    }
     res.json(rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
