@@ -1,4 +1,4 @@
-// SanusBio v1.8.0 | 2026-06-27 | app-medical.js
+// SanusBio v1.8.6 | 2026-07-10 | app-medical.js
 // Health Events, Vaccinations, Litters, Medical Info, Procedures
 
 // ─── Health Event Modal ───────────────────────────────────────────────────────
@@ -238,9 +238,6 @@ function openMedModal(ferretId, medInfoId) {
   document.getElementById('medInfoId').value = medInfoId;
   document.getElementById('medSpayed').value = 'n';
   document.getElementById('medSpayDate').value = '';
-  document.getElementById('medExamDate').value = today();
-  document.getElementById('medPerformedBy').value = '';
-  document.getElementById('medExamLog').value = '';
   document.getElementById('medOrders').value = '';
   document.getElementById('medTreatments').value = '';
   new bootstrap.Modal(document.getElementById('medModal')).show();
@@ -253,14 +250,41 @@ async function submitMedicalInfo() {
       method: 'PUT', body: {
         castrated_or_spayed: document.getElementById('medSpayed').value,
         castration_or_spay_date: document.getElementById('medSpayDate').value || null,
-        last_exam_date: document.getElementById('medExamDate').value || null,
-        performed_by: document.getElementById('medPerformedBy').value || null,
-        exam_log: document.getElementById('medExamLog').value || null,
         orders: document.getElementById('medOrders').value || null,
         treatments: document.getElementById('medTreatments').value || null
       }
     });
     bootstrap.Modal.getInstance(document.getElementById('medModal')).hide();
+    loadFerretDetail(ferretId);
+  } catch (err) { alert(err.message); }
+}
+
+// ─── Exam / Health Check Notes ────────────────────────────────────────────────
+function openExamNoteModal(ferretId) {
+  document.getElementById('enFerretId').value = ferretId;
+  document.getElementById('enDate').value = today();
+  document.getElementById('enWeight').value = '';
+  document.getElementById('enStatus').value = '';
+  document.getElementById('enPerformedBy').value = '';
+  document.getElementById('enNotes').value = '';
+  new bootstrap.Modal(document.getElementById('examNoteModal')).show();
+}
+
+async function submitExamNote() {
+  const ferretId = document.getElementById('enFerretId').value;
+  const exam_date = document.getElementById('enDate').value;
+  if (!exam_date) return alert('Exam date is required.');
+  try {
+    await api(`/ferrets/${ferretId}/exam-notes`, {
+      method: 'POST', body: {
+        exam_date,
+        weight_grams: document.getElementById('enWeight').value || null,
+        status: document.getElementById('enStatus').value || null,
+        notes: document.getElementById('enNotes').value || null,
+        performed_by: document.getElementById('enPerformedBy').value || null
+      }
+    });
+    bootstrap.Modal.getInstance(document.getElementById('examNoteModal')).hide();
     loadFerretDetail(ferretId);
   } catch (err) { alert(err.message); }
 }

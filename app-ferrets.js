@@ -1,4 +1,4 @@
-// SanusBio v1.8.6 | 2026-07-20 | app-ferrets.js
+// SanusBio v1.8.6 | 2026-07-10 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
@@ -139,13 +139,14 @@ async function loadFerretDetail(id) {
   const el = document.getElementById('ferretDetail');
   el.innerHTML = '<div class="text-center py-5 text-muted"><div class="spinner-border" role="status"></div></div>';
   try {
-    const [f, health, vacc, litters, history, repro] = await Promise.all([
+    const [f, health, vacc, litters, history, repro, examNotes] = await Promise.all([
       api(`/ferrets/${id}`),
       api(`/ferrets/${id}/health`),
       api(`/ferrets/${id}/vaccinations`),
       api(`/ferrets/${id}/litters`),
       api(`/ferrets/${id}/history`),
-      api(`/ferrets/${id}/reproductive`).catch(() => [])
+      api(`/ferrets/${id}/reproductive`).catch(() => []),
+      api(`/ferrets/${id}/exam-notes`).catch(() => [])
     ]);
     const isAdmin = roleIs('admin', 'research');
     const isMat = roleIs('admin', 'maternity');
@@ -382,14 +383,27 @@ async function loadFerretDetail(id) {
           <strong>${f.castrated_or_spayed === 'y' ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>'}</strong></div>
         <div class="col-md-4"><span class="text-muted small d-block">Date</span><strong>${fmtDate(f.castration_or_spay_date)}</strong></div>
       </div>
-      <h6 class="fw-semibold text-muted small text-uppercase mb-2">Last Exam</h6>
       <div class="row g-3 mb-3">
-        <div class="col-md-4"><span class="text-muted small d-block">Exam Date</span><strong>${fmtDate(f.last_exam_date)}</strong></div>
-        <div class="col-md-4"><span class="text-muted small d-block">Performed By</span><strong>${f.performed_by || '—'}</strong></div>
         <div class="col-md-4"><span class="text-muted small d-block">Treatments</span><strong>${f.treatments || '—'}</strong></div>
         <div class="col-md-4"><span class="text-muted small d-block">Orders</span><strong>${f.orders || '—'}</strong></div>
-        ${f.exam_log ? `<div class="col-12"><span class="text-muted small d-block">Exam Notes</span><div class="border rounded p-2 bg-light small" style="white-space:pre-wrap">${f.exam_log}</div></div>` : ''}
       </div>
+      <div class="d-flex align-items-center mb-2">
+        <h6 class="fw-semibold text-muted small text-uppercase mb-0">Exam / Health Check History</h6>
+        <button class="btn btn-sm btn-primary ms-auto" onclick="openExamNoteModal(${id})"><i class="bi bi-plus-lg me-1"></i>Add Exam Note</button>
+      </div>
+      ${examNotes.length ? `
+      <div class="d-flex flex-column gap-2 mb-3">
+        ${examNotes.map(n => `
+          <div class="border rounded p-3 bg-light">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+              <strong>${fmtDate(n.exam_date)}</strong>
+              ${n.weight_grams != null ? `<span class="badge bg-secondary">${n.weight_grams} g</span>` : ''}
+              ${n.status ? `<span class="badge bg-info text-dark">${n.status}</span>` : ''}
+              ${n.performed_by ? `<span class="text-muted small ms-auto">By: ${n.performed_by}</span>` : ''}
+            </div>
+            ${n.notes ? `<div class="small" style="white-space:pre-wrap;line-height:1.6">${n.notes}</div>` : ''}
+          </div>`).join('')}
+      </div>` : `<p class="text-muted small">No exam notes recorded yet.</p>`}
       <h6 class="fw-semibold text-muted small text-uppercase mb-2">Surgical Procedure Log</h6>
       ${f.surgical_procedure_log
           ? `<div class="border rounded p-3 bg-light small" style="white-space:pre-wrap;line-height:1.7">${f.surgical_procedure_log}</div>`

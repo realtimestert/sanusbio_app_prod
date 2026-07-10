@@ -541,6 +541,55 @@ app.put('/api/ferrets/:id/medical', authenticate, require_perm('update'), async 
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ─── Exam / Health Check Notes (full dated history) ───────────────────────────
+app.get('/api/ferrets/:id/exam-notes', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT * FROM exam_note WHERE ferret_id = ? ORDER BY exam_date DESC, exam_note_id DESC',
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/ferrets/:id/exam-notes', authenticate, require_perm('update'), async (req, res) => {
+  const { exam_date, weight_grams, status, notes, performed_by } = req.body;
+  if (!exam_date) return res.status(400).json({ error: 'exam_date is required' });
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[ferret]] = await conn.query(
+      'SELECT medical_info_id, ferret_name FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]
+    );
+    if (!ferret) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Ferret not found' }); }
+
+    const wt = (weight_grams != null && weight_grams !== '') ? parseInt(weight_grams) : null;
+
+    const [r] = await conn.query(
+      'INSERT INTO exam_note (ferret_id, exam_date, weight_grams, status, notes, performed_by, recorded_by) VALUES (?,?,?,?,?,?,?)',
+      [req.params.id, exam_date, wt, status || null, notes || null, performed_by || null, req.user.username]
+    );
+
+    // Keep medical_info's "current status" fields synced to the latest note
+    await conn.query(
+      'UPDATE medical_info SET last_exam_date = ?, performed_by = ?, exam_log = ? WHERE medical_info_id = ?',
+      [exam_date, performed_by || null, notes || null, ferret.medical_info_id]
+    );
+
+    if (wt != null && !isNaN(wt)) {
+      await conn.query('UPDATE ferret_qr005 SET weight = ? WHERE Ferret_QR005_id = ?', [wt, req.params.id]);
+    }
+
+    await conn.commit();
+    await log_activity(req.user.user_id, 'EXAM_NOTE', 'exam_note', req.params.id,
+      `Exam note recorded for ${ferret.ferret_name} on ${exam_date}`);
+    res.json({ id: r.insertId, message: 'Exam note recorded' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
+});
+
 app.post('/api/ferrets/:id/procedure', authenticate, require_perm('update'), async (req, res) => {
   const { procedure_name, procedure_date, performed_by, notes } = req.body;
   if (!procedure_name || !procedure_date) return res.status(400).json({ error: 'procedure_name and procedure_date are required' });

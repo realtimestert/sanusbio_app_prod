@@ -1098,15 +1098,6 @@
             <div class="col-6"><label class="form-label">Spay / Castration Date</label><input id="medSpayDate"
                 type="date" class="form-control"></div>
           </div>
-          <h6 class="fw-semibold mb-2">Last Exam</h6>
-          <div class="row g-2 mb-3">
-            <div class="col-6"><label class="form-label">Exam Date</label><input id="medExamDate" type="date"
-                class="form-control"></div>
-            <div class="col-6"><label class="form-label">Performed By</label><input id="medPerformedBy"
-                class="form-control"></div>
-            <div class="col-12"><label class="form-label">Exam Notes</label><textarea id="medExamLog"
-                class="form-control" rows="2"></textarea></div>
-          </div>
           <h6 class="fw-semibold mb-2">Orders / Treatments</h6>
           <div class="row g-2">
             <div class="col-12"><label class="form-label">Orders</label><input id="medOrders" class="form-control">
@@ -1154,31 +1145,38 @@
   </div>
 
   <!-- Assignment Modal -->
-  <div class="modal fade" id="assignModal" tabindex="-1">
+  <!-- Exam / Health Check Note Modal -->
+  <div class="modal fade" id="examNoteModal" tabindex="-1">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Create Assignment</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+          <h5 class="modal-title">Add Exam / Health Check Note</h5><button class="btn-close"
+            data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <div class="mb-2"><label class="form-label">Assign To</label><select id="aAssignTo"
-              class="form-select"></select></div>
-          <div class="mb-2"><label class="form-label">Type</label>
-            <select id="aType" class="form-select">
-              <option value="cleaning">Cleaning</option>
-              <option value="feeding">Feeding</option>
-              <option value="health_check">Health Check</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-          <div class="mb-2"><label class="form-label">Description</label><textarea id="aDesc" class="form-control"
-              rows="3"></textarea></div>
-          <div class="mb-2"><label class="form-label">Due Date</label><input id="aDue" type="date" class="form-control">
+          <input type="hidden" id="enFerretId">
+          <div class="row g-2">
+            <div class="col-md-6"><label class="form-label">Exam Date <span class="text-danger">*</span></label>
+              <input id="enDate" type="date" class="form-control">
+            </div>
+            <div class="col-md-6"><label class="form-label">Weight (g)</label>
+              <input id="enWeight" type="number" class="form-control" placeholder="Optional">
+            </div>
+            <div class="col-12"><label class="form-label">Status</label>
+              <input id="enStatus" class="form-control" placeholder="e.g. BAR, Active">
+            </div>
+            <div class="col-12"><label class="form-label">Performed By</label>
+              <input id="enPerformedBy" class="form-control">
+            </div>
+            <div class="col-12"><label class="form-label">Notes</label>
+              <textarea id="enNotes" class="form-control" rows="5"
+                placeholder="Detailed exam / health check notes…"></textarea>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button class="btn btn-primary" onclick="submitAssign()">Create Assignment</button>
+          <button class="btn btn-primary" onclick="submitExamNote()">Save Note</button>
         </div>
       </div>
     </div>
