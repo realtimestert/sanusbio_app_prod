@@ -362,10 +362,16 @@ async function deleteReproEvent(ferretId, eventId) {
 
 // ─── Mating Restrictions ──────────────────────────────────────────────────────
 async function saveMatingRestriction(ferretId) {
-  const text = document.getElementById('matingRestrictionText').value;
+  const flags = [...document.querySelectorAll('.mr-flag:checked')].map(el => el.value);
+  const otherText = flags.includes('other')
+    ? (document.getElementById('matingRestrictionText')?.value.trim() || '')
+    : '';
   try {
     await api(`/ferrets/${ferretId}/mating-restriction`, {
-      method: 'PUT', body: { mating_restriction: text || null }
+      method: 'PUT', body: {
+        mating_restriction_flags: flags.length ? flags.join(',') : null,
+        mating_restriction: otherText || null
+      }
     });
     document.getElementById('matingRestrictionSaved').style.display = '';
     setTimeout(() => { const el = document.getElementById('matingRestrictionSaved'); if (el) el.style.display = 'none'; }, 2500);

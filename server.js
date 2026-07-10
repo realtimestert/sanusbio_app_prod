@@ -1,4 +1,4 @@
-// SanusBio v1.8.5 | 2026-07-08 | server.js
+// SanusBio v1.8.6 | 2026-07-10 | server.js
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -1371,11 +1371,14 @@ app.get('/api/females/estrus', authenticate, require_perm('read'), async (req, r
 
 // Update mating restriction for a ferret
 app.put('/api/ferrets/:id/mating-restriction', authenticate, require_perm('update'), async (req, res) => {
-  const { mating_restriction } = req.body;
+  const { mating_restriction_flags, mating_restriction } = req.body;
   try {
+    const flagsStr = Array.isArray(mating_restriction_flags)
+      ? mating_restriction_flags.join(',')
+      : (mating_restriction_flags || null);
     await pool.query(
-      'UPDATE ferret_qr005 SET mating_restriction = ? WHERE Ferret_QR005_id = ?',
-      [mating_restriction || null, req.params.id]
+      'UPDATE ferret_qr005 SET mating_restriction_flags = ?, mating_restriction = ? WHERE Ferret_QR005_id = ?',
+      [flagsStr || null, mating_restriction || null, req.params.id]
     );
     await log_activity(req.user.user_id, 'UPDATE', 'ferret_qr005', req.params.id,
       `Mating restriction updated for ferret #${req.params.id}`);

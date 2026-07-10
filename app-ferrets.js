@@ -1,4 +1,4 @@
-// SanusBio v1.8.4 | 2026-07-08 | app-ferrets.js
+// SanusBio v1.8.6 | 2026-07-20 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
@@ -463,26 +463,52 @@ async function loadFerretDetail(id) {
     </div>` : ''}
 
     <!-- Mating Restrictions -->
-    ${canUpdate() ? `
+    ${canUpdate() ? (function () {
+        const activeFlags = (f.mating_restriction_flags || '').split(',').map(s => s.trim()).filter(Boolean);
+        const chk = flag => activeFlags.includes(flag) ? 'checked' : '';
+        return `
     <div id="tMatingRestriction" class="tab-pane">
       <div class="card p-4" style="max-width:640px">
         <h6 class="fw-semibold mb-1">Mating Restrictions</h6>
-        <p class="text-muted small mb-3">Document any restrictions on mating this ferret (e.g. genetic concerns, health status, pairing exclusions).</p>
-        <textarea id="matingRestrictionText" class="form-control mb-3" rows="6"
-          placeholder="Describe any mating restrictions…">${f.mating_restriction || ''}</textarea>
-        <div class="d-flex align-items-center gap-3">
+        <p class="text-muted small mb-3">Select any restrictions that make this ferret ineligible for mating.</p>
+
+        <div class="form-check mb-2">
+          <input class="form-check-input mr-flag" type="checkbox" value="over_age" id="mrOverAge" ${chk('over_age')}>
+          <label class="form-check-label" for="mrOverAge">Over Age</label>
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input mr-flag" type="checkbox" value="under_age" id="mrUnderAge" ${chk('under_age')}>
+          <label class="form-check-label" for="mrUnderAge">Under Age</label>
+        </div>
+        ${f.sex === 'male' ? `
+        <div class="form-check mb-2">
+          <input class="form-check-input mr-flag" type="checkbox" value="albino" id="mrAlbino" ${chk('albino')}>
+          <label class="form-check-label" for="mrAlbino">Albino</label>
+        </div>` : ''}
+        <div class="form-check mb-2">
+          <input class="form-check-input mr-flag" type="checkbox" value="other" id="mrOther" onchange="toggleMrOtherBox()" ${chk('other')}>
+          <label class="form-check-label" for="mrOther">Other</label>
+        </div>
+
+        <div id="mrOtherBox" style="display:${chk('other') ? '' : 'none'}">
+          <textarea id="matingRestrictionText" class="form-control mt-2 mb-3" rows="4"
+            placeholder="Describe the restriction…">${f.mating_restriction || ''}</textarea>
+        </div>
+
+        <div class="d-flex align-items-center gap-3 mt-2">
           <button class="btn btn-primary" onclick="saveMatingRestriction(${id})"><i class="bi bi-floppy me-1"></i>Save</button>
           <span id="matingRestrictionSaved" class="text-success small" style="display:none"><i class="bi bi-check2 me-1"></i>Saved</span>
         </div>
       </div>
-    </div>` : ''}
+    </div>`;
+      })() : ''}
 
     <!-- History -->
     <div id="tHistory" class="tab-pane">
       <div class="timeline ps-2">
         ${history.length ? history.map(h => {
-          const { icon, color } = historyMeta(h.action);
-          return `
+        const { icon, color } = historyMeta(h.action);
+        return `
         <div class="d-flex gap-3 mb-3 align-items-start">
           <div class="history-icon bg-${color} bg-opacity-10 text-${color}">${icon}</div>
           <div class="flex-grow-1">
@@ -494,7 +520,7 @@ async function loadFerretDetail(id) {
             ${h.details ? `<div class="text-muted small mt-1">${h.details}</div>` : ''}
           </div>
         </div>`;
-        }).join('') : '<p class="text-muted small">No history yet.</p>'}
+      }).join('') : '<p class="text-muted small">No history yet.</p>'}
       </div>
     </div>
 
@@ -535,6 +561,11 @@ function historyMeta(action) {
     LOGIN: { icon: '🔑', color: 'secondary' },
   };
   return map[action] || { icon: '•', color: 'secondary' };
+}
+
+function toggleMrOtherBox() {
+  const checked = document.getElementById('mrOther').checked;
+  document.getElementById('mrOtherBox').style.display = checked ? '' : 'none';
 }
 
 // ─── RFID ─────────────────────────────────────────────────────────────────────
