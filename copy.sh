@@ -1,1 +1,6 @@
+# Windows
 scp C:\Users\istew\sanusbio_app_prod\sanusbio_app_prod\index.html bazzite@100.126.146.37:~/sanusbio-app/index.html
+
+
+# Cachyos
+scp -i ~/.ssh/sshcachy index.html bazzite@100.126.146.37:~/sanusbio-app/index.html

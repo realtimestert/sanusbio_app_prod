@@ -1,4 +1,4 @@
-<!-- SanusBio v1.8.4 | 2026-07-08 -->
+<!-- SanusBio v1.8.7 | 2026-07-14 -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -44,7 +44,6 @@
       <nav class="nav flex-column pt-2 px-1 gap-1" id="navLinks">
         <a class="nav-link" href="#" data-page="dashboard"><i class="bi bi-speedometer2"></i>Dashboard</a>
         <a class="nav-link" href="#" data-page="ferrets"><i class="bi bi-grid-3x3-gap"></i>Ferrets</a>
-        <a class="nav-link" href="#" data-page="rfid-lookup"><i class="bi bi-broadcast"></i>RFID Lookup</a>
         <a class="nav-link" href="#" data-page="litters"><i class="bi bi-egg"></i>Litters</a>
         <a class="nav-link" href="#" data-page="locations"><i class="bi bi-geo-alt"></i>Locations</a>
         <a class="nav-link" href="#" data-page="suppliers"><i class="bi bi-truck"></i>Suppliers</a>
@@ -70,25 +69,50 @@
           <h4><i class="bi bi-speedometer2 me-2"></i>Dashboard</h4>
         </div>
         <div id="statCards" class="row g-3 mb-4"></div>
-        <div class="card" id="dashActivityCard">
-          <div class="card-header bg-white fw-semibold py-3">Recent Activity</div>
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>User</th>
-                  <th>Action</th>
-                  <th>Details</th>
-                </tr>
-              </thead>
-              <tbody id="dashActivity"></tbody>
-            </table>
+
+        <!-- Ferret Lookup (all roles except cleaner) -->
+        <div class="row g-3 mb-4 hide-cleaner" id="dashLookupRow">
+          <div class="col-md-6">
+            <div class="card h-100 shadow-sm">
+              <div class="card-body p-4">
+                <label class="fw-bold fs-6 d-block mb-1"><i class="bi bi-search me-1 text-primary"></i>Find Ferret by Name</label>
+                <p class="text-muted small mb-2">Search by ferret name or animal ID.</p>
+                <div class="input-group">
+                  <input id="dashNameLookupInput" class="form-control" placeholder="Ferret name or animal ID"
+                    autocomplete="off" onkeydown="if(event.key==='Enter') doDashNameLookup()">
+                  <button class="btn btn-primary" onclick="doDashNameLookup()"><i class="bi bi-search me-1"></i>Look Up</button>
+                </div>
+                <div id="dashNameLookupResult" class="mt-3"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card h-100 shadow-sm">
+              <div class="card-body p-4">
+                <label class="fw-bold fs-6 d-block mb-1"><i class="bi bi-broadcast me-1 text-primary"></i>Find Ferret by RFID</label>
+                <p class="text-muted small mb-2">Enter the <strong>last 6 digits</strong> of the RFID chip, or scan.</p>
+                <div id="dashNfcStatusBanner" class="alert alert-info py-2 small mb-2 d-none"></div>
+                <div class="input-group mb-2">
+                  <input id="dashRfidLookupInput" class="form-control font-monospace" placeholder="e.g. 3C4D5E"
+                    maxlength="15" autocomplete="off" onkeydown="if(event.key==='Enter') doDashRfidLookup()">
+                  <button class="btn btn-primary" onclick="doDashRfidLookup()"><i class="bi bi-search me-1"></i>Look Up</button>
+                </div>
+                <div id="dashNfcScanWrap" class="d-none mb-2">
+                  <div class="d-flex align-items-center gap-3">
+                    <button id="dashNfcScanBtn" class="btn btn-outline-primary btn-sm" onclick="toggleDashNfcScan()">
+                      <i class="bi bi-broadcast me-1"></i>Start NFC Scan
+                    </button>
+                    <span id="dashNfcScanStatus" class="text-muted small"></span>
+                  </div>
+                </div>
+                <div id="dashRfidLookupResult"></div>
+              </div>
+            </div>
           </div>
         </div>
 
         <!-- Estrus / Reproductive Status Board -->
-        <div class="card mt-4" id="dashEstrусCard" style="display:none">
+        <div class="card" id="dashEstrusCard" style="display:none">
           <div class="card-header bg-white d-flex align-items-center py-3">
             <span class="fw-semibold"><i class="bi bi-heart-fill text-danger me-2"></i>Female Reproductive Status
               Board</span>
@@ -167,58 +191,6 @@
         <button class="btn btn-outline-secondary btn-sm mb-3" onclick="nav('ferrets')"><i
             class="bi bi-arrow-left me-1"></i>Back</button>
         <div id="ferretDetail"></div>
-      </div>
-
-      <!-- RFID Lookup -->
-      <div id="page-rfid-lookup" class="page">
-        <div class="page-header">
-          <h4><i class="bi bi-broadcast me-2"></i>RFID Lookup</h4>
-        </div>
-
-        <!-- NFC / manual input card -->
-        <div class="card mb-4 shadow-sm" style="border-radius:14px; max-width:560px;">
-          <div class="card-body p-4">
-
-            <!-- Web NFC status banner -->
-            <div id="nfcStatusBanner" class="alert alert-info py-2 small mb-3 d-none"></div>
-
-            <!-- Manual / USB wedge input -->
-            <div class="mb-3">
-              <label class="fw-bold fs-6 d-block mb-1"><i class="bi bi-upc-scan me-1"></i>Enter Last 6 Digits of
-                RFID</label>
-              <p class="text-muted small mb-2">
-                All 15 digits of each chip are still stored — but you only need to type the
-                <strong>last 6 digits</strong> to find a ferret. A full scan from a USB RFID wedge reader or the
-                NFC button below also works.
-              </p>
-              <div class="input-group">
-                <input id="rfidLookupInput" class="form-control font-monospace" placeholder="e.g. 3C4D5E" maxlength="15"
-                  autocomplete="off" onkeydown="if(event.key==='Enter') doRfidLookup()">
-                <button class="btn btn-primary" onclick="doRfidLookup()">
-                  <i class="bi bi-search me-1"></i>Look Up
-                </button>
-              </div>
-            </div>
-
-            <!-- Web NFC scan button (shown only on compatible browsers) -->
-            <div id="nfcScanWrap" class="d-none">
-              <hr class="my-3">
-              <div class="d-flex align-items-center gap-3">
-                <button id="nfcScanBtn" class="btn btn-outline-primary" onclick="toggleNfcScan()">
-                  <i class="bi bi-broadcast me-1"></i>Start NFC Scan
-                </button>
-                <span id="nfcScanStatus" class="text-muted small"></span>
-              </div>
-              <div class="text-muted small mt-2">
-                Hold an RFID/NFC chip near the reader. Supported on Android Chrome with an NFC-capable device.
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        <!-- Result area -->
-        <div id="rfidLookupResult"></div>
       </div>
 
       <!-- Litters -->

@@ -1,4 +1,4 @@
-// SanusBio v1.8.0 | 2026-06-27 | app-core.js
+// SanusBio v1.8.7 | 2026-07-14 | app-core.js
 // State, API, Auth, Init, Navigation, Dashboard, Helpers
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -70,6 +70,7 @@ function initApp() {
  <span class="badge role-${USER.role} role-badge">${USER.role}</span>`;
   if (USER.role !== 'admin') document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
   if (!['admin', 'research'].includes(USER.role)) document.querySelectorAll('.admin-research-only').forEach(el => el.style.display = 'none');
+  if (USER.role === 'cleaner') document.querySelectorAll('.hide-cleaner').forEach(el => el.style.display = 'none');
   document.getElementById('navLinks').querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', e => { e.preventDefault(); nav(link.dataset.page); });
   });
@@ -88,7 +89,7 @@ function nav(page) {
     dashboard: loadDashboard, ferrets: loadFerrets, litters: loadLitters,
     locations: loadLocations, suppliers: loadSuppliers, assignments: loadAssignments,
     users: loadUsers, activity: loadActivity, 'cleaning-reports': loadCleaningReports,
-    distribution: loadDistribution, 'rfid-lookup': loadRfidLookupPage
+    distribution: loadDistribution
   };
   if (loaders[page]) loaders[page]();
 }
@@ -109,21 +110,13 @@ async function loadDashboard() {
       <div><div class="fs-3 fw-bold">${s.val}</div><div class="text-muted small">${s.label}</div></div>
     </div>
   </div>`).join('');
-    const activityCard = document.getElementById('dashActivityCard');
-    if (roleIs('admin')) {
-      activityCard.style.display = '';
-      document.getElementById('dashActivity').innerHTML = d.recent_activity.map(a => `
-    <tr>
-      <td class="text-muted small">${fmtDT(a.created_at)}</td>
-      <td><strong>${a.username}</strong></td>
-      <td><span class="badge bg-secondary action-type">${a.action}</span></td>
-      <td class="small">${a.details || ''}</td>
-    </tr>`).join('') || '<tr><td colspan="4" class="text-muted text-center py-3">No activity yet</td></tr>';
-    } else { activityCard.style.display = 'none'; }
   } catch (err) { console.error(err); }
 
+  // Ferret lookup — all roles except cleaner
+  if (USER?.role !== 'cleaner' && typeof initDashLookups === 'function') initDashLookups();
+
   // Estrus board — show to maternity, admin, research
-  const estrusCard = document.getElementById('dashEstrусCard');
+  const estrusCard = document.getElementById('dashEstrusCard');
   if (estrusCard && roleIs('admin', 'research', 'maternity')) {
     estrusCard.style.display = '';
     try {
@@ -133,11 +126,11 @@ async function loadDashboard() {
         tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-3">No females currently tracked</td></tr>';
       } else {
         const statusMeta = {
-          estrus: { label: 'In Estrus', color: 'danger' },
-          mated: { label: 'Mated', color: 'warning' },
-          littered: { label: 'Littered', color: 'success' },
-          weaned: { label: 'Weaned', color: 'info' },
-          baseline: { label: 'Baseline', color: 'secondary' },
+          estrus:   { label: 'In Estrus',  color: 'danger' },
+          mated:    { label: 'Mated',       color: 'warning' },
+          littered: { label: 'Littered',    color: 'success' },
+          weaned:   { label: 'Weaned',      color: 'info' },
+          baseline: { label: 'Baseline',    color: 'secondary' },
         };
         tbody.innerHTML = females.map(f => {
           const m = statusMeta[f.female_status] || statusMeta.baseline;

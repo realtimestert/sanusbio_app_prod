@@ -1,4 +1,4 @@
-// SanusBio v1.8.6 | 2026-07-10 | app-ferrets.js
+// SanusBio v1.8.7 | 2026-07-14 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
@@ -656,104 +656,133 @@ async function unassignRfid(ferretId) {
   } catch (err) { alert(err.message); }
 }
 
-// ─── RFID Lookup Page ─────────────────────────────────────────────────────────
+// ─── Dashboard Ferret Lookup (Name + RFID) ────────────────────────────────────
 let _nfcReader = null, _nfcActive = false;
 
-function loadRfidLookupPage() {
-  document.getElementById('rfidLookupResult').innerHTML = '';
-  document.getElementById('rfidLookupInput').value = '';
-  document.getElementById('nfcStatusBanner').classList.add('d-none');
+function initDashLookups() {
+  const nameInput = document.getElementById('dashNameLookupInput');
+  const rfidInput = document.getElementById('dashRfidLookupInput');
+  if (!nameInput || !rfidInput) return;
 
+  document.getElementById('dashNameLookupResult').innerHTML = '';
+  nameInput.value = '';
+  document.getElementById('dashRfidLookupResult').innerHTML = '';
+  rfidInput.value = '';
+
+  const banner = document.getElementById('dashNfcStatusBanner');
+  banner.classList.add('d-none');
   if ('NDEFReader' in window) {
-    document.getElementById('nfcScanWrap').classList.remove('d-none');
-    document.getElementById('nfcStatusBanner').textContent = '✅ Web NFC is supported on this device.';
-    document.getElementById('nfcStatusBanner').className = 'alert alert-success py-2 small mb-3';
-    document.getElementById('nfcStatusBanner').classList.remove('d-none');
+    document.getElementById('dashNfcScanWrap').classList.remove('d-none');
+    banner.textContent = '✅ Web NFC is supported on this device.';
+    banner.className = 'alert alert-success py-2 small mb-2';
+    banner.classList.remove('d-none');
   } else {
-    document.getElementById('nfcScanWrap').classList.add('d-none');
-    document.getElementById('nfcStatusBanner').innerHTML =
-      '⚠️ Web NFC is not available in this browser. Use a USB RFID wedge reader or type the chip value manually. ' +
-      '<strong>Web NFC requires Android Chrome with NFC hardware.</strong>';
-    document.getElementById('nfcStatusBanner').className = 'alert alert-warning py-2 small mb-3';
-    document.getElementById('nfcStatusBanner').classList.remove('d-none');
+    document.getElementById('dashNfcScanWrap').classList.add('d-none');
+    banner.innerHTML = '⚠️ Web NFC is not available in this browser. Use a USB RFID wedge reader or type the chip value manually.';
+    banner.className = 'alert alert-warning py-2 small mb-2';
+    banner.classList.remove('d-none');
   }
-
-  setTimeout(() => document.getElementById('rfidLookupInput')?.focus(), 100);
 }
 
-async function doRfidLookup(rfidOverride) {
-  const val = (rfidOverride || document.getElementById('rfidLookupInput').value).trim();
+async function doDashNameLookup() {
+  const val = document.getElementById('dashNameLookupInput').value.trim();
   if (!val) return;
-  const resultEl = document.getElementById('rfidLookupResult');
-  resultEl.innerHTML = '<div class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm me-2"></div>Looking up…</div>';
+  const resultEl = document.getElementById('dashNameLookupResult');
+  resultEl.innerHTML = '<div class="text-center text-muted py-2"><div class="spinner-border spinner-border-sm me-2"></div>Searching…</div>';
+  try {
+    const matches = await api('/ferrets?search=' + encodeURIComponent(val));
+    if (!matches.length) {
+      resultEl.innerHTML = `
+        <div class="alert alert-danger d-flex align-items-center gap-2 py-2 small mb-0">
+          <i class="bi bi-exclamation-octagon-fill"></i>
+          <div>No ferret found matching "${val}".</div>
+        </div>`;
+    } else if (matches.length === 1) {
+      resultEl.innerHTML = '';
+      loadFerretDetail(matches[0].id);
+    } else {
+      resultEl.innerHTML = `
+        <div class="text-muted small mb-2">${matches.length} matches — pick one:</div>
+        <div class="list-group">
+          ${matches.slice(0, 8).map(f => `
+            <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+              onclick="loadFerretDetail(${f.id})">
+              <span><strong>${f.name}</strong> ${f.animal_id ? `<span class="text-muted small">· ID ${f.animal_id}</span>` : ''}</span>
+              <i class="bi bi-chevron-right text-muted"></i>
+            </button>`).join('')}
+        </div>`;
+    }
+  } catch (err) {
+    resultEl.innerHTML = `<div class="alert alert-warning py-2 small mb-0">Error: ${err.message}</div>`;
+  }
+}
+
+async function doDashRfidLookup(rfidOverride) {
+  const val = (rfidOverride || document.getElementById('dashRfidLookupInput').value).trim();
+  if (!val) return;
+  const resultEl = document.getElementById('dashRfidLookupResult');
+  resultEl.innerHTML = '<div class="text-center text-muted py-2"><div class="spinner-border spinner-border-sm me-2"></div>Looking up…</div>';
   try {
     const f = await api(`/rfid/lookup/${encodeURIComponent(val)}`);
-    // Go straight to the ferret's actual profile card — no intermediate summary.
     resultEl.innerHTML = '';
     loadFerretDetail(f.id);
   } catch (err) {
     if (err.message === 'unassigned' || err.message.includes('404') || err.message.includes('not found')) {
       resultEl.innerHTML = `
-        <div class="alert alert-danger d-flex align-items-center gap-3" style="max-width:560px;border-radius:12px;">
-          <i class="bi bi-exclamation-octagon-fill fs-3"></i>
-          <div>
-            <div class="fw-bold">Unassigned</div>
-            <div class="small">No ferret is currently assigned to a chip ending in <code>${val}</code>.</div>
-          </div>
+        <div class="alert alert-danger d-flex align-items-center gap-2 py-2 small mb-0">
+          <i class="bi bi-exclamation-octagon-fill"></i>
+          <div>No ferret is currently assigned to a chip ending in <code>${val}</code>.</div>
         </div>`;
     } else if (err.message.includes('Multiple active chips')) {
       resultEl.innerHTML = `
-        <div class="alert alert-warning d-flex align-items-center gap-3" style="max-width:560px;border-radius:12px;">
-          <i class="bi bi-exclamation-triangle-fill fs-3"></i>
-          <div>
-            <div class="fw-bold">Multiple Matches</div>
-            <div class="small">${err.message}</div>
-          </div>
+        <div class="alert alert-warning d-flex align-items-center gap-2 py-2 small mb-0">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <div>${err.message}</div>
         </div>`;
     } else {
-      resultEl.innerHTML = `<div class="alert alert-warning" style="max-width:560px">Error: ${err.message}</div>`;
+      resultEl.innerHTML = `<div class="alert alert-warning py-2 small mb-0">Error: ${err.message}</div>`;
     }
   }
 }
 
-async function toggleNfcScan() {
+async function toggleDashNfcScan() {
   if (_nfcActive) {
     _nfcActive = false;
     _nfcReader = null;
-    document.getElementById('nfcScanBtn').innerHTML = '<i class="bi bi-broadcast me-1"></i>Start NFC Scan';
-    document.getElementById('nfcScanBtn').classList.remove('btn-danger');
-    document.getElementById('nfcScanBtn').classList.add('btn-outline-primary');
-    document.getElementById('nfcScanStatus').textContent = '';
+    document.getElementById('dashNfcScanBtn').innerHTML = '<i class="bi bi-broadcast me-1"></i>Start NFC Scan';
+    document.getElementById('dashNfcScanBtn').classList.remove('btn-danger');
+    document.getElementById('dashNfcScanBtn').classList.add('btn-outline-primary');
+    document.getElementById('dashNfcScanStatus').textContent = '';
     return;
   }
   try {
     _nfcReader = new NDEFReader();
     await _nfcReader.scan();
     _nfcActive = true;
-    document.getElementById('nfcScanBtn').innerHTML = '<i class="bi bi-stop-circle me-1"></i>Stop Scanning';
-    document.getElementById('nfcScanBtn').classList.remove('btn-outline-primary');
-    document.getElementById('nfcScanBtn').classList.add('btn-danger');
-    document.getElementById('nfcScanStatus').innerHTML = '<span class="spinner-grow spinner-grow-sm text-danger me-1"></span>Scanning… hold chip near reader';
+    document.getElementById('dashNfcScanBtn').innerHTML = '<i class="bi bi-stop-circle me-1"></i>Stop Scanning';
+    document.getElementById('dashNfcScanBtn').classList.remove('btn-outline-primary');
+    document.getElementById('dashNfcScanBtn').classList.add('btn-danger');
+    document.getElementById('dashNfcScanStatus').innerHTML = '<span class="spinner-grow spinner-grow-sm text-danger me-1"></span>Scanning…';
 
     _nfcReader.addEventListener('reading', ({ serialNumber }) => {
       const rfid = (serialNumber || '').replace(/:/g, '').toUpperCase();
       if (!rfid) return;
-      document.getElementById('rfidLookupInput').value = rfid;
-      doRfidLookup(rfid);
+      document.getElementById('dashRfidLookupInput').value = rfid;
+      doDashRfidLookup(rfid);
       _nfcActive = false;
       _nfcReader = null;
-      document.getElementById('nfcScanBtn').innerHTML = '<i class="bi bi-broadcast me-1"></i>Start NFC Scan';
-      document.getElementById('nfcScanBtn').classList.remove('btn-danger');
-      document.getElementById('nfcScanBtn').classList.add('btn-outline-primary');
-      document.getElementById('nfcScanStatus').textContent = `Read: ${rfid}`;
+      document.getElementById('dashNfcScanBtn').innerHTML = '<i class="bi bi-broadcast me-1"></i>Start NFC Scan';
+      document.getElementById('dashNfcScanBtn').classList.remove('btn-danger');
+      document.getElementById('dashNfcScanBtn').classList.add('btn-outline-primary');
+      document.getElementById('dashNfcScanStatus').textContent = `Read: ${rfid}`;
     });
 
     _nfcReader.addEventListener('error', (e) => {
-      document.getElementById('nfcScanStatus').textContent = 'NFC error: ' + e.message;
+      document.getElementById('dashNfcScanStatus').textContent = 'NFC error: ' + e.message;
       _nfcActive = false;
     });
   } catch (err) {
-    document.getElementById('nfcScanStatus').textContent = 'NFC unavailable: ' + err.message;
+    document.getElementById('dashNfcScanStatus').textContent = 'NFC unavailable: ' + err.message;
     _nfcActive = false;
   }
 }
