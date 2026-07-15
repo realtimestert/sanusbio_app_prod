@@ -1,4 +1,4 @@
-// SanusBio v1.8.6 | 2026-07-10 | server.js
+// SanusBio v1.9.0 | 2026-07-15 | server.js
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -1306,6 +1306,64 @@ function deriveStatus(events) {
   if (last.event_type === 'weaned') return 'baseline';
   return last.event_type; // estrus | mated | littered
 }
+
+// ─── Mating History (works from either the female's or the male's page) ─────
+app.get('/api/ferrets/:id/matings', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [[ferret]] = await pool.query('SELECT sex FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]);
+    if (!ferret) return res.status(404).json({ error: 'Ferret not found' });
+    const whereClause = ferret.sex === 'male'
+      ? 're.partner_id = ? AND re.event_type = \'mated\''
+      : 're.ferret_id = ? AND re.event_type = \'mated\'';
+    const [rows] = await pool.query(`
+      SELECT re.event_id, re.event_date, re.notes, re.recorded_by,
+             re.ferret_id AS female_id, f.ferret_name AS female_name,
+             re.partner_id AS male_id, m.ferret_name AS male_name
+      FROM reproductive_event re
+      JOIN ferret_qr005 f ON re.ferret_id = f.Ferret_QR005_id
+      LEFT JOIN ferret_qr005 m ON re.partner_id = m.Ferret_QR005_id
+      WHERE ${whereClause}
+      ORDER BY re.event_date DESC, re.event_id DESC
+    `, [req.params.id]);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/ferrets/:id/matings', authenticate, require_perm('update'), async (req, res) => {
+  const { partner_id, event_date, notes } = req.body;
+  if (!partner_id || !event_date) return res.status(400).json({ error: 'partner_id and event_date are required' });
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[current]] = await conn.query('SELECT ferret_name, sex FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]);
+    const [[partner]] = await conn.query('SELECT ferret_name, sex FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [partner_id]);
+    if (!current || !partner) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Ferret not found' }); }
+    if (!current.sex || !partner.sex || current.sex === partner.sex) {
+      await conn.rollback(); conn.release();
+      return res.status(400).json({ error: 'A mating requires one male and one female ferret with sex set' });
+    }
+    const femaleId = current.sex === 'female' ? req.params.id : partner_id;
+    const maleId   = current.sex === 'male'   ? req.params.id : partner_id;
+
+    const [r] = await conn.query(
+      'INSERT INTO reproductive_event (ferret_id, event_type, event_date, partner_id, notes, recorded_by) VALUES (?,?,?,?,?,?)',
+      [femaleId, 'mated', event_date, maleId, notes || null, req.user.username]
+    );
+    const [events] = await conn.query(
+      'SELECT event_type FROM reproductive_event WHERE ferret_id = ? ORDER BY event_date DESC, event_id DESC',
+      [femaleId]
+    );
+    await conn.query('UPDATE ferret_qr005 SET female_status = ? WHERE Ferret_QR005_id = ?', [deriveStatus(events), femaleId]);
+
+    await conn.commit();
+    await log_activity(req.user.user_id, 'MATING', 'reproductive_event', r.insertId,
+      `Mating recorded between ${current.ferret_name} and ${partner.ferret_name}`);
+    res.json({ id: r.insertId, message: 'Mating recorded' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
+});
 
 // Get all reproductive events for a ferret
 app.get('/api/ferrets/:id/reproductive', authenticate, require_perm('read'), async (req, res) => {

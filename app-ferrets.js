@@ -1,4 +1,4 @@
-// SanusBio v1.8.7 | 2026-07-14 | app-ferrets.js
+// SanusBio v1.9.0 | 2026-07-15 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
@@ -139,14 +139,15 @@ async function loadFerretDetail(id) {
   const el = document.getElementById('ferretDetail');
   el.innerHTML = '<div class="text-center py-5 text-muted"><div class="spinner-border" role="status"></div></div>';
   try {
-    const [f, health, vacc, litters, history, repro, examNotes] = await Promise.all([
+    const [f, health, vacc, litters, history, repro, examNotes, matings] = await Promise.all([
       api(`/ferrets/${id}`),
       api(`/ferrets/${id}/health`),
       api(`/ferrets/${id}/vaccinations`),
       api(`/ferrets/${id}/litters`),
       api(`/ferrets/${id}/history`),
       api(`/ferrets/${id}/reproductive`).catch(() => []),
-      api(`/ferrets/${id}/exam-notes`).catch(() => [])
+      api(`/ferrets/${id}/exam-notes`).catch(() => []),
+      api(`/ferrets/${id}/matings`).catch(() => [])
     ]);
     const isAdmin = roleIs('admin', 'research');
     const isMat = roleIs('admin', 'maternity');
@@ -275,6 +276,9 @@ async function loadFerretDetail(id) {
   <ul class="nav nav-tabs mb-3" role="tablist">
     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tHealth">Health Events</button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tVacc">Vaccinations</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tVacc">Vaccinations</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMating"><i class="bi bi-heart-fill me-1"></i>Mating History</button></li>
+    ${isMat && f.sex === 'female' ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tLitter">Litters</button></li>` : ''}
     ${isMat ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tLitter">Litters</button></li>` : ''}
     ${canUpdate() ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMed">Medical Info</button></li>` : ''}
     ${f.sex === 'female' ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tRepro"><i class="bi bi-heart me-1"></i>Estrus Status</button></li>` : ''}
@@ -326,6 +330,26 @@ async function loadFerretDetail(id) {
             <td>${v.notes || '—'}</td>
             <td class="text-muted">${v.recorded_by || '—'}</td>
           </tr>`).join('') : '<tr><td colspan="6" class="text-muted text-center py-3">No vaccinations</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mating History -->
+    <div id="tMating" class="tab-pane">
+      <div class="d-flex mb-2">
+        ${canUpdate() ? `<button class="btn btn-sm btn-primary ms-auto" onclick="openMatingModal(${id})"><i class="bi bi-plus-lg me-1"></i>Record Mating</button>` : ''}
+      </div>
+      <table class="table table-sm">
+        <thead><tr><th>Date</th><th>Female</th><th>Male</th><th>Notes</th><th>Recorded By</th>${roleIs('admin', 'research') ? '<th></th>' : ''}</tr></thead>
+        <tbody>${matings.length ? matings.map(m => `
+          <tr>
+            <td>${fmtDate(m.event_date)}</td>
+            <td><strong>${m.female_name}</strong></td>
+            <td><strong>${m.male_name || '—'}</strong></td>
+            <td class="small">${m.notes || '—'}</td>
+            <td class="text-muted small">${m.recorded_by || '—'}</td>
+            ${roleIs('admin', 'research') ? `<td><button class="btn btn-sm btn-outline-danger" onclick="deleteReproEvent(${m.female_id},${m.event_id})"><i class="bi bi-trash"></i></button></td>` : ''}
+          </tr>`).join('') : `<tr><td colspan="${roleIs('admin', 'research') ? 6 : 5}" class="text-muted text-center py-3">No matings recorded</td></tr>`}
         </tbody>
       </table>
     </div>

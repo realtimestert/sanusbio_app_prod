@@ -1,4 +1,4 @@
-// SanusBio v1.8.6 | 2026-07-10 | app-medical.js
+// SanusBio v1.9.0 | 2026-07-15 | app-medical.js
 // Health Events, Vaccinations, Litters, Medical Info, Procedures
 
 // ─── Health Event Modal ───────────────────────────────────────────────────────
@@ -380,6 +380,41 @@ async function deleteReproEvent(ferretId, eventId) {
   if (!confirm('Delete this reproductive event? The ferret status will be recalculated.')) return;
   try {
     await api(`/ferrets/${ferretId}/reproductive/${eventId}`, { method: 'DELETE' });
+    loadFerretDetail(ferretId);
+  } catch (err) { alert(err.message); }
+}
+
+// ─── Mating History ───────────────────────────────────────────────────────────
+async function openMatingModal(ferretId) {
+  document.getElementById('matingFerretId').value = ferretId;
+  document.getElementById('matingDate').value = today();
+  document.getElementById('matingNotes').value = '';
+  try {
+    const ferrets = await api('/ferrets');
+    const current = ferrets.find(f => f.id === ferretId);
+    if (!current?.sex) return alert("This ferret's sex must be set before recording a mating.");
+    const partnerSex = current.sex === 'male' ? 'female' : 'male';
+    const partners = ferrets.filter(f => f.sex === partnerSex && f.dead !== '1' && !f.distributed);
+    document.getElementById('matingPartnerLabel').textContent = partnerSex === 'male' ? 'Male Partner' : 'Female Partner';
+    document.getElementById('matingPartnerSelect').innerHTML =
+      '<option value="">— Select —</option>' +
+      partners.map(p => `<option value="${p.id}">${p.name} (ID: ${p.animal_id || '—'})</option>`).join('');
+    new bootstrap.Modal(document.getElementById('matingModal')).show();
+  } catch (err) { alert(err.message); }
+}
+
+async function submitMatingRecord() {
+  const ferretId = document.getElementById('matingFerretId').value;
+  const partner_id = document.getElementById('matingPartnerSelect').value;
+  const event_date = document.getElementById('matingDate').value;
+  const notes = document.getElementById('matingNotes').value.trim();
+  if (!partner_id) return alert('Please select a partner.');
+  if (!event_date) return alert('Date is required.');
+  try {
+    await api(`/ferrets/${ferretId}/matings`, {
+      method: 'POST', body: { partner_id: parseInt(partner_id), event_date, notes: notes || null }
+    });
+    bootstrap.Modal.getInstance(document.getElementById('matingModal')).hide();
     loadFerretDetail(ferretId);
   } catch (err) { alert(err.message); }
 }
