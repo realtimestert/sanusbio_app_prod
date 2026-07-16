@@ -1,4 +1,4 @@
-/* SanusBio v1.6.0 | 2026-06-25 */
+/* SanusBio v1.9.1 | 2026-07-16 | style.css */
 
 :root {
   --sidebar-w: 230px;
@@ -180,7 +180,7 @@ body {
   flex-wrap: wrap;
 }
 
-.page-header h4 {
+.page-header h2 {
   margin: 0;
   font-weight: 700;
 }
