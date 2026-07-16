@@ -1,4 +1,4 @@
-// SanusBio v1.9.0 | 2026-07-15 | app-ferrets.js
+// SanusBio v1.9.1 | 2026-07-16 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
@@ -276,10 +276,8 @@ async function loadFerretDetail(id) {
   <ul class="nav nav-tabs mb-3" role="tablist">
     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tHealth">Health Events</button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tVacc">Vaccinations</button></li>
-    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tVacc">Vaccinations</button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMating"><i class="bi bi-heart-fill me-1"></i>Mating History</button></li>
     ${isMat && f.sex === 'female' ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tLitter">Litters</button></li>` : ''}
-    ${isMat ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tLitter">Litters</button></li>` : ''}
     ${canUpdate() ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMed">Medical Info</button></li>` : ''}
     ${f.sex === 'female' ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tRepro"><i class="bi bi-heart me-1"></i>Estrus Status</button></li>` : ''}
     ${canUpdate() ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMatingRestriction">Mating Restrictions</button></li>` : ''}

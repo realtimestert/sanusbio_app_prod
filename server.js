@@ -1,4 +1,4 @@
-// SanusBio v1.9.0 | 2026-07-15 | server.js
+// SanusBio v1.9.1 | 2026-07-16 | server.js
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -1468,6 +1468,7 @@ app.get('/api/females/estrus', authenticate, require_perm('read'), async (req, r
         AND (f.distributed = 0 OR f.distributed IS NULL)
         AND (f.breeding_retired = 0 OR f.breeding_retired IS NULL)
         AND f.female_status IS NOT NULL
+        AND f.female_status <> 'baseline'
       ORDER BY
         FIELD(f.female_status, 'estrus', 'mated', 'littered', 'weaned', 'baseline'),
         re.event_date ASC
