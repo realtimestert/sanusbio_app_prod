@@ -2,8 +2,8 @@
 
 :root {
   --sidebar-w: 230px;
-  --brand: #0f3460;
-  --brand-light: #16213e;
+  --brand: #122754;
+  --brand-light: #8aa8a1;
 }
 
 body {
@@ -16,7 +16,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--brand) 0%, #1a5276 100%);
+  background: linear-gradient(135deg, var(--brand) 0%, #8aa8a1 100%);
 }
 
 #loginCard {
@@ -218,11 +218,11 @@ body {
 }
 
 .photo-upload-zone:hover {
-  border-color: #0d6efd;
+  border-color: var(--brand-light);
 }
 
 .photo-upload-zone.dragover {
-  border-color: #0d6efd;
+  border-color: var(--brand-light);
   background: #f0f4ff;
 }
 
