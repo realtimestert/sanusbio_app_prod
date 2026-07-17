@@ -1,4 +1,4 @@
-// SanusBio v1.9.1 | 2026-07-16 | app-ferrets.js
+// SanusBio v1.9.2 | 2026-07-17 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
@@ -85,11 +85,13 @@ function renderFerretGrid() {
     const vaccDue = f.next_rabies_vaccine_due &&
       new Date(f.next_rabies_vaccine_due) <= new Date(Date.now() + 30 * 864e5) && !isDistributed(f) && f.dead !== '1';
     let ageLabel;
-    if (isDeceased(f)) {
-      ageLabel = 'Lived ' + ferretAge(f.birth_date, f.death_date);
-    } else {
-      ageLabel = ferretAge(f.birth_date);
-    }
+      if (isDeceased(f)) {
+        ageLabel = 'Lived ' + ferretAge(f.birth_date, f.death_date);
+      } else if (isDistributed(f)) {
+        ageLabel = 'At distribution: ' + ferretAge(f.birth_date, f.distribution_date);
+      } else {
+        ageLabel = ferretAge(f.birth_date);
+      }
     return `
   <div class="col-md-4 col-lg-3">
     <div class="card ferret-card" onclick="loadFerretDetail(${f.id})">
@@ -256,18 +258,14 @@ async function loadFerretDetail(id) {
         <div class="d-flex align-items-center justify-content-between">
           <div>
             <span class="fw-semibold"><i class="bi bi-lightbulb me-1 text-warning"></i>8-Hour Light Schedule</span>
-            <div class="text-muted small mt-1">Ferret is on an 8-hour light cycle</div>
+            <div class="text-muted small mt-1">Set per room (Room ${f.room_id || '?'}) — manage on the Locations page.</div>
           </div>
-          ${canUpdate() ? `
-          <div class="form-check form-switch ms-3">
-            <input class="form-check-input" type="checkbox" id="eightHourLightToggle"
-              ${f.eight_hour_light ? 'checked' : ''}
-              onchange="toggleEightHourLight(${id}, this.checked)"
-              style="width:2.5em;height:1.4em;cursor:pointer;">
-          </div>` : `
-          <span class="badge ${f.eight_hour_light ? 'bg-warning text-dark' : 'bg-secondary'}">
-            ${f.eight_hour_light ? 'On' : 'Off'}
-          </span>`}
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge ${f.room_eight_hour_light ? 'bg-warning text-dark' : 'bg-secondary'}">
+              ${f.room_eight_hour_light ? 'On' : 'Off'}
+            </span>
+            ${canUpdate() ? `<button class="btn btn-sm btn-outline-secondary" onclick="nav('locations')"><i class="bi bi-geo-alt me-1"></i>Manage</button>` : ''}
+          </div>
         </div>
       </div>
     </div>
@@ -295,7 +293,7 @@ async function loadFerretDetail(id) {
       ${health.filter(h => h.event_type === 'weight' && h.weight).length > 1 ? `
       <div class="card mb-3 p-3">
         <div class="fw-semibold small mb-2 text-muted">Weight Over Time (g)</div>
-        <canvas id="weightChart" height="90"></canvas>
+        <canvas id="weightChart" height="220"></canvas>
       </div>` : ''}
       <table class="table table-sm">
         <thead><tr><th>Date</th><th>Time</th><th>Type</th><th>Weight</th><th>Notes</th><th>By</th></tr></thead>
@@ -877,17 +875,6 @@ async function loadFerretDistHistory(ferretId) {
       </table>`;
   } catch (err) {
     el.innerHTML = '<div class="text-danger small">Failed to load distribution records.</div>';
-  }
-}
-
-// ─── 8-Hour Light Toggle ──────────────────────────────────────────────────────
-async function toggleEightHourLight(ferretId, enabled) {
-  try {
-    await api(`/ferrets/${ferretId}`, { method: 'PUT', body: { eight_hour_light: enabled ? 1 : 0 } });
-  } catch (err) {
-    alert(err.message);
-    const toggle = document.getElementById('eightHourLightToggle');
-    if (toggle) toggle.checked = !enabled;
   }
 }
 

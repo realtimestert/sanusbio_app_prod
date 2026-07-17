@@ -1,4 +1,4 @@
-<!-- SanusBio v1.9.1 | 2026-07-16 | index.html -->
+<!-- SanusBio v1.9.2 | 2026-07-17 | index.html -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -230,6 +230,15 @@
             onclick="new bootstrap.Modal(document.getElementById('addrModal')).show()"><i
               class="bi bi-plus-lg me-1"></i>Add Location</button>
         </div>
+
+        <div class="card mb-3 p-3" id="roomLightCard">
+          <div class="d-flex align-items-center mb-2">
+            <span class="fw-semibold"><i class="bi bi-lightbulb me-2 text-warning"></i>Room 8-Hour Light Schedule</span>
+            <span class="text-muted small ms-2">(applies to every ferret currently in that room)</span>
+          </div>
+          <div id="roomLightList" class="d-flex flex-wrap gap-3"></div>
+        </div>
+
         <div id="locationAccordion" class="accordion"></div>
       </div>
 

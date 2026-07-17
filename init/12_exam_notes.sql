@@ -1,3 +1,7 @@
+-- SanusBio Migration 12: Exam Notes
+-- Run after 11_mating_restrictions.sql
+-- Safe to re-run
+
 USE sanusbio;
 
 SET FOREIGN_KEY_CHECKS=0;

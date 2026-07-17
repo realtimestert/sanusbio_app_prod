@@ -1,4 +1,4 @@
-// SanusBio v1.9.1 | 2026-07-16 | server.js
+// SanusBio v1.9.2 | 2026-07-17 | server.js
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -130,7 +130,7 @@ app.get('/api/me', authenticate, (req, res) => res.json(req.user));
 // ─── Dashboard Stats ──────────────────────────────────────────────────────────
 app.get('/api/dashboard', authenticate, require_perm('read'), async (req, res) => {
   try {
-    const [[{ total }]] = await pool.query("SELECT COUNT(*) as total FROM ferret_qr005 WHERE dead='0' OR dead IS NULL");
+    const [[{ total }]] = await pool.query("SELECT COUNT(*) as total FROM ferret_qr005 WHERE (dead='0' OR dead IS NULL) AND (distributed = 0 OR distributed IS NULL)");
     const [[{ overdue }]] = await pool.query("SELECT COUNT(*) as overdue FROM assignments WHERE completed=0 AND due_date < CURDATE()");
     const [[{ vacc_due }]] = await pool.query("SELECT COUNT(*) as vacc_due FROM ferret_qr005 WHERE next_rabies_vaccine_due <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND (dead='0' OR dead IS NULL)");
     const [[{ litters_this_month }]] = await pool.query("SELECT COUNT(*) as litters_this_month FROM litter_log WHERE litter_date >= DATE_FORMAT(CURDATE(),'%Y-%m-01')");
@@ -151,17 +151,24 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
     try {
       [rows] = await pool.query(`
         SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
-               f.birth_date, f.death_date, f.weight, f.dead, f.description, f.color, f.litter_id,
-               f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
-               f.next_rabies_vaccine_due, f.sex, f.eight_hour_light,
-               f.distributed, f.distributor_id, f.female_status, f.breeding_retired,
-               a.cage_address, a.room_id, a.room_name, a.room_lighting,
-               s.supplier_name,
-               d.distributor_name
+              f.birth_date, f.death_date, f.weight, f.dead, f.description, f.color, f.litter_id,
+              f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
+              f.next_rabies_vaccine_due, f.sex,
+              COALESCE(rls.eight_hour_light, 0) AS eight_hour_light,
+              f.distributed, f.distributor_id, f.female_status, f.breeding_retired,
+              a.cage_address, a.room_id, a.room_name, a.room_lighting,
+              s.supplier_name,
+              d.distributor_name,
+              de.distribution_date
         FROM ferret_qr005 f
         LEFT JOIN address     a ON f.address_id     = a.address_id
         LEFT JOIN supplier    s ON f.supplier_id    = s.supplier_id
         LEFT JOIN distributor d ON f.distributor_id = d.distributor_id
+        LEFT JOIN room_light_schedule rls ON a.room_id = rls.room_id
+        LEFT JOIN (
+          SELECT ferret_id, MAX(distribution_date) AS distribution_date
+          FROM distribution_event GROUP BY ferret_id
+        ) de ON de.ferret_id = f.Ferret_QR005_id
         WHERE f.ferret_name LIKE ? OR f.animal_id LIKE ?
         ORDER BY f.ferret_name
       `, [q, q]);
@@ -188,22 +195,24 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
 app.get('/api/ferrets/:id', authenticate, require_perm('read'), async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT f.*,
-             a.cage_address, a.room_id, a.room_lighting, a.maintenance,
-             s.supplier_name, s.contact_info, s.supplier_phone_number,
-             mi.castrated_or_spayed, mi.castration_or_spay_date,
-             mi.treatments, mi.last_exam_date, mi.orders, mi.performed_by,
-             mi.weight_loss_or_gain, mi.exam_log, mi.surgical_procedure_log,
-             mi.cause_of_death,
-             ecl.estrus_status, ecl.in_estrus, ecl.vulva_description,
-             ecl.formed_observation, ecl.comments AS estrus_comments
-      FROM ferret_qr005 f
-      LEFT JOIN address          a   ON f.address_id          = a.address_id
-      LEFT JOIN supplier         s   ON f.supplier_id         = s.supplier_id
-      LEFT JOIN medical_info     mi  ON f.medical_info_id     = mi.medical_info_id
-      LEFT JOIN estrus_check_log ecl ON f.estrus_check_log_id = ecl.estrus_check_log_id
-      WHERE f.Ferret_QR005_id = ?
-    `, [req.params.id]);
+        SELECT f.*,
+              a.cage_address, a.room_id, a.room_lighting, a.maintenance,
+              s.supplier_name, s.contact_info, s.supplier_phone_number,
+              mi.castrated_or_spayed, mi.castration_or_spay_date,
+              mi.treatments, mi.last_exam_date, mi.orders, mi.performed_by,
+              mi.weight_loss_or_gain, mi.exam_log, mi.surgical_procedure_log,
+              mi.cause_of_death,
+              ecl.estrus_status, ecl.in_estrus, ecl.vulva_description,
+              ecl.formed_observation, ecl.comments AS estrus_comments,
+              COALESCE(rls.eight_hour_light, 0) AS room_eight_hour_light
+        FROM ferret_qr005 f
+        LEFT JOIN address          a   ON f.address_id          = a.address_id
+        LEFT JOIN supplier         s   ON f.supplier_id         = s.supplier_id
+        LEFT JOIN medical_info     mi  ON f.medical_info_id     = mi.medical_info_id
+        LEFT JOIN estrus_check_log ecl ON f.estrus_check_log_id = ecl.estrus_check_log_id
+        LEFT JOIN room_light_schedule rls ON a.room_id = rls.room_id
+        WHERE f.Ferret_QR005_id = ?
+      `, [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Ferret not found' });
     res.json(rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1044,13 +1053,33 @@ app.put('/api/ferrets/:id/rfid/unassign', authenticate, require_perm('update'), 
 
 // ─── Cleaning Reports ─────────────────────────────────────────────────────────
 
-// Get distinct rooms from address table (for the cleaner form dropdown)
-app.get('/api/rooms', authenticate, async (req, res) => {
+// ─── Room Light Schedule ──────────────────────────────────────────────────────
+app.get('/api/rooms/light-schedule', authenticate, require_perm('read'), async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      'SELECT DISTINCT room_id FROM address WHERE room_id IS NOT NULL AND room_id > 0 ORDER BY room_id'
+    const [rows] = await pool.query(`
+      SELECT DISTINCT a.room_id, a.room_name, COALESCE(rls.eight_hour_light,0) AS eight_hour_light
+      FROM address a
+      LEFT JOIN room_light_schedule rls ON a.room_id = rls.room_id
+      WHERE a.room_id IS NOT NULL AND a.room_id > 0
+      ORDER BY a.room_id
+    `);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/rooms/:room_id/light', authenticate, require_perm('update'), async (req, res) => {
+  const { eight_hour_light } = req.body;
+  const roomId = parseInt(req.params.room_id);
+  if (!roomId) return res.status(400).json({ error: 'Invalid room_id' });
+  try {
+    await pool.query(
+      `INSERT INTO room_light_schedule (room_id, eight_hour_light) VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE eight_hour_light = VALUES(eight_hour_light)`,
+      [roomId, eight_hour_light ? 1 : 0]
     );
-    res.json(rows.map(r => r.room_id));
+    await log_activity(req.user.user_id, 'UPDATE', 'room_light_schedule', roomId,
+      `Room ${roomId} 8-hour light schedule ${eight_hour_light ? 'enabled' : 'disabled'}`);
+    res.json({ message: 'Room light schedule updated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

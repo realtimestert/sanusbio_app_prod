@@ -1,4 +1,4 @@
-// SanusBio v1.9.0 | 2026-07-15 | app-medical.js
+// SanusBio v1.9.2 | 2026-07-17 | app-medical.js
 // Health Events, Vaccinations, Litters, Medical Info, Procedures
 
 // ─── Health Event Modal ───────────────────────────────────────────────────────
@@ -98,7 +98,11 @@ async function loadLitters() {
     <td>${l.individuals_created ?? 0} / ${l.kit_count ?? '?'}</td>
     <td class="small text-muted">${l.anomalies_and_notes || '—'}</td>
     <td>
-      ${canUpdate() ? `<button class="btn btn-sm btn-outline-success" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>` : ''}
+      ${canUpdate() && (!l.individuals_created || l.individuals_created < l.kit_count)
+        ? `<button class="btn btn-sm btn-outline-success" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>`
+        : (l.kit_count && l.individuals_created >= l.kit_count
+            ? `<span class="badge bg-success-subtle text-success border border-success-subtle">All kits created</span>`
+            : '')}
     </td>
   </tr>`).join('');
   } catch (err) { console.error(err); }

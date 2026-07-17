@@ -1,9 +1,10 @@
-// SanusBio v1.6.0 | 2026-06-25 app-admin.js
+// SanusBio v1.9.2 | 2026-07-17 | app-admin.js
 // Locations, Suppliers, Assignments, Users, Activity Log, Distribution Page
 
 // ─── Locations ────────────────────────────────────────────────────────────────
 async function loadLocations() {
   if (roleIs('admin', 'research')) document.getElementById('btnAddLocationMain').classList.remove('d-none');
+  loadRoomLightSchedule();
   try {
     const addresses = await api('/addresses');
     const accordion = document.getElementById('locationAccordion');
@@ -102,6 +103,40 @@ async function submitAddress() {
     document.getElementById('adPosNone').checked = true;
     alert('Location added!');
   } catch (err) { alert(err.message); }
+}
+
+// ─── Room Light Schedule ──────────────────────────────────────────────────────
+async function loadRoomLightSchedule() {
+  const el = document.getElementById('roomLightList');
+  if (!el) return;
+  try {
+    const rooms = await api('/rooms/light-schedule');
+    if (!rooms.length) { el.innerHTML = '<span class="text-muted small">No rooms configured yet.</span>'; return; }
+    const canToggle = roleIs('admin', 'research', 'maternity');
+    el.innerHTML = rooms.map(r => `
+      <div class="d-flex align-items-center gap-2 border rounded-3 px-3 py-2">
+        <span class="fw-semibold small">Room ${r.room_id}${r.room_name ? ' ' + r.room_name : ''}</span>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" ${r.eight_hour_light ? 'checked' : ''}
+            ${canToggle ? '' : 'disabled'}
+            onchange="toggleRoomLight(${r.room_id}, this.checked)"
+            style="width:2.5em;height:1.4em;cursor:pointer;">
+        </div>
+      </div>`).join('');
+  } catch (err) {
+    console.error(err);
+    el.innerHTML = '<span class="text-danger small">Failed to load room light schedule.</span>';
+  }
+}
+
+async function toggleRoomLight(roomId, enabled) {
+  try {
+    await api(`/rooms/${roomId}/light`, { method: 'PUT', body: { eight_hour_light: enabled } });
+    loadRoomLightSchedule();
+  } catch (err) {
+    alert(err.message);
+    loadRoomLightSchedule();
+  }
 }
 
 // ─── Suppliers Page ───────────────────────────────────────────────────────────
