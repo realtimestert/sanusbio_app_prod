@@ -1,4 +1,4 @@
-<!-- SanusBio v1.9.2 | 2026-07-17 | index.html -->
+<!-- SanusBio v1.9.3 | 2026-07-20 | index.html -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -118,6 +118,7 @@
               Board</span>
             <span class="text-muted small ms-2">(females with active status)</span>
           </div>
+          <div class="px-3 pt-3 pb-1 d-flex flex-wrap gap-2" id="dashReproFilterBtns"></div>
           <div class="table-responsive">
             <table class="table table-hover mb-0">
               <thead>
@@ -1484,6 +1485,13 @@
               <option value="">— Unknown / Not recorded —</option>
             </select>
             <div class="form-text">Select the male ferret used for mating, if known.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Photo (optional)</label>
+            <div class="form-text mb-1">Attach a photo for this event — e.g. a litter photo.</div>
+            <input type="file" id="reproPhotoFile" accept="image/*" class="form-control"
+              onchange="previewPhoto(this,'reproPhotoPreview')">
+            <div id="reproPhotoPreview" class="mt-2"></div>
           </div>
           <div class="mb-2">
             <label class="form-label fw-semibold">Notes</label>

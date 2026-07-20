@@ -1,4 +1,4 @@
-// SanusBio v1.8.7 | 2026-07-14 | app-core.js
+// SanusBio v1.9.3 | 2026-07-20 | app-core.js
 // State, API, Auth, Init, Navigation, Dashboard, Helpers
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -6,6 +6,15 @@ let TOKEN = localStorage.getItem('sb_token');
 let USER = JSON.parse(localStorage.getItem('sb_user') || 'null');
 let _editUserId = null, _editSupplierId = null, _currentFerretId = null;
 let _ferretData = [], _searchTimer;
+
+let _dashReproData = [], _dashReproFilter = null;
+const DASH_REPRO_STATUS_META = {
+  estrus:    { label: 'In Estrus',  color: 'danger' },
+  mated:     { label: 'Mated',      color: 'warning' },
+  littered:  { label: 'Littered',   color: 'success' },
+  weaned:    { label: 'Weaned',     color: 'info' },
+  no_litter: { label: 'No Litter',  color: 'secondary' },
+};
 
 // ─── API Helper ───────────────────────────────────────────────────────────────
 async function api(path, opts = {}) {
@@ -115,43 +124,68 @@ async function loadDashboard() {
   // Ferret lookup — all roles except cleaner
   if (USER?.role !== 'cleaner' && typeof initDashLookups === 'function') initDashLookups();
 
-  // Estrus board — show to maternity, admin, research
+  // Estrus / Reproductive board — show to maternity, admin, research
   const estrusCard = document.getElementById('dashEstrusCard');
   if (estrusCard && roleIs('admin', 'research', 'maternity')) {
     estrusCard.style.display = '';
     try {
-      const females = await api('/females/estrus');
-      const tbody = document.getElementById('dashEstrusList');
-      if (!females.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-3">No females currently tracked</td></tr>';
-      } else {
-        const statusMeta = {
-          estrus:   { label: 'In Estrus',  color: 'danger' },
-          mated:    { label: 'Mated',       color: 'warning' },
-          littered: { label: 'Littered',    color: 'success' },
-          weaned:   { label: 'Weaned',      color: 'info' },
-          baseline: { label: 'Baseline',    color: 'secondary' },
-        };
-        tbody.innerHTML = females.map(f => {
-          const m = statusMeta[f.female_status] || statusMeta.baseline;
-          const daysSince = f.status_since
-            ? Math.floor((Date.now() - new Date(f.status_since)) / 864e5)
-            : null;
-          const urgency = f.female_status === 'estrus' && daysSince !== null && daysSince >= 8;
-          return `<tr class="${urgency ? 'table-danger' : ''}" style="cursor:pointer" onclick="loadFerretDetail(${f.id}); nav('ferrets');">
-            <td><strong>${f.name}</strong><br><span class="text-muted small">${f.animal_id || '—'}</span></td>
-            <td><span class="badge bg-${m.color}">${m.label}</span></td>
-            <td>${f.status_since ? fmtDate(f.status_since) : '—'}</td>
-            <td>${daysSince !== null ? daysSince + 'd' : '—'}${urgency ? ' <i class="bi bi-exclamation-triangle-fill text-danger ms-1"></i>' : ''}</td>
-            <td class="small text-muted">Room ${f.room_id || '?'} · ${f.cage_address || '?'}</td>
-            <td class="small text-muted">${f.status_notes || '—'}</td>
-          </tr>`;
-        }).join('');
-      }
+      _dashReproData = await api('/females/estrus');
+      renderDashReproFilterBtns();
+      renderDashReproTable();
     } catch (err) { console.error('Estrus board:', err); }
   } else if (estrusCard) {
     estrusCard.style.display = 'none';
   }
+}
+
+function renderDashReproFilterBtns() {
+  const wrap = document.getElementById('dashReproFilterBtns');
+  if (!wrap) return;
+  const counts = {};
+  _dashReproData.forEach(f => { counts[f.status] = (counts[f.status] || 0) + 1; });
+  const cats = ['estrus', 'mated', 'littered', 'weaned'];
+  wrap.innerHTML = `
+    <button class="btn btn-sm ${_dashReproFilter === null ? 'btn-primary' : 'btn-outline-secondary'}"
+      onclick="setDashReproFilter(null)">
+      All <span class="badge bg-light text-dark ms-1">${_dashReproData.length}</span>
+    </button>
+    ${cats.map(c => {
+      const m = DASH_REPRO_STATUS_META[c];
+      const active = _dashReproFilter === c;
+      return `<button class="btn btn-sm ${active ? 'btn-' + m.color : 'btn-outline-secondary'}"
+        onclick="setDashReproFilter('${c}')">
+        ${m.label} <span class="badge bg-light text-dark ms-1">${counts[c] || 0}</span>
+      </button>`;
+    }).join('')}`;
+}
+
+function setDashReproFilter(cat) {
+  _dashReproFilter = cat;
+  renderDashReproFilterBtns();
+  renderDashReproTable();
+}
+
+function renderDashReproTable() {
+  const tbody = document.getElementById('dashEstrusList');
+  if (!tbody) return;
+  const filtered = _dashReproFilter ? _dashReproData.filter(f => f.status === _dashReproFilter) : _dashReproData;
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-3">No females in this category</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(f => {
+    const m = DASH_REPRO_STATUS_META[f.status] || DASH_REPRO_STATUS_META.estrus;
+    const daysSince = f.status_since ? Math.floor((Date.now() - new Date(f.status_since)) / 864e5) : null;
+    const urgency = f.status === 'estrus' && daysSince !== null && daysSince >= 8;
+    return `<tr class="${urgency ? 'table-danger' : ''}" style="cursor:pointer" onclick="loadFerretDetail(${f.id}); nav('ferrets');">
+      <td><strong>${f.name}</strong><br><span class="text-muted small">${f.animal_id || '—'}</span></td>
+      <td><span class="badge bg-${m.color}">${m.label}</span></td>
+      <td>${f.status_since ? fmtDate(f.status_since) : '—'}</td>
+      <td>${daysSince !== null ? daysSince + 'd' : '—'}${urgency ? ' <i class="bi bi-exclamation-triangle-fill text-danger ms-1"></i>' : ''}</td>
+      <td class="small text-muted">Room ${f.room_id || '?'} · ${f.cage_address || '?'}</td>
+      <td class="small text-muted">${f.status_notes || '—'}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

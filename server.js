@@ -1,4 +1,4 @@
-// SanusBio v1.9.2 | 2026-07-17 | server.js
+// SanusBio v1.9.3 | 2026-07-20 | server.js
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -1477,29 +1477,67 @@ app.delete('/api/ferrets/:id/reproductive/:eid', authenticate, admin_only, async
   } finally { conn.release(); }
 });
 
+// ─── Reproductive Event Photo ─────────────────────────────────────────────────
+const reproUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `repro-${req.params.id}-${req.params.eventId}-${Date.now()}${ext}`);
+    }
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+    if (allowed.includes(path.extname(file.originalname).toLowerCase())) cb(null, true);
+    else cb(new Error('Only image files are allowed'));
+  }
+});
+
+app.post('/api/ferrets/:id/reproductive/:eventId/photo', authenticate, require_perm('update'), reproUpload.single('photo'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  try {
+    const [[event]] = await pool.query(
+      'SELECT photo_url FROM reproductive_event WHERE event_id = ? AND ferret_id = ?',
+      [req.params.eventId, req.params.id]
+    );
+    if (!event) return res.status(404).json({ error: 'Reproductive event not found' });
+    if (event.photo_url?.startsWith('/uploads/')) {
+      const p = path.join(__dirname, event.photo_url);
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    }
+    const photoUrl = `/uploads/${req.file.filename}`;
+    await pool.query('UPDATE reproductive_event SET photo_url = ? WHERE event_id = ?', [photoUrl, req.params.eventId]);
+    await log_activity(req.user.user_id, 'PHOTO_UPLOAD', 'reproductive_event', req.params.eventId,
+      `Photo added to reproductive event #${req.params.eventId}`);
+    res.json({ photo_url: photoUrl, message: 'Photo uploaded' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // All females currently in estrus (for estrus board)
 app.get('/api/females/estrus', authenticate, require_perm('read'), async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
-             f.birth_date, f.weight, f.female_status, f.color, f.photo_url,
+             f.birth_date, f.weight, f.color, f.photo_url,
              a.room_id, a.room_name, a.cage_address, a.room_lighting,
+             re.event_type AS status,
              re.event_date AS status_since,
              re.notes AS status_notes
       FROM ferret_qr005 f
       LEFT JOIN address a ON f.address_id = a.address_id
-      LEFT JOIN reproductive_event re ON re.ferret_id = f.Ferret_QR005_id
-        AND re.event_id = (
-          SELECT MAX(r2.event_id) FROM reproductive_event r2 WHERE r2.ferret_id = f.Ferret_QR005_id
-        )
+      JOIN reproductive_event re ON re.event_id = (
+        SELECT r2.event_id FROM reproductive_event r2
+        WHERE r2.ferret_id = f.Ferret_QR005_id
+        ORDER BY r2.event_date DESC, r2.event_id DESC LIMIT 1
+      )
       WHERE f.sex = 'female'
         AND (f.dead = '0' OR f.dead IS NULL)
         AND (f.distributed = 0 OR f.distributed IS NULL)
         AND (f.breeding_retired = 0 OR f.breeding_retired IS NULL)
-        AND f.female_status IS NOT NULL
-        AND f.female_status <> 'baseline'
+        AND re.event_type <> 'no_litter'
       ORDER BY
-        FIELD(f.female_status, 'estrus', 'mated', 'littered', 'weaned', 'baseline'),
+        FIELD(re.event_type, 'estrus', 'mated', 'littered', 'weaned'),
         re.event_date ASC
     `);
     res.json(rows);

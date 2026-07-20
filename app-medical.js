@@ -344,7 +344,30 @@ function openReproModal(ferretId) {
   document.getElementById('reproPartnerRow').style.display = 'none';
   document.getElementById('reproNotes').value = '';
   document.getElementById('reproPartnerSelect').innerHTML = '<option value="">— None —</option>';
+  const pf = document.getElementById('reproPhotoFile'); if (pf) pf.value = '';
+  const pp = document.getElementById('reproPhotoPreview'); if (pp) pp.innerHTML = '';
   new bootstrap.Modal(document.getElementById('reproModal')).show();
+}
+
+async function submitReproEvent() {
+  const ferretId = document.getElementById('reproFerretId').value;
+  const event_type = document.getElementById('reproType').value;
+  const event_date = document.getElementById('reproDate').value;
+  const partner_id = document.getElementById('reproPartnerSelect').value || null;
+  const notes = document.getElementById('reproNotes').value.trim();
+  if (!event_date) return alert('Date is required.');
+  try {
+    const r = await api(`/ferrets/${ferretId}/reproductive`, {
+      method: 'POST', body: { event_type, event_date, partner_id: partner_id ? parseInt(partner_id) : null, notes: notes || null }
+    });
+    const photoFile = document.getElementById('reproPhotoFile')?.files[0];
+    if (photoFile && r.id) {
+      const fd = new FormData(); fd.append('photo', photoFile);
+      await apiUpload(`/ferrets/${ferretId}/reproductive/${r.id}/photo`, fd);
+    }
+    bootstrap.Modal.getInstance(document.getElementById('reproModal')).hide();
+    loadFerretDetail(ferretId);
+  } catch (err) { alert(err.message); }
 }
 
 async function onReproTypeChange() {
