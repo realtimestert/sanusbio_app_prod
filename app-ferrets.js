@@ -480,7 +480,7 @@ async function loadFerretDetail(id) {
       </div>
       ${repro.length ? `
       <table class="table table-sm table-hover">
-        <thead><tr><th>Date</th><th>Event</th><th>Partner</th><th>Notes</th><th>Recorded By</th>${roleIs('admin', 'research') ? '<th></th>' : ''}</tr></thead>
+        <thead><tr><th>Date</th><th>Event</th><th>Partner</th><th>Photo</th><th>Notes</th><th>Recorded By</th>${roleIs('admin', 'research') ? '<th></th>' : ''}</tr></thead>
         <tbody>${repro.map(e => {
           const meta = { estrus: { label: 'In Estrus', color: 'danger' }, mated: { label: 'Mated', color: 'warning' }, littered: { label: 'Littered', color: 'success' }, weaned: { label: 'Weaned', color: 'info' }, no_litter: { label: 'No Litter', color: 'secondary' } };
           const m = meta[e.event_type] || { label: e.event_type, color: 'secondary' };
@@ -488,6 +488,7 @@ async function loadFerretDetail(id) {
             <td>${fmtDate(e.event_date)}</td>
             <td><span class="badge bg-${m.color}">${m.label}</span></td>
             <td>${e.partner_name ? `<strong>${e.partner_name}</strong>` : '—'}</td>
+            <td>${e.photo_url ? `<img src="${e.photo_url}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;cursor:pointer" onclick="window.open('${e.photo_url}','_blank')">` : '—'}</td>
             <td class="small">${e.notes || '—'}</td>
             <td class="text-muted small">${e.recorded_by || '—'}</td>
             ${roleIs('admin', 'research') ? `<td><button class="btn btn-sm btn-outline-danger" onclick="deleteReproEvent(${id},${e.event_id})"><i class="bi bi-trash"></i></button></td>` : ''}
