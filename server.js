@@ -1,4 +1,6 @@
-// SanusBio v1.9.3 | 2026-07-20 | server.js
+// SanusBio v1.9.4 | 2026-07-22 | server.js
+// v1.9.4: room light duration tracking (light_state_since), litter_kit_death
+//         and litter_care_event endpoints (maternity log)
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -204,7 +206,8 @@ app.get('/api/ferrets/:id', authenticate, require_perm('read'), async (req, res)
               mi.cause_of_death,
               ecl.estrus_status, ecl.in_estrus, ecl.vulva_description,
               ecl.formed_observation, ecl.comments AS estrus_comments,
-              COALESCE(rls.eight_hour_light, 0) AS room_eight_hour_light
+              COALESCE(rls.eight_hour_light, 0) AS room_eight_hour_light,
+              rls.light_state_since AS room_light_state_since
         FROM ferret_qr005 f
         LEFT JOIN address          a   ON f.address_id          = a.address_id
         LEFT JOIN supplier         s   ON f.supplier_id         = s.supplier_id
@@ -727,6 +730,176 @@ app.post('/api/litters/:id/create-ferrets', authenticate, async (req, res) => {
   } finally { conn.release(); }
 });
 
+// ─── Litter Kit Deaths (pre-ID kit deaths) ────────────────────────────────────
+app.get('/api/litters/:id/kit-deaths', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT * FROM litter_kit_death WHERE litter_log_id = ? ORDER BY death_date DESC, kit_death_id DESC',
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/litters/:id/kit-deaths', authenticate, async (req, res) => {
+  if (!['admin', 'maternity', 'research'].includes(req.user.role))
+    return res.status(403).json({ error: 'Only admin, research, and maternity can log kit deaths' });
+  const { death_date, cause_category, notes, treatments } = req.body;
+  const VALID_CAUSES = ['mother_ate', 'fell_from_cage', 'crushed', 'failure_to_thrive', 'unknown', 'other'];
+  if (!death_date) return res.status(400).json({ error: 'death_date is required' });
+  if (!VALID_CAUSES.includes(cause_category)) return res.status(400).json({ error: 'Invalid cause_category' });
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[litter]] = await conn.query('SELECT * FROM litter_log WHERE litter_log_id = ?', [req.params.id]);
+    if (!litter) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Litter not found' }); }
+
+    const [r] = await conn.query(
+      'INSERT INTO litter_kit_death (litter_log_id, death_date, cause_category, notes, treatments, recorded_by) VALUES (?,?,?,?,?,?)',
+      [req.params.id, death_date, cause_category, notes || null, treatments || null, req.user.username]
+    );
+
+    // Keep infant_deaths / surviving_litter_count in sync with the death log
+    const newInfantDeaths = (litter.infant_deaths || 0) + 1;
+    const surviving = litter.kit_count != null
+      ? Math.max(0, litter.kit_count - (litter.stillborn || 0) - newInfantDeaths)
+      : null;
+    await conn.query(
+      'UPDATE litter_log SET infant_deaths = ?, surviving_litter_count = ? WHERE litter_log_id = ?',
+      [newInfantDeaths, surviving, req.params.id]
+    );
+
+    await conn.commit();
+    await log_activity(req.user.user_id, 'KIT_DEATH', 'litter_kit_death', r.insertId,
+      `Kit death logged for litter #${req.params.id}: ${cause_category}`);
+    res.json({ id: r.insertId, message: 'Kit death recorded' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
+});
+
+app.delete('/api/litters/:id/kit-deaths/:deathId', authenticate, admin_only, async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[litter]] = await conn.query('SELECT * FROM litter_log WHERE litter_log_id = ?', [req.params.id]);
+    if (!litter) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Litter not found' }); }
+    const [result] = await conn.query(
+      'DELETE FROM litter_kit_death WHERE kit_death_id = ? AND litter_log_id = ?',
+      [req.params.deathId, req.params.id]
+    );
+    if (!result.affectedRows) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Kit death record not found' }); }
+
+    const newInfantDeaths = Math.max(0, (litter.infant_deaths || 0) - 1);
+    const surviving = litter.kit_count != null
+      ? Math.max(0, litter.kit_count - (litter.stillborn || 0) - newInfantDeaths)
+      : null;
+    await conn.query(
+      'UPDATE litter_log SET infant_deaths = ?, surviving_litter_count = ? WHERE litter_log_id = ?',
+      [newInfantDeaths, surviving, req.params.id]
+    );
+
+    await conn.commit();
+    await log_activity(req.user.user_id, 'DELETE', 'litter_kit_death', req.params.deathId,
+      `Kit death record deleted for litter #${req.params.id}`);
+    res.json({ message: 'Kit death record deleted' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
+});
+
+// ─── Litter Care Log (maternity: weighing, nest changes, supplemental feeding) ─
+app.get('/api/litters/:id/care-events', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT * FROM litter_care_event WHERE litter_log_id = ? ORDER BY event_date DESC, care_event_id DESC',
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/litters/:id/care-events', authenticate, async (req, res) => {
+  if (!['admin', 'maternity', 'research'].includes(req.user.role))
+    return res.status(403).json({ error: 'Only admin, research, and maternity can log litter care events' });
+  const { event_type, event_date, weight_grams, kit_count, feed_type, notes } = req.body;
+  const VALID_TYPES = ['weight', 'nest_change', 'supplemental_feeding', 'feeding_check', 'other'];
+  if (!VALID_TYPES.includes(event_type)) return res.status(400).json({ error: 'Invalid event_type' });
+  if (!event_date) return res.status(400).json({ error: 'event_date is required' });
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[litter]] = await conn.query('SELECT * FROM litter_log WHERE litter_log_id = ?', [req.params.id]);
+    if (!litter) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Litter not found' }); }
+
+    const wt = (weight_grams != null && weight_grams !== '') ? parseInt(weight_grams) : null;
+    const kc = (kit_count != null && kit_count !== '') ? parseInt(kit_count) : null;
+
+    const [r] = await conn.query(
+      `INSERT INTO litter_care_event (litter_log_id, event_type, event_date, weight_grams, kit_count, feed_type, notes, recorded_by)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [req.params.id, event_type, event_date, wt, kc, feed_type || null, notes || null, req.user.username]
+    );
+
+    // Keep litter_log's summary fields in sync for at-a-glance display / growth-rate calc
+    if (event_type === 'weight' && wt != null) {
+      await conn.query(
+        `UPDATE litter_log SET
+           previous_weight_grams = last_weight_grams,
+           previous_weigh_date   = last_weigh_date,
+           last_weight_grams     = ?,
+           last_weigh_date       = ?
+         WHERE litter_log_id = ?`,
+        [wt, event_date, req.params.id]
+      );
+    } else if (event_type === 'nest_change') {
+      const entry = `[${event_date}] Nest/litter box changed${notes ? ' — ' + notes : ''}`;
+      const updated = litter.nest_box_change_log ? litter.nest_box_change_log + '\n' + entry : entry;
+      await conn.query(
+        `UPDATE litter_log SET nest_litter_changed = ?, change_nest_litter_box = 1, nest_box_change_log = ?
+         WHERE litter_log_id = ?`,
+        [event_date, updated, req.params.id]
+      );
+    } else if (event_type === 'supplemental_feeding') {
+      const entry = `[${event_date}] ${feed_type || 'Supplemental feeding'}${kc != null ? ' — ' + kc + ' kit(s)' : ''}${notes ? ': ' + notes : ''}`;
+      const updated = litter.syringe_feeding_log ? litter.syringe_feeding_log + '\n' + entry : entry;
+      await conn.query(
+        `UPDATE litter_log SET support_feeding = 'y', support_feed_type = ?, syringe_feeding_log = ?
+         WHERE litter_log_id = ?`,
+        [feed_type || null, updated, req.params.id]
+      );
+    } else {
+      const entry = `[${event_date}] ${event_type.replace('_', ' ')}${notes ? ' — ' + notes : ''}`;
+      const updated = litter.event_history ? litter.event_history + '\n' + entry : entry;
+      await conn.query('UPDATE litter_log SET event_history = ? WHERE litter_log_id = ?', [updated, req.params.id]);
+    }
+
+    await conn.commit();
+    await log_activity(req.user.user_id, 'LITTER_CARE', 'litter_care_event', r.insertId,
+      `${event_type} logged for litter #${req.params.id}`);
+    res.json({ id: r.insertId, message: 'Care event recorded' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
+});
+
+app.delete('/api/litters/:id/care-events/:eventId', authenticate, admin_only, async (req, res) => {
+  try {
+    const [result] = await pool.query(
+      'DELETE FROM litter_care_event WHERE care_event_id = ? AND litter_log_id = ?',
+      [req.params.eventId, req.params.id]
+    );
+    if (!result.affectedRows) return res.status(404).json({ error: 'Care event not found' });
+    await log_activity(req.user.user_id, 'DELETE', 'litter_care_event', req.params.eventId,
+      `Care event deleted for litter #${req.params.id}`);
+    res.json({ message: 'Care event deleted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ─── Assignments ──────────────────────────────────────────────────────────────
 app.get('/api/assignments', authenticate, require_perm('read'), async (req, res) => {
   try {
@@ -1057,7 +1230,8 @@ app.put('/api/ferrets/:id/rfid/unassign', authenticate, require_perm('update'), 
 app.get('/api/rooms/light-schedule', authenticate, require_perm('read'), async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT DISTINCT a.room_id, a.room_name, COALESCE(rls.eight_hour_light,0) AS eight_hour_light
+      SELECT DISTINCT a.room_id, a.room_name, COALESCE(rls.eight_hour_light,0) AS eight_hour_light,
+             rls.light_state_since
       FROM address a
       LEFT JOIN room_light_schedule rls ON a.room_id = rls.room_id
       WHERE a.room_id IS NOT NULL AND a.room_id > 0
@@ -1071,14 +1245,23 @@ app.put('/api/rooms/:room_id/light', authenticate, require_perm('update'), async
   const { eight_hour_light } = req.body;
   const roomId = parseInt(req.params.room_id);
   if (!roomId) return res.status(400).json({ error: 'Invalid room_id' });
+  const newVal = eight_hour_light ? 1 : 0;
   try {
-    await pool.query(
-      `INSERT INTO room_light_schedule (room_id, eight_hour_light) VALUES (?, ?)
-       ON DUPLICATE KEY UPDATE eight_hour_light = VALUES(eight_hour_light)`,
-      [roomId, eight_hour_light ? 1 : 0]
+    const [[existing]] = await pool.query(
+      'SELECT eight_hour_light FROM room_light_schedule WHERE room_id = ?', [roomId]
     );
+    // Only reset the "since" date when the state actually flips — repeated
+    // saves of the same value shouldn't restart the duration clock.
+    const stateChanged = !existing || existing.eight_hour_light != newVal;
+    if (stateChanged) {
+      await pool.query(
+        `INSERT INTO room_light_schedule (room_id, eight_hour_light, light_state_since) VALUES (?, ?, CURDATE())
+         ON DUPLICATE KEY UPDATE eight_hour_light = VALUES(eight_hour_light), light_state_since = CURDATE()`,
+        [roomId, newVal]
+      );
+    }
     await log_activity(req.user.user_id, 'UPDATE', 'room_light_schedule', roomId,
-      `Room ${roomId} 8-hour light schedule ${eight_hour_light ? 'enabled' : 'disabled'}`);
+      `Room ${roomId} 8-hour light schedule ${newVal ? 'enabled' : 'disabled'}`);
     res.json({ message: 'Room light schedule updated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

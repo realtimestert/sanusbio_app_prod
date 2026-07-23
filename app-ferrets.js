@@ -1,5 +1,6 @@
-// SanusBio v1.9.2 | 2026-07-17 | app-ferrets.js
+// SanusBio v1.9.4 | 2026-07-22 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
+// v1.9.4: ages always shown in weeks (no Y/mo breakdown); Age at Death added next to Date of Death
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
 async function loadFerrets(search = '') {
@@ -31,18 +32,7 @@ function ferretAge(birthDate, endDate) {
   const totalDays = Math.floor((end - birth) / 864e5);
   if (totalDays < 0) return '—';
   const totalWeeks = Math.floor(totalDays / 7);
-  if (totalWeeks < 52) return totalWeeks + 'wk';
-  let years = end.getFullYear() - birth.getFullYear();
-  let months = end.getMonth() - birth.getMonth();
-  let days = end.getDate() - birth.getDate();
-  if (days < 0) { months--; days += new Date(end.getFullYear(), end.getMonth(), 0).getDate(); }
-  if (months < 0) { years--; months += 12; }
-  const weeks = Math.floor(days / 7);
-  let parts = [];
-  if (years) parts.push(years + 'Y');
-  if (months) parts.push(months + 'mo');
-  if (weeks) parts.push(weeks + 'wk');
-  return parts.length ? parts.join(' ') : years + 'Y';
+  return totalWeeks + 'wk';
 }
 
 function renderFerretGrid() {
@@ -392,6 +382,8 @@ async function loadFerretDetail(id) {
         ${f.dead === '1' ? `
         <div class="col-md-4"><span class="text-muted small d-block">Date of Death</span>
           <strong>${fmtDate(f.death_date)}</strong></div>
+        <div class="col-md-4"><span class="text-muted small d-block">Age at Death</span>
+          <strong>${ferretAge(f.birth_date, f.death_date)}</strong></div>
         <div class="col-md-4"><span class="text-muted small d-block">Cause of Death</span>
           <strong>${f.cause_of_death || '<span class=\"text-muted\">Not recorded</span>'}</strong></div>
         ` : ''}
