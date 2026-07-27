@@ -1,5 +1,7 @@
-// SanusBio v1.9.2 | 2026-07-17 | app-medical.js
+// SanusBio v1.9.4 | 2026-07-22 | app-medical.js
 // Health Events, Vaccinations, Litters, Medical Info, Procedures
+// v1.9.4: added Litter Care Log (kit weighing, nest changes, supplemental feeding)
+//         and pre-ID Kit Death logging, accessed via "Care Log" on litter rows
 
 // ─── Health Event Modal ───────────────────────────────────────────────────────
 function openHealthModal(ferretId) {
@@ -98,11 +100,14 @@ async function loadLitters() {
     <td>${l.individuals_created ?? 0} / ${l.kit_count ?? '?'}</td>
     <td class="small text-muted">${l.anomalies_and_notes || '—'}</td>
     <td>
-      ${canUpdate() && (!l.individuals_created || l.individuals_created < l.kit_count)
+      <div class="d-flex gap-1 flex-wrap">
+        <button class="btn btn-sm btn-outline-secondary" onclick="openLitterDetailModal(${l.litter_log_id})"><i class="bi bi-journal-medical me-1"></i>Care Log</button>
+        ${canUpdate() && (!l.individuals_created || l.individuals_created < l.kit_count)
         ? `<button class="btn btn-sm btn-outline-success" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>`
         : (l.kit_count && l.individuals_created >= l.kit_count
-            ? `<span class="badge bg-success-subtle text-success border border-success-subtle">All kits created</span>`
+            ? `<span class="badge bg-success-subtle text-success border border-success-subtle align-self-center">All kits created</span>`
             : '')}
+      </div>
     </td>
   </tr>`).join('');
   } catch (err) { console.error(err); }
@@ -443,6 +448,169 @@ async function submitMatingRecord() {
     });
     bootstrap.Modal.getInstance(document.getElementById('matingModal')).hide();
     loadFerretDetail(ferretId);
+  } catch (err) { alert(err.message); }
+}
+
+// ─── Litter Detail (Kit Deaths + Care Log) ────────────────────────────────────
+let _ldLitterId = null;
+const KIT_DEATH_CAUSE_LABELS = {
+  mother_ate: 'Mother ate / cannibalized',
+  fell_from_cage: 'Fell from cage',
+  crushed: 'Crushed / overlain',
+  failure_to_thrive: 'Failure to thrive',
+  unknown: 'Unknown',
+  other: 'Other'
+};
+const CARE_EVENT_TYPE_LABELS = {
+  weight: 'Kit Weighing',
+  nest_change: 'Nest Box Change',
+  supplemental_feeding: 'Supplemental Feeding',
+  feeding_check: 'Feeding Check',
+  other: 'Other'
+};
+
+async function openLitterDetailModal(litterLogId) {
+  _ldLitterId = litterLogId;
+  document.getElementById('ldLitterId').value = litterLogId;
+  document.getElementById('ldSummary').textContent = 'Loading…';
+  document.getElementById('ldKitDeathTable').innerHTML = '';
+  document.getElementById('ldCareEventTable').innerHTML = '';
+  document.getElementById('ldAddKitDeathBtn').style.display = canUpdate() ? '' : 'none';
+  document.getElementById('ldAddCareEventBtn').style.display = canUpdate() ? '' : 'none';
+  new bootstrap.Modal(document.getElementById('litterDetailModal')).show();
+  try {
+    const litters = await api('/litters');
+    const litter = litters.find(l => l.litter_log_id === litterLogId);
+    if (litter) {
+      document.getElementById('ldSummary').innerHTML =
+        `<strong>${litter.litter_id || '—'}</strong> · ${fmtDate(litter.litter_date)} ·
+         Jill: ${litter.jill_name} · Kits: ${litter.kit_count ?? '—'} ·
+         Stillborn: ${litter.stillborn ?? 0} · Infant Deaths: ${litter.infant_deaths ?? 0}`;
+    } else {
+      document.getElementById('ldSummary').textContent = 'Litter not found.';
+    }
+    await Promise.all([refreshKitDeathTable(), refreshCareEventTable()]);
+  } catch (err) {
+    document.getElementById('ldSummary').innerHTML = `<span class="text-danger">${err.message}</span>`;
+  }
+}
+
+async function refreshKitDeathTable() {
+  const tbody = document.getElementById('ldKitDeathTable');
+  try {
+    const rows = await api(`/litters/${_ldLitterId}/kit-deaths`);
+    tbody.innerHTML = rows.length ? rows.map(r => `
+      <tr>
+        <td>${fmtDate(r.death_date)}</td>
+        <td><span class="badge bg-danger-subtle text-danger border border-danger-subtle">${KIT_DEATH_CAUSE_LABELS[r.cause_category] || r.cause_category}</span></td>
+        <td class="small">${r.notes || '—'}</td>
+        <td class="small">${r.treatments || '—'}</td>
+        <td class="text-muted small">${r.recorded_by || '—'}</td>
+        <td>${roleIs('admin') ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteKitDeath(${r.kit_death_id})"><i class="bi bi-trash"></i></button>` : ''}</td>
+      </tr>`).join('') : `<tr><td colspan="6" class="text-muted text-center py-3">No kit deaths logged</td></tr>`;
+  } catch (err) { tbody.innerHTML = `<tr><td colspan="6" class="text-danger text-center py-2">${err.message}</td></tr>`; }
+}
+
+async function refreshCareEventTable() {
+  const tbody = document.getElementById('ldCareEventTable');
+  try {
+    const rows = await api(`/litters/${_ldLitterId}/care-events`);
+    tbody.innerHTML = rows.length ? rows.map(r => `
+      <tr>
+        <td>${fmtDate(r.event_date)}</td>
+        <td><span class="badge bg-secondary">${CARE_EVENT_TYPE_LABELS[r.event_type] || r.event_type}</span></td>
+        <td>${r.weight_grams != null ? r.weight_grams + ' g' : '—'}</td>
+        <td>${r.kit_count ?? '—'}</td>
+        <td>${r.feed_type || '—'}</td>
+        <td class="small">${r.notes || '—'}</td>
+        <td class="text-muted small">${r.recorded_by || '—'}</td>
+        <td>${roleIs('admin') ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteCareEvent(${r.care_event_id})"><i class="bi bi-trash"></i></button>` : ''}</td>
+      </tr>`).join('') : `<tr><td colspan="8" class="text-muted text-center py-3">No care events logged</td></tr>`;
+  } catch (err) { tbody.innerHTML = `<tr><td colspan="8" class="text-danger text-center py-2">${err.message}</td></tr>`; }
+}
+
+function openKitDeathModal() {
+  document.getElementById('kdLitterId').value = _ldLitterId;
+  document.getElementById('kdDate').value = today();
+  document.getElementById('kdCause').value = 'unknown';
+  document.getElementById('kdNotes').value = '';
+  document.getElementById('kdTreatments').value = '';
+  new bootstrap.Modal(document.getElementById('kitDeathModal')).show();
+}
+
+async function submitKitDeath() {
+  const litterLogId = document.getElementById('kdLitterId').value;
+  const death_date = document.getElementById('kdDate').value;
+  if (!death_date) return alert('Date of death is required.');
+  try {
+    await api(`/litters/${litterLogId}/kit-deaths`, {
+      method: 'POST', body: {
+        death_date,
+        cause_category: document.getElementById('kdCause').value,
+        notes: document.getElementById('kdNotes').value || null,
+        treatments: document.getElementById('kdTreatments').value || null
+      }
+    });
+    bootstrap.Modal.getInstance(document.getElementById('kitDeathModal')).hide();
+    await refreshKitDeathTable();
+    loadLitters();
+    if (_currentFerretId) loadFerretDetail(_currentFerretId);
+  } catch (err) { alert(err.message); }
+}
+
+async function deleteKitDeath(deathId) {
+  if (!confirm('Delete this kit death record?')) return;
+  try {
+    await api(`/litters/${_ldLitterId}/kit-deaths/${deathId}`, { method: 'DELETE' });
+    await refreshKitDeathTable();
+    loadLitters();
+  } catch (err) { alert(err.message); }
+}
+
+function onCareEventTypeChange() {
+  const type = document.getElementById('ceType').value;
+  document.getElementById('ceWeightRow').style.display = type === 'weight' ? '' : 'none';
+  document.getElementById('ceFeedTypeRow').style.display = type === 'supplemental_feeding' ? '' : 'none';
+  document.getElementById('ceKitCountRow').style.display = (type === 'weight' || type === 'supplemental_feeding') ? '' : 'none';
+}
+
+function openCareEventModal() {
+  document.getElementById('ceLitterId').value = _ldLitterId;
+  document.getElementById('ceType').value = 'weight';
+  document.getElementById('ceDate').value = today();
+  document.getElementById('ceWeight').value = '';
+  document.getElementById('ceFeedType').value = '';
+  document.getElementById('ceKitCount').value = '';
+  document.getElementById('ceNotes').value = '';
+  onCareEventTypeChange();
+  new bootstrap.Modal(document.getElementById('careEventModal')).show();
+}
+
+async function submitCareEvent() {
+  const litterLogId = document.getElementById('ceLitterId').value;
+  const event_date = document.getElementById('ceDate').value;
+  if (!event_date) return alert('Date is required.');
+  try {
+    await api(`/litters/${litterLogId}/care-events`, {
+      method: 'POST', body: {
+        event_type: document.getElementById('ceType').value,
+        event_date,
+        weight_grams: document.getElementById('ceWeight').value || null,
+        kit_count: document.getElementById('ceKitCount').value || null,
+        feed_type: document.getElementById('ceFeedType').value || null,
+        notes: document.getElementById('ceNotes').value || null
+      }
+    });
+    bootstrap.Modal.getInstance(document.getElementById('careEventModal')).hide();
+    await refreshCareEventTable();
+  } catch (err) { alert(err.message); }
+}
+
+async function deleteCareEvent(eventId) {
+  if (!confirm('Delete this care event?')) return;
+  try {
+    await api(`/litters/${_ldLitterId}/care-events/${eventId}`, { method: 'DELETE' });
+    await refreshCareEventTable();
   } catch (err) { alert(err.message); }
 }
 
