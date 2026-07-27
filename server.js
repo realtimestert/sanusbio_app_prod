@@ -1,6 +1,7 @@
-// SanusBio v1.9.4 | 2026-07-22 | server.js
-// v1.9.4: room light duration tracking (light_state_since), litter_kit_death
-//         and litter_care_event endpoints (maternity log)
+// SanusBio v1.9.5 | 2026-07-24 | server.js
+// v1.9.5: light-cycle duration tracking moved from rooms to ferrets
+//         (light_mode auto/manual); moves now take a move_date; room toggle
+//         cascades to auto-mode ferrets in that room
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -156,7 +157,8 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
               f.birth_date, f.death_date, f.weight, f.dead, f.description, f.color, f.litter_id,
               f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
               f.next_rabies_vaccine_due, f.sex,
-              COALESCE(rls.eight_hour_light, 0) AS eight_hour_light,
+              COALESCE(f.eight_hour_light, 0) AS eight_hour_light,
+              f.light_state_since, f.light_mode,
               f.distributed, f.distributor_id, f.female_status, f.breeding_retired,
               a.cage_address, a.room_id, a.room_name, a.room_lighting,
               s.supplier_name,
@@ -166,7 +168,6 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
         LEFT JOIN address     a ON f.address_id     = a.address_id
         LEFT JOIN supplier    s ON f.supplier_id    = s.supplier_id
         LEFT JOIN distributor d ON f.distributor_id = d.distributor_id
-        LEFT JOIN room_light_schedule rls ON a.room_id = rls.room_id
         LEFT JOIN (
           SELECT ferret_id, MAX(distribution_date) AS distribution_date
           FROM distribution_event GROUP BY ferret_id
@@ -179,7 +180,8 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
         SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
                f.birth_date, f.death_date, f.weight, f.dead, f.description, f.color, f.litter_id,
                f.photo_url, f.mother_name, f.father_name, f.acquisition_by,
-               f.next_rabies_vaccine_due, f.sex, 0 AS eight_hour_light,
+               f.next_rabies_vaccine_due, f.sex, COALESCE(f.eight_hour_light, 0) AS eight_hour_light,
+               f.light_state_since, f.light_mode,
                0 AS distributed, NULL AS distributor_id, 0 AS breeding_retired,
                a.cage_address, a.room_id, a.room_name, a.room_lighting,
                s.supplier_name, NULL AS distributor_name
@@ -206,8 +208,7 @@ app.get('/api/ferrets/:id', authenticate, require_perm('read'), async (req, res)
               mi.cause_of_death,
               ecl.estrus_status, ecl.in_estrus, ecl.vulva_description,
               ecl.formed_observation, ecl.comments AS estrus_comments,
-              COALESCE(rls.eight_hour_light, 0) AS room_eight_hour_light,
-              rls.light_state_since AS room_light_state_since
+              COALESCE(rls.eight_hour_light, 0) AS room_eight_hour_light
         FROM ferret_qr005 f
         LEFT JOIN address          a   ON f.address_id          = a.address_id
         LEFT JOIN supplier         s   ON f.supplier_id         = s.supplier_id
@@ -386,11 +387,12 @@ app.get('/api/ferrets/:id/photo/original', authenticate, require_perm('read'), a
 
 // Change ferret location
 app.put('/api/ferrets/:id/location', authenticate, async (req, res) => {
-  const { address_id, position } = req.body;
+  const { address_id, position, move_date } = req.body;
   if (!address_id) return res.status(400).json({ error: 'address_id required' });
+  const moveDate = move_date || new Date().toISOString().slice(0, 10);
   try {
     const [[ferret]] = await pool.query(
-      'SELECT dead, distributed FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]
+      'SELECT dead, distributed, light_mode FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]
     );
     if (!ferret) return res.status(404).json({ error: 'Ferret not found' });
     if (ferret.dead === '1') return res.status(400).json({ error: 'Cannot change location of a deceased ferret' });
@@ -399,9 +401,63 @@ app.put('/api/ferrets/:id/location', authenticate, async (req, res) => {
     if (position !== undefined) {
       await pool.query('UPDATE address SET room_lighting = ? WHERE address_id = ?', [position || null, address_id]);
     }
-    await log_activity(req.user.user_id, 'MOVE', 'ferret_qr005', req.params.id, `Moved ferret #${req.params.id} to address #${address_id}${position ? ' · ' + position : ''}`);
+    // Auto light-cycle sync: adopt the destination room's current schedule,
+    // dated to the move (not necessarily today, if this is being logged after the fact)
+    if (ferret.light_mode !== 'manual') {
+      const [[destRoom]] = await pool.query(`
+        SELECT rls.eight_hour_light
+        FROM address a LEFT JOIN room_light_schedule rls ON a.room_id = rls.room_id
+        WHERE a.address_id = ?`, [address_id]);
+      await pool.query(
+        'UPDATE ferret_qr005 SET eight_hour_light = ?, light_state_since = ? WHERE Ferret_QR005_id = ?',
+        [destRoom?.eight_hour_light ? 1 : 0, moveDate, req.params.id]
+      );
+    }
+    await log_activity(req.user.user_id, 'MOVE', 'ferret_qr005', req.params.id,
+      `Moved ferret #${req.params.id} to address #${address_id}${position ? ' · ' + position : ''} (moved ${moveDate})`);
     res.json({ message: 'Location updated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Set a ferret's light-cycle mode/state — 'manual' lets staff set the exact
+// cycle and since-date directly; 'auto' immediately resyncs from the ferret's
+// current room and hands control back to room moves / room toggles
+app.put('/api/ferrets/:id/light-cycle', authenticate, require_perm('update'), async (req, res) => {
+  const { light_mode, eight_hour_light, light_state_since } = req.body;
+  if (!['auto', 'manual'].includes(light_mode)) return res.status(400).json({ error: 'Invalid light_mode' });
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    if (light_mode === 'manual') {
+      if (eight_hour_light === undefined || !light_state_since) {
+        await conn.rollback(); conn.release();
+        return res.status(400).json({ error: 'eight_hour_light and light_state_since are required for manual mode' });
+      }
+      await conn.query(
+        "UPDATE ferret_qr005 SET light_mode = 'manual', eight_hour_light = ?, light_state_since = ? WHERE Ferret_QR005_id = ?",
+        [eight_hour_light ? 1 : 0, light_state_since, req.params.id]
+      );
+    } else {
+      const [[room]] = await conn.query(`
+        SELECT rls.eight_hour_light, rls.light_state_since
+        FROM ferret_qr005 f
+        LEFT JOIN address a ON f.address_id = a.address_id
+        LEFT JOIN room_light_schedule rls ON a.room_id = rls.room_id
+        WHERE f.Ferret_QR005_id = ?`, [req.params.id]);
+      const today = new Date().toISOString().slice(0, 10);
+      await conn.query(
+        "UPDATE ferret_qr005 SET light_mode = 'auto', eight_hour_light = ?, light_state_since = ? WHERE Ferret_QR005_id = ?",
+        [room?.eight_hour_light ? 1 : 0, room?.light_state_since || today, req.params.id]
+      );
+    }
+    await conn.commit();
+    await log_activity(req.user.user_id, 'UPDATE', 'ferret_qr005', req.params.id,
+      `Light cycle mode set to ${light_mode} for ferret #${req.params.id}`);
+    res.json({ message: 'Light cycle updated' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
 });
 
 // Delete ferret (cleans up all dependent records first to avoid FK constraint errors)
@@ -1246,24 +1302,39 @@ app.put('/api/rooms/:room_id/light', authenticate, require_perm('update'), async
   const roomId = parseInt(req.params.room_id);
   if (!roomId) return res.status(400).json({ error: 'Invalid room_id' });
   const newVal = eight_hour_light ? 1 : 0;
+  const conn = await pool.getConnection();
   try {
-    const [[existing]] = await pool.query(
+    await conn.beginTransaction();
+    const [[existing]] = await conn.query(
       'SELECT eight_hour_light FROM room_light_schedule WHERE room_id = ?', [roomId]
     );
     // Only reset the "since" date when the state actually flips — repeated
-    // saves of the same value shouldn't restart the duration clock.
+    // saves of the same value shouldn't restart any ferret's duration clock.
     const stateChanged = !existing || existing.eight_hour_light != newVal;
     if (stateChanged) {
-      await pool.query(
+      await conn.query(
         `INSERT INTO room_light_schedule (room_id, eight_hour_light, light_state_since) VALUES (?, ?, CURDATE())
          ON DUPLICATE KEY UPDATE eight_hour_light = VALUES(eight_hour_light), light_state_since = CURDATE()`,
         [roomId, newVal]
       );
+      // Cascade to every auto-mode ferret currently housed in this room —
+      // flipping the room's actual light schedule is itself a trigger event
+      // (e.g. to induce estrus) even if no ferret physically moves.
+      await conn.query(`
+        UPDATE ferret_qr005 f
+        JOIN address a ON f.address_id = a.address_id
+        SET f.eight_hour_light = ?, f.light_state_since = CURDATE()
+        WHERE a.room_id = ? AND f.light_mode = 'auto'
+      `, [newVal, roomId]);
     }
+    await conn.commit();
     await log_activity(req.user.user_id, 'UPDATE', 'room_light_schedule', roomId,
-      `Room ${roomId} 8-hour light schedule ${newVal ? 'enabled' : 'disabled'}`);
+      `Room ${roomId} 8-hour light schedule ${newVal ? 'enabled' : 'disabled'}${stateChanged ? ' — synced to auto-mode ferrets in room' : ''}`);
     res.json({ message: 'Room light schedule updated' });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
 });
 
 // Submit a cleaning report (any authenticated user)
