@@ -1,5 +1,6 @@
-// SanusBio v1.9.3 | 2026-07-20 | app-core.js
+// SanusBio v1.9.4 | 2026-07-22 | app-core.js
 // State, API, Auth, Init, Navigation, Dashboard, Helpers
+// v1.9.4: added weeksSince() helper for light-schedule duration display
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let TOKEN = localStorage.getItem('sb_token');
@@ -206,6 +207,12 @@ function fmtTime(dt) {
   return `${h}:${min.toString().padStart(2, '0')} ${ampm}`;
 }
 function fmtDT(dt) { if (!dt) return '—'; return `${fmtDate(dt)} ${fmtTime(dt)}`; }
+function weeksSince(dateStr) {
+  if (!dateStr) return null;
+  const start = new Date(dateStr);
+  const days = Math.floor((Date.now() - start) / 864e5);
+  return days < 0 ? 0 : Math.floor(days / 7);
+}
 
 // ─── DOMContentLoaded bootstrap ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
