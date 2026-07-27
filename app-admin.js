@@ -1,5 +1,7 @@
-// SanusBio v1.9.2 | 2026-07-17 | app-admin.js
+// SanusBio v1.9.5 | 2026-07-24 | app-admin.js
 // Locations, Suppliers, Assignments, Users, Activity Log, Distribution Page
+// v1.9.5: room light schedule reverted to on/off only — duration now tracked
+//         per ferret (see app-ferrets.js) since it must follow the animal
 
 // ─── Locations ────────────────────────────────────────────────────────────────
 async function loadLocations() {
@@ -61,6 +63,7 @@ async function deleteLocation(id, label) {
 
 async function openMoveModal(ferretId) {
   document.getElementById('moveFerretId').value = ferretId;
+  document.getElementById('moveDate').value = today();
   document.getElementById('movePosNone').checked = true;
   try {
     const addresses = await api('/addresses');
@@ -76,8 +79,9 @@ async function submitMove() {
   const ferretId = document.getElementById('moveFerretId').value;
   const address_id = document.getElementById('moveAddrId').value;
   const position = document.querySelector('input[name="movePosition"]:checked')?.value || null;
+  const move_date = document.getElementById('moveDate').value || today();
   try {
-    await api(`/ferrets/${ferretId}/location`, { method: 'PUT', body: { address_id: parseInt(address_id), position } });
+    await api(`/ferrets/${ferretId}/location`, { method: 'PUT', body: { address_id: parseInt(address_id), position, move_date } });
     bootstrap.Modal.getInstance(document.getElementById('moveModal')).hide();
     loadFerretDetail(ferretId);
   } catch (err) { alert(err.message); }
