@@ -1,6 +1,7 @@
-// SanusBio v1.9.4 | 2026-07-22 | app-ferrets.js
+// SanusBio v1.9.5 | 2026-07-24 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 // v1.9.4: ages always shown in weeks (no Y/mo breakdown); Age at Death added next to Date of Death
+// v1.9.5: light cycle moved to per-ferret tracking (auto/manual), duration + edit controls on ferret detail
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
 async function loadFerrets(search = '') {
@@ -245,18 +246,40 @@ async function loadFerretDetail(id) {
     </div>
     <div class="col-md-6">
       <div class="card p-3 h-100">
-        <div class="d-flex align-items-center justify-content-between">
-          <div>
-            <span class="fw-semibold"><i class="bi bi-lightbulb me-1 text-warning"></i>8-Hour Light Schedule</span>
-            <div class="text-muted small mt-1">Set per room (Room ${f.room_id || '?'}) — manage on the Locations page.</div>
-          </div>
-          <div class="d-flex align-items-center gap-2">
-            <span class="badge ${f.room_eight_hour_light ? 'bg-warning text-dark' : 'bg-secondary'}">
-              ${f.room_eight_hour_light ? 'On' : 'Off'}
-            </span>
-            ${canUpdate() ? `<button class="btn btn-sm btn-outline-secondary" onclick="nav('locations')"><i class="bi bi-geo-alt me-1"></i>Manage</button>` : ''}
-          </div>
+        <div class="d-flex align-items-center justify-content-between mb-1">
+          <span class="fw-semibold"><i class="bi bi-lightbulb me-1 text-warning"></i>Light Cycle (Summer / Winter)</span>
+          <span class="badge ${f.eight_hour_light ? 'bg-warning text-dark' : 'bg-secondary'}">
+            ${f.eight_hour_light ? '8-Hour (Winter)' : 'Standard (Summer)'}
+          </span>
         </div>
+        <div class="text-muted small">
+          ${f.light_state_since ? `${weeksSince(f.light_state_since)}wk on this cycle (since ${fmtDate(f.light_state_since)})` : 'Duration unknown'}
+        </div>
+        <div class="text-muted small mb-2">
+          Mode: <strong>${f.light_mode === 'manual' ? 'Manual' : 'Automatic (follows moves & room changes)'}</strong>
+          · Room ${f.room_id || '?'} is currently ${f.room_eight_hour_light ? '8-Hour' : 'Standard'}
+        </div>
+        ${canUpdate() ? `
+        <div id="lightCycleEditRow" class="d-flex flex-wrap gap-2 align-items-end mb-2" style="display:none">
+          <div>
+            <label class="form-label small mb-1">Cycle</label>
+            <select id="lcManualValue" class="form-select form-select-sm">
+              <option value="0" ${!f.eight_hour_light ? 'selected' : ''}>Standard (Summer)</option>
+              <option value="1" ${f.eight_hour_light ? 'selected' : ''}>8-Hour (Winter)</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label small mb-1">Since</label>
+            <input id="lcManualSince" type="date" class="form-control form-control-sm">
+          </div>
+          <button class="btn btn-sm btn-primary" onclick="saveLightCycle(${id}, 'manual')">Save</button>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-secondary" onclick="toggleLightCycleEdit()">
+            <i class="bi bi-pencil me-1"></i>${f.light_mode === 'manual' ? 'Edit' : 'Set Manually'}
+          </button>
+          ${f.light_mode === 'manual' ? `<button class="btn btn-sm btn-outline-success" onclick="saveLightCycle(${id}, 'auto')"><i class="bi bi-arrow-repeat me-1"></i>Return to Automatic</button>` : ''}
+        </div>` : ''}
       </div>
     </div>
   </div>
@@ -358,8 +381,11 @@ async function loadFerretDetail(id) {
             <td>${l.individuals_created ?? 0}</td>
             <td class="small">${l.anomalies_and_notes || '—'}</td>
             <td>
-              ${canUpdate() && (!l.individuals_created || l.individuals_created < l.kit_count)
+              <div class="d-flex gap-1 flex-wrap">
+                <button class="btn btn-sm btn-outline-secondary" onclick="openLitterDetailModal(${l.litter_log_id})"><i class="bi bi-journal-medical me-1"></i>Care Log</button>
+                ${canUpdate() && (!l.individuals_created || l.individuals_created < l.kit_count)
             ? `<button class="btn btn-xs btn-outline-success btn-sm" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>` : ''}
+              </div>
             </td>
           </tr>`).join('') : '<tr><td colspan="8" class="text-muted text-center py-3">No litter records</td></tr>'}
         </tbody>
@@ -869,6 +895,28 @@ async function loadFerretDistHistory(ferretId) {
   } catch (err) {
     el.innerHTML = '<div class="text-danger small">Failed to load distribution records.</div>';
   }
+}
+
+// ─── Light Cycle (per-ferret, auto/manual) ────────────────────────────────────
+function toggleLightCycleEdit() {
+  const row = document.getElementById('lightCycleEditRow');
+  if (!row) return;
+  const showing = row.style.display !== 'none';
+  row.style.display = showing ? 'none' : '';
+  if (!showing) document.getElementById('lcManualSince').value = today();
+}
+
+async function saveLightCycle(ferretId, mode) {
+  try {
+    const body = { light_mode: mode };
+    if (mode === 'manual') {
+      body.eight_hour_light = document.getElementById('lcManualValue').value === '1';
+      body.light_state_since = document.getElementById('lcManualSince').value;
+      if (!body.light_state_since) return alert('Please choose a since-date.');
+    }
+    await api(`/ferrets/${ferretId}/light-cycle`, { method: 'PUT', body });
+    loadFerretDetail(ferretId);
+  } catch (err) { alert(err.message); }
 }
 
 async function toggleBreedingRetired(ferretId, enabled) {
