@@ -1,7 +1,6 @@
 -- SanusBio Migration 15: Light Schedule Duration, Pre-ID Kit Deaths, Litter Care Log
 -- Run AFTER 14_reproductive_event_photo.sql
 -- Safe to re-run
--- 1.9.4 7/22/26
 
 USE sanusbio;
 
