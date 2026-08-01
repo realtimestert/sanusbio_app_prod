@@ -1,7 +1,10 @@
-// SanusBio v1.9.5 | 2026-07-24 | app-ferrets.js
+// SanusBio v1.10.1 | 2026-07-28 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 // v1.9.4: ages always shown in weeks (no Y/mo breakdown); Age at Death added next to Date of Death
 // v1.9.5: light cycle moved to per-ferret tracking (auto/manual), duration + edit controls on ferret detail
+// v1.10.0: new Location History tab (every former room, via ferret_location_history);
+//          Mating History + Estrus Status tabs show pulled-date + expected litter range
+// v1.10.1: ferret-detail Litters tab uses litterCreatableCount() (excludes stillborn)
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
 async function loadFerrets(search = '') {
@@ -293,6 +296,7 @@ async function loadFerretDetail(id) {
     ${f.sex === 'female' ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tRepro"><i class="bi bi-heart me-1"></i>Estrus Status</button></li>` : ''}
     ${canUpdate() ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMatingRestriction">Mating Restrictions</button></li>` : ''}
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tDist">Distribution</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tLocHistory"><i class="bi bi-geo-alt me-1"></i>Location History</button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tHistory">History</button></li>
   </ul>
 
@@ -349,16 +353,19 @@ async function loadFerretDetail(id) {
         ${canUpdate() ? `<button class="btn btn-sm btn-primary ms-auto" onclick="openMatingModal(${id})"><i class="bi bi-plus-lg me-1"></i>Record Mating</button>` : ''}
       </div>
       <table class="table table-sm">
-        <thead><tr><th>Date</th><th>Female</th><th>Male</th><th>Notes</th><th>Recorded By</th>${roleIs('admin', 'research') ? '<th></th>' : ''}</tr></thead>
+        <thead><tr><th>Date</th><th>Female</th><th>Male</th><th>Pulled Date</th><th>Expected Litter</th><th>Notes</th><th>Recorded By</th><th></th>${roleIs('admin', 'research') ? '<th></th>' : ''}</tr></thead>
         <tbody>${matings.length ? matings.map(m => `
           <tr>
             <td>${fmtDate(m.event_date)}</td>
             <td><strong>${m.female_name}</strong></td>
             <td><strong>${m.male_name || '—'}</strong></td>
+            <td>${m.pulled_date ? fmtDate(m.pulled_date) : '<span class="text-muted">Not set</span>'}</td>
+            <td class="small">${expectedLitterRangeLabel(m)}</td>
             <td class="small">${m.notes || '—'}</td>
             <td class="text-muted small">${m.recorded_by || '—'}</td>
+            <td>${canUpdate() ? `<button class="btn btn-sm btn-outline-secondary" onclick="openPulledDateModal(${m.female_id},${m.event_id},'${m.pulled_date ? String(m.pulled_date).slice(0, 10) : ''}')"><i class="bi bi-calendar-check"></i></button>` : ''}</td>
             ${roleIs('admin', 'research') ? `<td><button class="btn btn-sm btn-outline-danger" onclick="deleteReproEvent(${m.female_id},${m.event_id})"><i class="bi bi-trash"></i></button></td>` : ''}
-          </tr>`).join('') : `<tr><td colspan="${roleIs('admin', 'research') ? 6 : 5}" class="text-muted text-center py-3">No matings recorded</td></tr>`}
+          </tr>`).join('') : `<tr><td colspan="${roleIs('admin', 'research') ? 8 : 7}" class="text-muted text-center py-3">No matings recorded</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -371,23 +378,26 @@ async function loadFerretDetail(id) {
       </div>
       <table class="table table-sm">
         <thead><tr><th>Date</th><th>Litter ID</th><th>Kits</th><th>Stillborn</th><th>Father</th><th>Created</th><th>Notes</th><th></th></tr></thead>
-        <tbody>${litters.length ? litters.map(l => `
+        <tbody>${litters.length ? litters.map(l => {
+          const creatable = litterCreatableCount(l);
+          return `
           <tr>
             <td>${fmtDate(l.litter_date)}</td>
             <td>${l.litter_id || '—'}</td>
             <td>${l.kit_count ?? '—'}</td>
             <td>${l.stillborn ?? '—'}</td>
             <td>${l.father || '—'}</td>
-            <td>${l.individuals_created ?? 0}</td>
+            <td>${l.individuals_created ?? 0} / ${creatable}</td>
             <td class="small">${l.anomalies_and_notes || '—'}</td>
             <td>
               <div class="d-flex gap-1 flex-wrap">
                 <button class="btn btn-sm btn-outline-secondary" onclick="openLitterDetailModal(${l.litter_log_id})"><i class="bi bi-journal-medical me-1"></i>Care Log</button>
-                ${canUpdate() && (!l.individuals_created || l.individuals_created < l.kit_count)
+                ${canUpdate() && (!l.individuals_created || l.individuals_created < creatable)
             ? `<button class="btn btn-xs btn-outline-success btn-sm" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>` : ''}
               </div>
             </td>
-          </tr>`).join('') : '<tr><td colspan="8" class="text-muted text-center py-3">No litter records</td></tr>'}
+          </tr>`;
+        }).join('') : '<tr><td colspan="8" class="text-muted text-center py-3">No litter records</td></tr>'}
         </tbody>
       </table>
     </div>` : ''}
@@ -498,14 +508,17 @@ async function loadFerretDetail(id) {
       </div>
       ${repro.length ? `
       <table class="table table-sm table-hover">
-        <thead><tr><th>Date</th><th>Event</th><th>Partner</th><th>Photo</th><th>Notes</th><th>Recorded By</th>${roleIs('admin', 'research') ? '<th></th>' : ''}</tr></thead>
+        <thead><tr><th>Date</th><th>Event</th><th>Partner</th><th>Pulled Date</th><th>Expected Litter</th><th>Photo</th><th>Notes</th><th>Recorded By</th>${roleIs('admin', 'research') ? '<th></th>' : ''}</tr></thead>
         <tbody>${repro.map(e => {
           const meta = { estrus: { label: 'In Estrus', color: 'danger' }, mated: { label: 'Mated', color: 'warning' }, littered: { label: 'Littered', color: 'success' }, weaned: { label: 'Weaned', color: 'info' }, no_litter: { label: 'No Litter', color: 'secondary' } };
           const m = meta[e.event_type] || { label: e.event_type, color: 'secondary' };
+          const isMated = e.event_type === 'mated';
           return `<tr>
             <td>${fmtDate(e.event_date)}</td>
             <td><span class="badge bg-${m.color}">${m.label}</span></td>
             <td>${e.partner_name ? `<strong>${e.partner_name}</strong>` : '—'}</td>
+            <td>${isMated ? (e.pulled_date ? fmtDate(e.pulled_date) : '<span class="text-muted">Not set</span>') + (canUpdate() ? ` <button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="openPulledDateModal(${id},${e.event_id},'${e.pulled_date ? String(e.pulled_date).slice(0, 10) : ''}')"><i class="bi bi-calendar-check"></i></button>` : '') : '—'}</td>
+            <td class="small">${isMated ? expectedLitterRangeLabel(e) : '—'}</td>
             <td>${e.photo_url ? `<img src="${e.photo_url}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;cursor:pointer" onclick="window.open('${e.photo_url}','_blank')">` : '—'}</td>
             <td class="small">${e.notes || '—'}</td>
             <td class="text-muted small">${e.recorded_by || '—'}</td>
@@ -556,6 +569,16 @@ async function loadFerretDetail(id) {
     </div>`;
       })() : ''}
 
+    <!-- Location History (every former room) -->
+    <div id="tLocHistory" class="tab-pane">
+      <table class="table table-sm">
+        <thead><tr><th>Room</th><th>Cage</th><th>Moved In</th><th>Moved Out</th></tr></thead>
+        <tbody id="locHistoryTable">
+          <tr><td colspan="4" class="text-muted text-center py-3"><div class="spinner-border spinner-border-sm" role="status"></div> Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
     <!-- History -->
     <div id="tHistory" class="tab-pane">
       <div class="timeline ps-2">
@@ -599,7 +622,30 @@ async function loadFerretDetail(id) {
 
     loadRfidDisplay(id);
     loadFerretDistHistory(id);
+    loadLocationHistory(id);
   } catch (err) { el.innerHTML = `<div class="alert alert-danger">${err.message}</div>`; }
+}
+
+// ─── Location History (former rooms) ──────────────────────────────────────────
+async function loadLocationHistory(ferretId) {
+  const el = document.getElementById('locHistoryTable');
+  if (!el) return;
+  try {
+    const rows = await api(`/ferrets/${ferretId}/location-history`);
+    if (!rows.length) {
+      el.innerHTML = '<tr><td colspan="4" class="text-muted text-center py-3">No location history recorded.</td></tr>';
+      return;
+    }
+    el.innerHTML = rows.map(r => `
+      <tr class="${!r.move_out ? 'table-success bg-opacity-25' : ''}">
+        <td>Room ${r.room_id ?? '?'}${r.room_name ? ' ' + r.room_name : ''}</td>
+        <td>${r.cage_address || '—'}${r.room_lighting ? ' · ' + r.room_lighting : ''}</td>
+        <td>${fmtDate(r.move_in)}</td>
+        <td>${r.move_out ? fmtDate(r.move_out) : '<span class="badge bg-success">Current</span>'}</td>
+      </tr>`).join('');
+  } catch (err) {
+    el.innerHTML = `<tr><td colspan="4" class="text-danger text-center py-2">${err.message}</td></tr>`;
+  }
 }
 
 function historyMeta(action) {
