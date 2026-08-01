@@ -1,6 +1,9 @@
-// SanusBio v1.9.4 | 2026-07-22 | app-core.js
+// SanusBio v1.10.1 | 2026-07-28 | app-core.js
 // State, API, Auth, Init, Navigation, Dashboard, Helpers
 // v1.9.4: added weeksSince() helper for light-schedule duration display
+// v1.10.0: estrus board shows expected litter range for mated females;
+//          dashboard surfaces females who died while active on the board
+// v1.10.1: fixed stacked Bootstrap modal z-index (nested modals were covered)
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let TOKEN = localStorage.getItem('sb_token');
@@ -137,6 +140,29 @@ async function loadDashboard() {
   } else if (estrusCard) {
     estrusCard.style.display = 'none';
   }
+
+  // Females who died while active on the board
+  const diedCard = document.getElementById('dashDiedOnBoardCard');
+  if (diedCard && roleIs('admin', 'research', 'maternity')) {
+    try {
+      const died = await api('/females/died-on-board');
+      if (died.length) {
+        diedCard.style.display = '';
+        const STATUS_LABEL = { estrus: 'In Estrus', mated: 'Mated', littered: 'Littered', weaned: 'Weaned' };
+        document.getElementById('dashDiedOnBoardList').innerHTML = died.map(f => `
+          <tr style="cursor:pointer" onclick="loadFerretDetail(${f.id})">
+            <td><strong>${f.name}</strong><br><span class="text-muted small">${f.animal_id || '—'}</span></td>
+            <td><span class="badge bg-danger">${STATUS_LABEL[f.death_female_status] || f.death_female_status}</span></td>
+            <td>${fmtDate(f.death_date)}</td>
+            <td class="small text-muted">Room ${f.room_id || '?'} · ${f.cage_address || '?'}</td>
+          </tr>`).join('');
+      } else {
+        diedCard.style.display = 'none';
+      }
+    } catch (err) { console.error('Died-on-board:', err); }
+  } else if (diedCard) {
+    diedCard.style.display = 'none';
+  }
 }
 
 function renderDashReproFilterBtns() {
@@ -171,18 +197,25 @@ function renderDashReproTable() {
   if (!tbody) return;
   const filtered = _dashReproFilter ? _dashReproData.filter(f => f.status === _dashReproFilter) : _dashReproData;
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-3">No females in this category</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-muted text-center py-3">No females in this category</td></tr>';
     return;
   }
   tbody.innerHTML = filtered.map(f => {
     const m = DASH_REPRO_STATUS_META[f.status] || DASH_REPRO_STATUS_META.estrus;
     const daysSince = f.status_since ? Math.floor((Date.now() - new Date(f.status_since)) / 864e5) : null;
     const urgency = f.status === 'estrus' && daysSince !== null && daysSince >= 8;
+    let litterLabel = '—';
+    if (f.status === 'mated') {
+      const start = f.expected_litter_start, end = f.expected_litter_end;
+      if (start && end) litterLabel = (fmtDate(start) === fmtDate(end)) ? fmtDate(start) : `${fmtDate(start)} – ${fmtDate(end)}`;
+      else if (start) litterLabel = fmtDate(start) + ' (est.)';
+    }
     return `<tr class="${urgency ? 'table-danger' : ''}" style="cursor:pointer" onclick="loadFerretDetail(${f.id}); nav('ferrets');">
       <td><strong>${f.name}</strong><br><span class="text-muted small">${f.animal_id || '—'}</span></td>
       <td><span class="badge bg-${m.color}">${m.label}</span></td>
       <td>${f.status_since ? fmtDate(f.status_since) : '—'}</td>
       <td>${daysSince !== null ? daysSince + 'd' : '—'}${urgency ? ' <i class="bi bi-exclamation-triangle-fill text-danger ms-1"></i>' : ''}</td>
+      <td class="small">${litterLabel}</td>
       <td class="small text-muted">Room ${f.room_id || '?'} · ${f.cage_address || '?'}</td>
       <td class="small text-muted">${f.status_notes || '—'}</td>
     </tr>`;
@@ -213,6 +246,23 @@ function weeksSince(dateStr) {
   const days = Math.floor((Date.now() - start) / 864e5);
   return days < 0 ? 0 : Math.floor(days / 7);
 }
+
+// ─── Stacked Modal Fix ─────────────────────────────────────────────────────────
+// Bootstrap doesn't bump z-index for a modal opened from within another modal
+// (e.g. Log Kit Death opened on top of Litter Care Details), so the new modal
+// and its backdrop can end up rendering *behind* the modal it was opened from.
+// Give each successively-opened modal (and its backdrop) a higher z-index.
+document.addEventListener('show.bs.modal', e => {
+  const openCount = document.querySelectorAll('.modal.show').length;
+  if (!openCount) return;
+  const zIndex = 1055 + openCount * 20;
+  e.target.style.zIndex = zIndex;
+  setTimeout(() => {
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    const topBackdrop = backdrops[backdrops.length - 1];
+    if (topBackdrop) topBackdrop.style.zIndex = zIndex - 5;
+  }, 0);
+});
 
 // ─── DOMContentLoaded bootstrap ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
