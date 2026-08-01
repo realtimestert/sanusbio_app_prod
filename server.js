@@ -1,7 +1,16 @@
-// SanusBio v1.9.5 | 2026-07-24 | server.js
+// SanusBio v1.10.1 | 2026-07-28 | server.js
 // v1.9.5: light-cycle duration tracking moved from rooms to ferrets
 //         (light_mode auto/manual); moves now take a move_date; room toggle
 //         cascades to auto-mode ferrets in that room
+// v1.10.0: (1) ferret_location_history now actually populated on create/move,
+//          plus GET history endpoint — former rooms are viewable; (2) mating
+//          records support a pulled_date (date female was separated from the
+//          male); expected litter is now returned as a RANGE — 6 weeks from
+//          mating date through 6 weeks from pulled_date; (3) marking a female
+//          deceased snapshots her female_status into death_female_status when
+//          she was active on the Reproductive Status Board at time of death
+// v1.10.1: stillborn kits no longer count toward individuals left to create —
+//          surviving_litter_count is now computed on litter create/edit
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -160,6 +169,7 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
               COALESCE(f.eight_hour_light, 0) AS eight_hour_light,
               f.light_state_since, f.light_mode,
               f.distributed, f.distributor_id, f.female_status, f.breeding_retired,
+              f.death_female_status,
               a.cage_address, a.room_id, a.room_name, a.room_lighting,
               s.supplier_name,
               d.distributor_name,
@@ -275,6 +285,13 @@ app.post('/api/ferrets', authenticate, async (req, res) => {
       next_rabies_vaccine_due || null, acquisition_by || null, photo_url || null,
       sex || null, litter_id || null, litter_date || null]);
 
+    if (resolved_address_id) {
+      await conn.query(
+        'INSERT INTO ferret_location_history (move_in, ferret_id, address_id) VALUES (?,?,?)',
+        [birth_date, r.insertId, resolved_address_id]
+      );
+    }
+
     await conn.commit();
     await log_activity(req.user.user_id, 'CREATE', 'ferret_qr005', r.insertId, `Created ferret: ${ferret_name}`);
     res.json({ id: r.insertId, message: 'Ferret created successfully' });
@@ -311,24 +328,34 @@ app.put('/api/ferrets/:id/deceased', authenticate, require_perm('update'), async
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    await conn.query(
-      "UPDATE ferret_qr005 SET dead = '1', death_date = ? WHERE Ferret_QR005_id = ?",
-      [death_date || null, req.params.id]
-    );
-    const [[ferret]] = await conn.query(
-      'SELECT medical_info_id, ferret_name FROM ferret_qr005 WHERE Ferret_QR005_id = ?',
+
+    const [[before]] = await conn.query(
+      'SELECT medical_info_id, ferret_name, sex, female_status, breeding_retired FROM ferret_qr005 WHERE Ferret_QR005_id = ?',
       [req.params.id]
     );
-    if (ferret) {
-      await conn.query(
-        "UPDATE medical_info SET cause_of_death = ?, date_of_death = ?, dead = 'y' WHERE medical_info_id = ?",
-        [cause_of_death || null, death_date || null, ferret.medical_info_id]
-      );
-    }
+    if (!before) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Ferret not found' }); }
+
+    // If she's female, currently active on the Reproductive Status Board
+    // (non-baseline status, not retired), snapshot that status so it's
+    // flagged/queryable that she died while on the board.
+    const diedOnBoard = before.sex === 'female'
+      && before.female_status && before.female_status !== 'baseline'
+      && !before.breeding_retired;
+
+    await conn.query(
+      "UPDATE ferret_qr005 SET dead = '1', death_date = ?, death_female_status = ? WHERE Ferret_QR005_id = ?",
+      [death_date || null, diedOnBoard ? before.female_status : null, req.params.id]
+    );
+    await conn.query(
+      "UPDATE medical_info SET cause_of_death = ?, date_of_death = ?, dead = 'y' WHERE medical_info_id = ?",
+      [cause_of_death || null, death_date || null, before.medical_info_id]
+    );
+
     await conn.commit();
+    const boardNote = diedOnBoard ? ` — died while ${before.female_status} on the Reproductive Status Board` : '';
     await log_activity(req.user.user_id, 'UPDATE', 'ferret_qr005', req.params.id,
-      `Marked deceased: ferret #${req.params.id}${cause_of_death ? ' — ' + cause_of_death : ''}`);
-    res.json({ message: 'Ferret marked as deceased' });
+      `Marked deceased: ferret #${req.params.id}${cause_of_death ? ' — ' + cause_of_death : ''}${boardNote}`);
+    res.json({ message: 'Ferret marked as deceased', died_on_board: diedOnBoard });
   } catch (err) {
     await conn.rollback();
     res.status(500).json({ error: err.message });
@@ -390,32 +417,69 @@ app.put('/api/ferrets/:id/location', authenticate, async (req, res) => {
   const { address_id, position, move_date } = req.body;
   if (!address_id) return res.status(400).json({ error: 'address_id required' });
   const moveDate = move_date || new Date().toISOString().slice(0, 10);
+  const conn = await pool.getConnection();
   try {
-    const [[ferret]] = await pool.query(
-      'SELECT dead, distributed, light_mode FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]
+    await conn.beginTransaction();
+    const [[ferret]] = await conn.query(
+      'SELECT dead, distributed, light_mode, address_id FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]
     );
-    if (!ferret) return res.status(404).json({ error: 'Ferret not found' });
-    if (ferret.dead === '1') return res.status(400).json({ error: 'Cannot change location of a deceased ferret' });
-    if (ferret.distributed) return res.status(400).json({ error: 'Cannot change location of a distributed ferret' });
-    await pool.query('UPDATE ferret_qr005 SET address_id = ? WHERE Ferret_QR005_id = ?', [address_id, req.params.id]);
+    if (!ferret) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Ferret not found' }); }
+    if (ferret.dead === '1') { await conn.rollback(); conn.release(); return res.status(400).json({ error: 'Cannot change location of a deceased ferret' }); }
+    if (ferret.distributed) { await conn.rollback(); conn.release(); return res.status(400).json({ error: 'Cannot change location of a distributed ferret' }); }
+
+    await conn.query('UPDATE ferret_qr005 SET address_id = ? WHERE Ferret_QR005_id = ?', [address_id, req.params.id]);
     if (position !== undefined) {
-      await pool.query('UPDATE address SET room_lighting = ? WHERE address_id = ?', [position || null, address_id]);
+      await conn.query('UPDATE address SET room_lighting = ? WHERE address_id = ?', [position || null, address_id]);
     }
+
+    // Location history: close out the currently-open row (if any) and open a
+    // new one for the destination, so every former room stays viewable.
+    if (String(ferret.address_id) !== String(address_id)) {
+      await conn.query(
+        `UPDATE ferret_location_history SET move_out = ?
+         WHERE ferret_id = ? AND move_out IS NULL`,
+        [moveDate, req.params.id]
+      );
+      await conn.query(
+        'INSERT INTO ferret_location_history (move_in, ferret_id, address_id) VALUES (?,?,?)',
+        [moveDate, req.params.id, address_id]
+      );
+    }
+
     // Auto light-cycle sync: adopt the destination room's current schedule,
     // dated to the move (not necessarily today, if this is being logged after the fact)
     if (ferret.light_mode !== 'manual') {
-      const [[destRoom]] = await pool.query(`
+      const [[destRoom]] = await conn.query(`
         SELECT rls.eight_hour_light
         FROM address a LEFT JOIN room_light_schedule rls ON a.room_id = rls.room_id
         WHERE a.address_id = ?`, [address_id]);
-      await pool.query(
+      await conn.query(
         'UPDATE ferret_qr005 SET eight_hour_light = ?, light_state_since = ? WHERE Ferret_QR005_id = ?',
         [destRoom?.eight_hour_light ? 1 : 0, moveDate, req.params.id]
       );
     }
+    await conn.commit();
     await log_activity(req.user.user_id, 'MOVE', 'ferret_qr005', req.params.id,
       `Moved ferret #${req.params.id} to address #${address_id}${position ? ' · ' + position : ''} (moved ${moveDate})`);
     res.json({ message: 'Location updated' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
+});
+
+// Location history for a ferret — every former room, most recent first
+app.get('/api/ferrets/:id/location-history', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT flh.location_event_id, flh.move_in, flh.move_out,
+             a.address_id, a.room_id, a.room_name, a.cage_address, a.room_lighting
+      FROM ferret_location_history flh
+      LEFT JOIN address a ON flh.address_id = a.address_id
+      WHERE flh.ferret_id = ?
+      ORDER BY flh.move_in DESC, flh.location_event_id DESC
+    `, [req.params.id]);
+    res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -702,13 +766,18 @@ app.post('/api/litters', authenticate, async (req, res) => {
   if (!['admin', 'maternity', 'research'].includes(req.user.role))
     return res.status(403).json({ error: 'Only admin, research, and maternity can add litter records' });
   const { Ferret_QR005_id, litter_id, litter_date, kit_count, stillborn, father, mother, anomalies_and_notes } = req.body;
+  const kc = kit_count || null;
+  const sb = stillborn || null;
+  // Stillborn kits are never individuated, so they shouldn't count toward
+  // the number of kits left to create — seed surviving_litter_count now.
+  const survivingCount = kc != null ? Math.max(0, kc - (sb || 0)) : null;
   try {
     const [r] = await pool.query(
       `INSERT INTO litter_log (Ferret_QR005_id, litter_id, litter_date, kit_count, stillborn,
-        father, mother, anomalies_and_notes, created, created_by)
-       VALUES (?,?,?,?,?,?,?,?,CURDATE(),?)`,
-      [Ferret_QR005_id, litter_id || null, litter_date, kit_count || null,
-        stillborn || null, father || null, mother || null,
+        surviving_litter_count, father, mother, anomalies_and_notes, created, created_by)
+       VALUES (?,?,?,?,?,?,?,?,?,CURDATE(),?)`,
+      [Ferret_QR005_id, litter_id || null, litter_date, kc,
+        sb, survivingCount, father || null, mother || null,
         anomalies_and_notes || null, req.user.username]
     );
     await log_activity(req.user.user_id, 'CREATE', 'litter_log', Ferret_QR005_id, `Litter recorded for ferret #${Ferret_QR005_id} — ${kit_count || 0} kits`);
@@ -724,8 +793,21 @@ app.put('/api/litters/:id', authenticate, require_perm('update'), async (req, re
     if (req.body[key] !== undefined) { sets.push(`${key} = ?`); vals.push(req.body[key]); }
   }
   if (!sets.length) return res.status(400).json({ error: 'Nothing to update' });
-  vals.push(req.params.id);
   try {
+    // If kit_count/stillborn changed but surviving_litter_count wasn't explicitly
+    // sent, recompute it so stillborn kits keep being excluded from the create count.
+    if ((req.body.kit_count !== undefined || req.body.stillborn !== undefined) && req.body.surviving_litter_count === undefined) {
+      const [[current]] = await pool.query('SELECT kit_count, stillborn, infant_deaths FROM litter_log WHERE litter_log_id = ?', [req.params.id]);
+      if (current) {
+        const kc = req.body.kit_count !== undefined ? req.body.kit_count : current.kit_count;
+        const sb = req.body.stillborn !== undefined ? req.body.stillborn : current.stillborn;
+        if (kc != null) {
+          const surviving = Math.max(0, kc - (sb || 0) - (current.infant_deaths || 0));
+          sets.push('surviving_litter_count = ?'); vals.push(surviving);
+        }
+      }
+    }
+    vals.push(req.params.id);
     await pool.query(`UPDATE litter_log SET ${sets.join(', ')} WHERE litter_log_id = ?`, vals);
     res.json({ message: 'Litter updated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1599,9 +1681,11 @@ app.get('/api/ferrets/:id/matings', authenticate, require_perm('read'), async (r
       ? 're.partner_id = ? AND re.event_type = \'mated\''
       : 're.ferret_id = ? AND re.event_type = \'mated\'';
     const [rows] = await pool.query(`
-      SELECT re.event_id, re.event_date, re.notes, re.recorded_by,
+      SELECT re.event_id, re.event_date, re.pulled_date, re.notes, re.recorded_by,
              re.ferret_id AS female_id, f.ferret_name AS female_name,
-             re.partner_id AS male_id, m.ferret_name AS male_name
+             re.partner_id AS male_id, m.ferret_name AS male_name,
+             DATE_ADD(re.event_date, INTERVAL 42 DAY) AS expected_litter_start,
+             CASE WHEN re.pulled_date IS NOT NULL THEN DATE_ADD(re.pulled_date, INTERVAL 42 DAY) ELSE NULL END AS expected_litter_end
       FROM reproductive_event re
       JOIN ferret_qr005 f ON re.ferret_id = f.Ferret_QR005_id
       LEFT JOIN ferret_qr005 m ON re.partner_id = m.Ferret_QR005_id
@@ -1613,7 +1697,7 @@ app.get('/api/ferrets/:id/matings', authenticate, require_perm('read'), async (r
 });
 
 app.post('/api/ferrets/:id/matings', authenticate, require_perm('update'), async (req, res) => {
-  const { partner_id, event_date, notes } = req.body;
+  const { partner_id, event_date, pulled_date, notes } = req.body;
   if (!partner_id || !event_date) return res.status(400).json({ error: 'partner_id and event_date are required' });
   const conn = await pool.getConnection();
   try {
@@ -1629,8 +1713,8 @@ app.post('/api/ferrets/:id/matings', authenticate, require_perm('update'), async
     const maleId   = current.sex === 'male'   ? req.params.id : partner_id;
 
     const [r] = await conn.query(
-      'INSERT INTO reproductive_event (ferret_id, event_type, event_date, partner_id, notes, recorded_by) VALUES (?,?,?,?,?,?)',
-      [femaleId, 'mated', event_date, maleId, notes || null, req.user.username]
+      'INSERT INTO reproductive_event (ferret_id, event_type, event_date, pulled_date, partner_id, notes, recorded_by) VALUES (?,?,?,?,?,?,?)',
+      [femaleId, 'mated', event_date, pulled_date || null, maleId, notes || null, req.user.username]
     );
     const [events] = await conn.query(
       'SELECT event_type FROM reproductive_event WHERE ferret_id = ? ORDER BY event_date DESC, event_id DESC',
@@ -1653,7 +1737,9 @@ app.get('/api/ferrets/:id/reproductive', authenticate, require_perm('read'), asy
   try {
     const [rows] = await pool.query(`
       SELECT re.*,
-             p.ferret_name AS partner_name
+             p.ferret_name AS partner_name,
+             DATE_ADD(re.event_date, INTERVAL 42 DAY) AS expected_litter_start,
+             CASE WHEN re.pulled_date IS NOT NULL THEN DATE_ADD(re.pulled_date, INTERVAL 42 DAY) ELSE NULL END AS expected_litter_end
       FROM reproductive_event re
       LEFT JOIN ferret_qr005 p ON re.partner_id = p.Ferret_QR005_id
       WHERE re.ferret_id = ?
@@ -1665,7 +1751,7 @@ app.get('/api/ferrets/:id/reproductive', authenticate, require_perm('read'), asy
 
 // Record a reproductive event (updates female_status automatically)
 app.post('/api/ferrets/:id/reproductive', authenticate, require_perm('update'), async (req, res) => {
-  const { event_type, event_date, partner_id, notes } = req.body;
+  const { event_type, event_date, partner_id, pulled_date, notes } = req.body;
   const VALID = ['estrus', 'mated', 'littered', 'weaned', 'no_litter'];
   if (!VALID.includes(event_type)) return res.status(400).json({ error: 'Invalid event_type' });
   if (!event_date) return res.status(400).json({ error: 'event_date is required' });
@@ -1682,8 +1768,8 @@ app.post('/api/ferrets/:id/reproductive', authenticate, require_perm('update'), 
     if (ferret.sex !== 'female') { await conn.rollback(); conn.release(); return res.status(400).json({ error: 'Reproductive events can only be recorded for female ferrets' }); }
 
     const [r] = await conn.query(
-      'INSERT INTO reproductive_event (ferret_id, event_type, event_date, partner_id, notes, recorded_by) VALUES (?,?,?,?,?,?)',
-      [req.params.id, event_type, event_date, partner_id || null, notes || null, req.user.username]
+      'INSERT INTO reproductive_event (ferret_id, event_type, event_date, pulled_date, partner_id, notes, recorded_by) VALUES (?,?,?,?,?,?,?)',
+      [req.params.id, event_type, event_date, event_type === 'mated' ? (pulled_date || null) : null, partner_id || null, notes || null, req.user.username]
     );
 
     // Recompute status from all events
@@ -1705,6 +1791,25 @@ app.post('/api/ferrets/:id/reproductive', authenticate, require_perm('update'), 
     await conn.rollback();
     res.status(500).json({ error: err.message });
   } finally { conn.release(); }
+});
+
+// Set/update the date a mated female was pulled/separated from the male —
+// recorded after the fact once staff separate the pair. Used with the
+// mating date to compute an expected-litter date RANGE (~6wk gestation).
+app.put('/api/ferrets/:id/reproductive/:eventId/pulled-date', authenticate, require_perm('update'), async (req, res) => {
+  const { pulled_date } = req.body;
+  try {
+    const [[event]] = await pool.query(
+      'SELECT event_type FROM reproductive_event WHERE event_id = ? AND ferret_id = ?',
+      [req.params.eventId, req.params.id]
+    );
+    if (!event) return res.status(404).json({ error: 'Reproductive event not found' });
+    if (event.event_type !== 'mated') return res.status(400).json({ error: 'Pulled date only applies to mated events' });
+    await pool.query('UPDATE reproductive_event SET pulled_date = ? WHERE event_id = ?', [pulled_date || null, req.params.eventId]);
+    await log_activity(req.user.user_id, 'UPDATE', 'reproductive_event', req.params.eventId,
+      `Pulled date ${pulled_date ? 'set to ' + pulled_date : 'cleared'} for reproductive event #${req.params.eventId}`);
+    res.json({ message: 'Pulled date updated' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Delete a reproductive event (admin only — with status recompute)
@@ -1777,7 +1882,11 @@ app.get('/api/females/estrus', authenticate, require_perm('read'), async (req, r
              a.room_id, a.room_name, a.cage_address, a.room_lighting,
              re.event_type AS status,
              re.event_date AS status_since,
-             re.notes AS status_notes
+             re.pulled_date,
+             re.notes AS status_notes,
+             DATE_ADD(re.event_date, INTERVAL 42 DAY) AS expected_litter_start,
+             CASE WHEN re.event_type = 'mated' AND re.pulled_date IS NOT NULL
+                  THEN DATE_ADD(re.pulled_date, INTERVAL 42 DAY) ELSE NULL END AS expected_litter_end
       FROM ferret_qr005 f
       LEFT JOIN address a ON f.address_id = a.address_id
       JOIN reproductive_event re ON re.event_id = (
@@ -1793,6 +1902,22 @@ app.get('/api/females/estrus', authenticate, require_perm('read'), async (req, r
       ORDER BY
         FIELD(re.event_type, 'estrus', 'mated', 'littered', 'weaned'),
         re.event_date ASC
+    `);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Females who died while active on the Reproductive Status Board (estrus/mated/littered/weaned)
+app.get('/api/females/died-on-board', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
+             f.birth_date, f.death_date, f.death_female_status,
+             a.room_id, a.room_name, a.cage_address
+      FROM ferret_qr005 f
+      LEFT JOIN address a ON f.address_id = a.address_id
+      WHERE f.sex = 'female' AND f.death_female_status IS NOT NULL
+      ORDER BY f.death_date DESC
     `);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
