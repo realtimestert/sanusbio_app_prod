@@ -1,7 +1,10 @@
-// SanusBio v1.9.4 | 2026-07-22 | app-medical.js
+// SanusBio v1.10.1 | 2026-07-28 | app-medical.js
 // Health Events, Vaccinations, Litters, Medical Info, Procedures
 // v1.9.4: added Litter Care Log (kit weighing, nest changes, supplemental feeding)
 //         and pre-ID Kit Death logging, accessed via "Care Log" on litter rows
+// v1.10.0: mating records now support a "pulled date" (date female separated
+//          from male) used to compute an expected-litter date RANGE
+// v1.10.1: litterCreatableCount() excludes stillborn from kits left to create
 
 // ─── Health Event Modal ───────────────────────────────────────────────────────
 function openHealthModal(ferretId) {
@@ -80,6 +83,14 @@ async function submitVaccination() {
 }
 
 // ─── Litters Page ─────────────────────────────────────────────────────────────
+// Stillborn (and any logged pre-ID kit deaths) never get individuated, so the
+// "kits left to create" count excludes them — use surviving_litter_count when
+// the server has computed it, otherwise fall back to kit_count - stillborn.
+function litterCreatableCount(l) {
+  if (l.surviving_litter_count != null) return l.surviving_litter_count;
+  return Math.max(0, (l.kit_count || 0) - (l.stillborn || 0));
+}
+
 async function loadLitters() {
   if (canUpdate()) document.getElementById('btnAddLitterMain').classList.remove('d-none');
   try {
@@ -89,7 +100,9 @@ async function loadLitters() {
       tbody.innerHTML = '<tr><td colspan="9" class="text-muted text-center py-4">No litter records yet.</td></tr>';
       return;
     }
-    tbody.innerHTML = litters.map(l => `
+    tbody.innerHTML = litters.map(l => {
+      const creatable = litterCreatableCount(l);
+      return `
   <tr>
     <td>${fmtDate(l.litter_date)}</td>
     <td>${l.litter_id || '—'}</td>
@@ -97,19 +110,20 @@ async function loadLitters() {
     <td>${l.father || '—'}</td>
     <td>${l.kit_count ?? '—'}</td>
     <td>${l.stillborn ?? '—'}</td>
-    <td>${l.individuals_created ?? 0} / ${l.kit_count ?? '?'}</td>
+    <td>${l.individuals_created ?? 0} / ${creatable}</td>
     <td class="small text-muted">${l.anomalies_and_notes || '—'}</td>
     <td>
       <div class="d-flex gap-1 flex-wrap">
         <button class="btn btn-sm btn-outline-secondary" onclick="openLitterDetailModal(${l.litter_log_id})"><i class="bi bi-journal-medical me-1"></i>Care Log</button>
-        ${canUpdate() && (!l.individuals_created || l.individuals_created < l.kit_count)
+        ${canUpdate() && (!l.individuals_created || l.individuals_created < creatable)
         ? `<button class="btn btn-sm btn-outline-success" onclick="openCreateFromLitter(${l.litter_log_id})"><i class="bi bi-egg me-1"></i>Create Ferrets</button>`
-        : (l.kit_count && l.individuals_created >= l.kit_count
+        : (creatable && l.individuals_created >= creatable
             ? `<span class="badge bg-success-subtle text-success border border-success-subtle align-self-center">All kits created</span>`
             : '')}
       </div>
     </td>
-  </tr>`).join('');
+  </tr>`;
+    }).join('');
   } catch (err) { console.error(err); }
 }
 
@@ -184,13 +198,14 @@ async function openCreateFromLitter(litterId) {
     const litters = await api('/litters');
     const litter = litters.find(l => l.litter_log_id === litterId);
     if (!litter) return;
-    const remaining = (litter.kit_count || 0) - (litter.individuals_created || 0);
+    const remaining = litterCreatableCount(litter) - (litter.individuals_created || 0);
     document.getElementById('cflLitterInfo').innerHTML =
       `<strong>Litter:</strong> ${litter.litter_id || '—'} &nbsp;|&nbsp;
    <strong>Date:</strong> ${fmtDate(litter.litter_date)} &nbsp;|&nbsp;
    <strong>Jill:</strong> ${litter.jill_name} &nbsp;|&nbsp;
    <strong>Father:</strong> ${litter.father || '—'} &nbsp;|&nbsp;
-   <strong>Kits remaining to create:</strong> ${remaining}`;
+   <strong>Stillborn:</strong> ${litter.stillborn ?? 0} &nbsp;|&nbsp;
+   <strong>Kits remaining to create:</strong> ${Math.max(0, remaining)}`;
     document.getElementById('cflKitList').innerHTML = '';
     for (let i = 0; i < Math.max(1, remaining); i++) addKitRow();
     new bootstrap.Modal(document.getElementById('createFromLitterModal')).show();
@@ -412,6 +427,37 @@ async function deleteReproEvent(ferretId, eventId) {
   if (!confirm('Delete this reproductive event? The ferret status will be recalculated.')) return;
   try {
     await api(`/ferrets/${ferretId}/reproductive/${eventId}`, { method: 'DELETE' });
+    loadFerretDetail(ferretId);
+  } catch (err) { alert(err.message); }
+}
+
+// ─── Expected Litter Range (6wk from mating date → 6wk from pulled date) ──────
+function expectedLitterRangeLabel(m) {
+  const start = m.expected_litter_start;
+  const end = m.expected_litter_end;
+  if (!start && !end) return '—';
+  if (start && end) {
+    if (fmtDate(start) === fmtDate(end)) return fmtDate(start);
+    return `${fmtDate(start)} – ${fmtDate(end)}`;
+  }
+  return fmtDate(start || end) + ' (est. — no pulled date yet)';
+}
+
+function openPulledDateModal(ferretId, eventId, currentDate) {
+  document.getElementById('pdFerretId').value = ferretId;
+  document.getElementById('pdEventId').value = eventId;
+  document.getElementById('pdDate').value = currentDate ? String(currentDate).slice(0, 10) : today();
+  new bootstrap.Modal(document.getElementById('pulledDateModal')).show();
+}
+
+async function submitPulledDate() {
+  const ferretId = document.getElementById('pdFerretId').value;
+  const eventId = document.getElementById('pdEventId').value;
+  const pulled_date = document.getElementById('pdDate').value;
+  if (!pulled_date) return alert('Please choose a date.');
+  try {
+    await api(`/ferrets/${ferretId}/reproductive/${eventId}/pulled-date`, { method: 'PUT', body: { pulled_date } });
+    bootstrap.Modal.getInstance(document.getElementById('pulledDateModal')).hide();
     loadFerretDetail(ferretId);
   } catch (err) { alert(err.message); }
 }
