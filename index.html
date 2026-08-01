@@ -1,4 +1,4 @@
-<!-- SanusBio v1.9.5 | 2026-07-24 | index.html -->
+<!-- SanusBio v1.10.0 | 2026-07-28 | index.html -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -127,6 +127,7 @@
                   <th>Status</th>
                   <th>Since</th>
                   <th>Days</th>
+                  <th>Expected Litter</th>
                   <th>Location</th>
                   <th>Notes</th>
                 </tr>
@@ -137,6 +138,19 @@
           <div class="card-footer bg-white text-muted small py-2">
             <i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>
             Females in estrus for 8+ days are highlighted — aim to mate within 10 days of estrus onset.
+          </div>
+        </div>
+
+        <!-- Died While Active on Board -->
+        <div class="card mt-3" id="dashDiedOnBoardCard" style="display:none">
+          <div class="card-header bg-white d-flex align-items-center py-3">
+            <span class="fw-semibold"><i class="bi bi-heartbreak text-danger me-2"></i>Died While Active on Reproductive Status Board</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead><tr><th>Female</th><th>Status at Death</th><th>Death Date</th><th>Location</th></tr></thead>
+              <tbody id="dashDiedOnBoardList"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -1642,6 +1656,28 @@
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pulled Date Modal (mating → date female separated from male) -->
+  <div class="modal fade" id="pulledDateModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Date Pulled From Male</h3><button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="pdFerretId">
+          <input type="hidden" id="pdEventId">
+          <p class="text-muted small">Used with the mating date to estimate a litter date range (~6 weeks gestation from each).</p>
+          <label class="form-label">Date Pulled</label>
+          <input id="pdDate" type="date" class="form-control">
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitPulledDate()">Save</button>
         </div>
       </div>
     </div>
