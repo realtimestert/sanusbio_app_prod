@@ -1,9 +1,15 @@
-// SanusBio v1.10.1 | 2026-07-28 | app-core.js
+// SanusBio v1.10.2 | 2026-08-03 | app-core.js
 // State, API, Auth, Init, Navigation, Dashboard, Helpers
 // v1.9.4: added weeksSince() helper for light-schedule duration display
 // v1.10.0: estrus board shows expected litter range for mated females;
 //          dashboard surfaces females who died while active on the board
 // v1.10.1: fixed stacked Bootstrap modal z-index (nested modals were covered)
+// v1.10.2: FIX — Care Alerts functions (loadDashCareAlerts, setDashCareFilter,
+//          openCareScheduleModal, etc.) were accidentally nested inside
+//          loadDashboard(), so they were never callable from onclick=
+//          handlers and loadDashCareAlerts() was never invoked, leaving the
+//          Weight & Grooming Alerts card permanently hidden. Moved to
+//          top-level scope and wired the call into loadDashboard().
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let TOKEN = localStorage.getItem('sb_token');
@@ -143,7 +149,97 @@ async function loadDashboard() {
     estrusCard.style.display = 'none';
   }
 
-  async function loadDashCareAlerts() {
+  // Weight & Grooming Care Alerts
+  await loadDashCareAlerts();
+
+  // Females who died while active on the board
+  const diedCard = document.getElementById('dashDiedOnBoardCard');
+  if (diedCard && roleIs('admin', 'research', 'maternity')) {
+    try {
+      const died = await api('/females/died-on-board');
+      if (died.length) {
+        diedCard.style.display = '';
+        const STATUS_LABEL = { estrus: 'In Estrus', mated: 'Mated', littered: 'Littered', weaned: 'Weaned' };
+        document.getElementById('dashDiedOnBoardList').innerHTML = died.map(f => `
+          <tr style="cursor:pointer" onclick="loadFerretDetail(${f.id})">
+            <td><strong>${f.name}</strong><br><span class="text-muted small">${f.animal_id || '—'}</span></td>
+            <td><span class="badge bg-danger">${STATUS_LABEL[f.death_female_status] || f.death_female_status}</span></td>
+            <td>${fmtDate(f.death_date)}</td>
+            <td class="small text-muted">Room ${f.room_id || '?'} · ${f.cage_address || '?'}</td>
+          </tr>`).join('');
+      } else {
+        diedCard.style.display = 'none';
+      }
+    } catch (err) { console.error('Died-on-board:', err); }
+  } else if (diedCard) {
+    diedCard.style.display = 'none';
+  }
+}
+
+function renderDashReproFilterBtns() {
+  const wrap = document.getElementById('dashReproFilterBtns');
+  if (!wrap) return;
+  const counts = {};
+  _dashReproData.forEach(f => { counts[f.status] = (counts[f.status] || 0) + 1; });
+  const cats = ['estrus', 'mated', 'littered', 'weaned'];
+  wrap.innerHTML = `
+    <button class="btn btn-sm ${_dashReproFilter === null ? 'btn-primary' : 'btn-outline-secondary'}"
+      onclick="setDashReproFilter(null)">
+      All <span class="badge bg-light text-dark ms-1">${_dashReproData.length}</span>
+    </button>
+    ${cats.map(c => {
+      const m = DASH_REPRO_STATUS_META[c];
+      const active = _dashReproFilter === c;
+      return `<button class="btn btn-sm ${active ? 'btn-' + m.color : 'btn-outline-secondary'}"
+        onclick="setDashReproFilter('${c}')">
+        ${m.label} <span class="badge bg-light text-dark ms-1">${counts[c] || 0}</span>
+      </button>`;
+    }).join('')}`;
+}
+
+function setDashReproFilter(cat) {
+  _dashReproFilter = cat;
+  renderDashReproFilterBtns();
+  renderDashReproTable();
+}
+
+function renderDashReproTable() {
+  const tbody = document.getElementById('dashEstrusList');
+  if (!tbody) return;
+  const filtered = _dashReproFilter ? _dashReproData.filter(f => f.status === _dashReproFilter) : _dashReproData;
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-muted text-center py-3">No females in this category</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(f => {
+    const m = DASH_REPRO_STATUS_META[f.status] || DASH_REPRO_STATUS_META.estrus;
+    const daysSince = f.status_since ? Math.floor((Date.now() - new Date(f.status_since)) / 864e5) : null;
+    const urgency = f.status === 'estrus' && daysSince !== null && daysSince >= 8;
+    let litterLabel = '—';
+    if (f.status === 'mated') {
+      const start = f.expected_litter_start, end = f.expected_litter_end;
+      if (start && end) litterLabel = (fmtDate(start) === fmtDate(end)) ? fmtDate(start) : `${fmtDate(start)} – ${fmtDate(end)}`;
+      else if (start) litterLabel = fmtDate(start) + ' (est.)';
+    }
+    return `<tr class="${urgency ? 'table-danger' : ''}" style="cursor:pointer" onclick="loadFerretDetail(${f.id}); nav('ferrets');">
+      <td><strong>${f.name}</strong><br><span class="text-muted small">${f.animal_id || '—'}</span></td>
+      <td><span class="badge bg-${m.color}">${m.label}</span></td>
+      <td>${f.status_since ? fmtDate(f.status_since) : '—'}</td>
+      <td>${daysSince !== null ? daysSince + 'd' : '—'}${urgency ? ' <i class="bi bi-exclamation-triangle-fill text-danger ms-1"></i>' : ''}</td>
+      <td class="small">${litterLabel}</td>
+      <td class="small text-muted">Room ${f.room_id || '?'} · ${f.cage_address || '?'}</td>
+      <td class="small text-muted">${f.status_notes || '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── Weight & Grooming Care Alerts ──────────────────────────────────────────────
+// v1.10.2 FIX: these were previously nested inside loadDashboard(), which meant
+// (a) they weren't in global scope, so onclick="setDashCareFilter(...)" and
+//     onclick="openCareScheduleModal()" handlers in index.html threw
+//     "is not defined" errors, and
+// (b) loadDashCareAlerts() was never actually invoked, so the card never loaded.
+async function loadDashCareAlerts() {
   const card = document.getElementById('dashCareCard');
   if (!card) return;
   if (USER?.role === 'cleaner') { card.style.display = 'none'; return; }
@@ -240,87 +336,6 @@ async function submitCareSchedule() {
     bootstrap.Modal.getInstance(document.getElementById('careScheduleModal')).hide();
     loadDashCareAlerts();
   } catch (err) { alert(err.message); }
-}
-
-  // Females who died while active on the board
-  const diedCard = document.getElementById('dashDiedOnBoardCard');
-  if (diedCard && roleIs('admin', 'research', 'maternity')) {
-    try {
-      const died = await api('/females/died-on-board');
-      if (died.length) {
-        diedCard.style.display = '';
-        const STATUS_LABEL = { estrus: 'In Estrus', mated: 'Mated', littered: 'Littered', weaned: 'Weaned' };
-        document.getElementById('dashDiedOnBoardList').innerHTML = died.map(f => `
-          <tr style="cursor:pointer" onclick="loadFerretDetail(${f.id})">
-            <td><strong>${f.name}</strong><br><span class="text-muted small">${f.animal_id || '—'}</span></td>
-            <td><span class="badge bg-danger">${STATUS_LABEL[f.death_female_status] || f.death_female_status}</span></td>
-            <td>${fmtDate(f.death_date)}</td>
-            <td class="small text-muted">Room ${f.room_id || '?'} · ${f.cage_address || '?'}</td>
-          </tr>`).join('');
-      } else {
-        diedCard.style.display = 'none';
-      }
-    } catch (err) { console.error('Died-on-board:', err); }
-  } else if (diedCard) {
-    diedCard.style.display = 'none';
-  }
-}
-
-function renderDashReproFilterBtns() {
-  const wrap = document.getElementById('dashReproFilterBtns');
-  if (!wrap) return;
-  const counts = {};
-  _dashReproData.forEach(f => { counts[f.status] = (counts[f.status] || 0) + 1; });
-  const cats = ['estrus', 'mated', 'littered', 'weaned'];
-  wrap.innerHTML = `
-    <button class="btn btn-sm ${_dashReproFilter === null ? 'btn-primary' : 'btn-outline-secondary'}"
-      onclick="setDashReproFilter(null)">
-      All <span class="badge bg-light text-dark ms-1">${_dashReproData.length}</span>
-    </button>
-    ${cats.map(c => {
-      const m = DASH_REPRO_STATUS_META[c];
-      const active = _dashReproFilter === c;
-      return `<button class="btn btn-sm ${active ? 'btn-' + m.color : 'btn-outline-secondary'}"
-        onclick="setDashReproFilter('${c}')">
-        ${m.label} <span class="badge bg-light text-dark ms-1">${counts[c] || 0}</span>
-      </button>`;
-    }).join('')}`;
-}
-
-function setDashReproFilter(cat) {
-  _dashReproFilter = cat;
-  renderDashReproFilterBtns();
-  renderDashReproTable();
-}
-
-function renderDashReproTable() {
-  const tbody = document.getElementById('dashEstrusList');
-  if (!tbody) return;
-  const filtered = _dashReproFilter ? _dashReproData.filter(f => f.status === _dashReproFilter) : _dashReproData;
-  if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-muted text-center py-3">No females in this category</td></tr>';
-    return;
-  }
-  tbody.innerHTML = filtered.map(f => {
-    const m = DASH_REPRO_STATUS_META[f.status] || DASH_REPRO_STATUS_META.estrus;
-    const daysSince = f.status_since ? Math.floor((Date.now() - new Date(f.status_since)) / 864e5) : null;
-    const urgency = f.status === 'estrus' && daysSince !== null && daysSince >= 8;
-    let litterLabel = '—';
-    if (f.status === 'mated') {
-      const start = f.expected_litter_start, end = f.expected_litter_end;
-      if (start && end) litterLabel = (fmtDate(start) === fmtDate(end)) ? fmtDate(start) : `${fmtDate(start)} – ${fmtDate(end)}`;
-      else if (start) litterLabel = fmtDate(start) + ' (est.)';
-    }
-    return `<tr class="${urgency ? 'table-danger' : ''}" style="cursor:pointer" onclick="loadFerretDetail(${f.id}); nav('ferrets');">
-      <td><strong>${f.name}</strong><br><span class="text-muted small">${f.animal_id || '—'}</span></td>
-      <td><span class="badge bg-${m.color}">${m.label}</span></td>
-      <td>${f.status_since ? fmtDate(f.status_since) : '—'}</td>
-      <td>${daysSince !== null ? daysSince + 'd' : '—'}${urgency ? ' <i class="bi bi-exclamation-triangle-fill text-danger ms-1"></i>' : ''}</td>
-      <td class="small">${litterLabel}</td>
-      <td class="small text-muted">Room ${f.room_id || '?'} · ${f.cage_address || '?'}</td>
-      <td class="small text-muted">${f.status_notes || '—'}</td>
-    </tr>`;
-  }).join('');
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

@@ -1,10 +1,14 @@
-// SanusBio v1.10.1 | 2026-07-28 | app-medical.js
+// SanusBio v1.10.2 | 2026-08-03 | app-medical.js
 // Health Events, Vaccinations, Litters, Medical Info, Procedures
 // v1.9.4: added Litter Care Log (kit weighing, nest changes, supplemental feeding)
 //         and pre-ID Kit Death logging, accessed via "Care Log" on litter rows
 // v1.10.0: mating records now support a "pulled date" (date female separated
 //          from male) used to compute an expected-litter date RANGE
 // v1.10.1: litterCreatableCount() excludes stillborn from kits left to create
+// v1.10.2: FIX — removed a duplicate submitReproEvent() declaration that was
+//          silently overriding the original (photo-upload-capable) version,
+//          which meant photos attached in the Record Reproductive Event
+//          modal were never actually uploaded
 
 // ─── Health Event Modal ───────────────────────────────────────────────────────
 function openHealthModal(ferretId) {
@@ -405,22 +409,6 @@ async function onReproTypeChange() {
   } else {
     partnerRow.style.display = 'none';
   }
-}
-
-async function submitReproEvent() {
-  const ferretId = document.getElementById('reproFerretId').value;
-  const event_type = document.getElementById('reproType').value;
-  const event_date = document.getElementById('reproDate').value;
-  const partner_id = document.getElementById('reproPartnerSelect').value || null;
-  const notes = document.getElementById('reproNotes').value.trim();
-  if (!event_date) return alert('Date is required.');
-  try {
-    const r = await api(`/ferrets/${ferretId}/reproductive`, {
-      method: 'POST', body: { event_type, event_date, partner_id: partner_id ? parseInt(partner_id) : null, notes: notes || null }
-    });
-    bootstrap.Modal.getInstance(document.getElementById('reproModal')).hide();
-    loadFerretDetail(ferretId);
-  } catch (err) { alert(err.message); }
 }
 
 async function deleteReproEvent(ferretId, eventId) {
