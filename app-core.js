@@ -20,6 +20,8 @@ const DASH_REPRO_STATUS_META = {
   no_litter: { label: 'No Litter',  color: 'secondary' },
 };
 
+let _dashCareData = [], _dashCareFilter = null, _dashCareSettings = null;
+
 // ─── API Helper ───────────────────────────────────────────────────────────────
 async function api(path, opts = {}) {
   const res = await fetch('/api' + path, {
@@ -140,6 +142,105 @@ async function loadDashboard() {
   } else if (estrusCard) {
     estrusCard.style.display = 'none';
   }
+
+  async function loadDashCareAlerts() {
+  const card = document.getElementById('dashCareCard');
+  if (!card) return;
+  if (USER?.role === 'cleaner') { card.style.display = 'none'; return; }
+  card.style.display = '';
+  try {
+    const data = await api('/ferrets/care-alerts');
+    _dashCareSettings = data.settings;
+    _dashCareData = data.ferrets;
+    renderDashCareFilterBtns();
+    renderDashCareTable();
+    const footer = document.getElementById('dashCareFooter');
+    if (footer) footer.innerHTML = `<i class="bi bi-info-circle me-1"></i>Nail trim every ${_dashCareSettings.nail_trim_interval_days}d · Bath every ${_dashCareSettings.bath_interval_days}d · Weight check every ${_dashCareSettings.weight_warn_days}d (yellow) / ${_dashCareSettings.weight_critical_days}d (red)`;
+  } catch (err) { console.error('Care alerts:', err); }
+}
+
+const DASH_CARE_FILTERS = {
+  weight_never:  f => f.weight_status === 'never',
+  weight_red:    f => f.weight_status === 'red',
+  weight_yellow: f => f.weight_status === 'yellow',
+  nail_overdue:  f => f.nail_status === 'overdue',
+  bath_overdue:  f => f.bath_status === 'overdue'
+};
+
+function renderDashCareFilterBtns() {
+  const wrap = document.getElementById('dashCareFilterBtns');
+  if (!wrap) return;
+  const counts = Object.fromEntries(Object.entries(DASH_CARE_FILTERS).map(([k, fn]) => [k, _dashCareData.filter(fn).length]));
+  const btn = (key, label, color) => `<button class="btn btn-sm ${_dashCareFilter === key ? 'btn-' + color : 'btn-outline-secondary'}"
+    onclick="setDashCareFilter('${key}')">${label} <span class="badge bg-light text-dark ms-1">${counts[key]}</span></button>`;
+  wrap.innerHTML =
+    `<button class="btn btn-sm ${_dashCareFilter === null ? 'btn-primary' : 'btn-outline-secondary'}" onclick="setDashCareFilter(null)">
+      All <span class="badge bg-light text-dark ms-1">${_dashCareData.length}</span></button>` +
+    btn('weight_never', 'Never Weighed', 'dark') +
+    btn('weight_red', 'Weight 45d+', 'danger') +
+    btn('weight_yellow', 'Weight 30d+', 'warning') +
+    btn('nail_overdue', 'Nail Trim Overdue', 'secondary') +
+    btn('bath_overdue', 'Bath Overdue', 'secondary');
+}
+
+function setDashCareFilter(key) {
+  _dashCareFilter = key;
+  renderDashCareFilterBtns();
+  renderDashCareTable();
+}
+
+function renderDashCareTable() {
+  const tbody = document.getElementById('dashCareList');
+  if (!tbody) return;
+  const filtered = _dashCareFilter ? _dashCareData.filter(DASH_CARE_FILTERS[_dashCareFilter]) : _dashCareData;
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-3">No ferrets need attention 🎉</td></tr>';
+    return;
+  }
+  const weightBadge = f => {
+    if (f.weight_status === 'never') return '<span class="badge bg-dark">Never Weighed</span>';
+    if (f.weight_status === 'red') return `<span class="badge bg-danger">${f.weight_days}d ago</span>`;
+    if (f.weight_status === 'yellow') return `<span class="badge bg-warning text-dark">${f.weight_days}d ago</span>`;
+    return `<span class="text-muted small">${f.weight_days}d ago</span>`;
+  };
+  const groomBadge = (status, days) => status === 'overdue'
+    ? `<span class="badge bg-danger">${days !== null ? days + 'd ago' : 'Never'}</span>`
+    : (days !== null ? `<span class="text-muted small">${days}d ago</span>` : '<span class="text-muted small">—</span>');
+  tbody.innerHTML = filtered.map(f => `
+    <tr style="cursor:pointer" onclick="loadFerretDetail(${f.id}); nav('ferrets');">
+      <td><strong>${f.name}</strong><br><span class="text-muted small">${f.animal_id || '—'}</span></td>
+      <td>${weightBadge(f)}</td>
+      <td>${groomBadge(f.nail_status, f.nail_days)}</td>
+      <td>${groomBadge(f.bath_status, f.bath_days)}</td>
+      <td class="small text-muted">Room ${f.room_id || '?'} · ${f.cage_address || '?'}</td>
+    </tr>`).join('');
+}
+
+async function openCareScheduleModal() {
+  try {
+    const s = _dashCareSettings || await api('/care-schedule');
+    document.getElementById('csNailInterval').value = s.nail_trim_interval_days;
+    document.getElementById('csBathInterval').value = s.bath_interval_days;
+    document.getElementById('csWeightWarn').value = s.weight_warn_days;
+    document.getElementById('csWeightCritical').value = s.weight_critical_days;
+    new bootstrap.Modal(document.getElementById('careScheduleModal')).show();
+  } catch (err) { alert(err.message); }
+}
+
+async function submitCareSchedule() {
+  try {
+    await api('/care-schedule', {
+      method: 'PUT', body: {
+        nail_trim_interval_days: parseInt(document.getElementById('csNailInterval').value) || 180,
+        bath_interval_days: parseInt(document.getElementById('csBathInterval').value) || 180,
+        weight_warn_days: parseInt(document.getElementById('csWeightWarn').value) || 30,
+        weight_critical_days: parseInt(document.getElementById('csWeightCritical').value) || 45
+      }
+    });
+    bootstrap.Modal.getInstance(document.getElementById('careScheduleModal')).hide();
+    loadDashCareAlerts();
+  } catch (err) { alert(err.message); }
+}
 
   // Females who died while active on the board
   const diedCard = document.getElementById('dashDiedOnBoardCard');

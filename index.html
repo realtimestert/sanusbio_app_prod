@@ -153,6 +153,25 @@
             </table>
           </div>
         </div>
+
+        <!-- Weight & Grooming Care Alerts -->
+        <div class="card mt-3 hide-cleaner" id="dashCareCard" style="display:none">
+          <div class="card-header bg-white d-flex align-items-center py-3">
+            <span class="fw-semibold"><i class="bi bi-clipboard2-pulse text-primary me-2"></i>Weight &amp; Grooming Alerts</span>
+            <span class="text-muted small ms-2">(needs weighing, nail trim, or bath)</span>
+            <button class="btn btn-sm btn-outline-secondary ms-auto admin-research-only" onclick="openCareScheduleModal()">
+              <i class="bi bi-gear me-1"></i>Schedule Settings
+            </button>
+          </div>
+          <div class="px-3 pt-3 pb-1 d-flex flex-wrap gap-2" id="dashCareFilterBtns"></div>
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead><tr><th>Ferret</th><th>Weight</th><th>Nail Trim</th><th>Bath</th><th>Location</th></tr></thead>
+              <tbody id="dashCareList"></tbody>
+            </table>
+          </div>
+          <div class="card-footer bg-white text-muted small py-2" id="dashCareFooter"></div>
+        </div>
       </div>
 
       <!-- Ferrets -->
@@ -1682,6 +1701,33 @@
       </div>
     </div>
   </div>
+
+  <!-- Care Schedule Settings Modal -->
+  <div class="modal fade" id="careScheduleModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Care Schedule Settings</h3><button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3"><label class="form-label small fw-semibold">Nail Trim Interval (days)</label>
+            <input id="csNailInterval" type="number" min="1" class="form-control"></div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Bath Interval (days)</label>
+            <input id="csBathInterval" type="number" min="1" class="form-control"></div>
+          <div class="mb-3"><label class="form-label small fw-semibold">Weight Warning — Yellow (days)</label>
+            <input id="csWeightWarn" type="number" min="1" class="form-control"></div>
+          <div class="mb-2"><label class="form-label small fw-semibold">Weight Critical — Red (days)</label>
+            <input id="csWeightCritical" type="number" min="1" class="form-control"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" onclick="submitCareSchedule()">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+</div>
 
   <!-- Mating Modal -->
 <div class="modal fade" id="matingModal" tabindex="-1">

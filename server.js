@@ -1419,6 +1419,85 @@ app.put('/api/rooms/:room_id/light', authenticate, require_perm('update'), async
   } finally { conn.release(); }
 });
 
+// ─── Care Schedule Settings (nail trim / bath interval, weight alert thresholds) ─
+app.get('/api/care-schedule', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [[settings]] = await pool.query('SELECT * FROM care_schedule_settings WHERE id = 1');
+    res.json(settings || { nail_trim_interval_days: 180, bath_interval_days: 180, weight_warn_days: 30, weight_critical_days: 45 });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/care-schedule', authenticate, admin_or_research, async (req, res) => {
+  const { nail_trim_interval_days, bath_interval_days, weight_warn_days, weight_critical_days } = req.body;
+  const sets = [], vals = [];
+  if (nail_trim_interval_days !== undefined) { sets.push('nail_trim_interval_days = ?'); vals.push(parseInt(nail_trim_interval_days)); }
+  if (bath_interval_days !== undefined) { sets.push('bath_interval_days = ?'); vals.push(parseInt(bath_interval_days)); }
+  if (weight_warn_days !== undefined) { sets.push('weight_warn_days = ?'); vals.push(parseInt(weight_warn_days)); }
+  if (weight_critical_days !== undefined) { sets.push('weight_critical_days = ?'); vals.push(parseInt(weight_critical_days)); }
+  if (!sets.length) return res.status(400).json({ error: 'Nothing to update' });
+  try {
+    await pool.query(
+      `INSERT INTO care_schedule_settings (id) VALUES (1) ON DUPLICATE KEY UPDATE ${sets.join(', ')}`,
+      vals
+    );
+    await log_activity(req.user.user_id, 'UPDATE', 'care_schedule_settings', 1, 'Care schedule settings updated');
+    res.json({ message: 'Care schedule settings updated' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Weight & Grooming Care Alerts ────────────────────────────────────────────
+app.get('/api/ferrets/care-alerts', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [[settingsRow]] = await pool.query('SELECT * FROM care_schedule_settings WHERE id = 1');
+    const s = settingsRow || { nail_trim_interval_days: 180, bath_interval_days: 180, weight_warn_days: 30, weight_critical_days: 45 };
+
+    const [rows] = await pool.query(`
+      SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id, f.birth_date,
+             a.room_id, a.room_name, a.cage_address,
+             lw.last_weight_date, lb.last_bath_date, lnt.last_nail_trim_date
+      FROM ferret_qr005 f
+      LEFT JOIN address a ON f.address_id = a.address_id
+      LEFT JOIN (SELECT ferret_id, MAX(event_date) AS last_weight_date FROM health_event WHERE event_type = 'weight' GROUP BY ferret_id) lw ON lw.ferret_id = f.Ferret_QR005_id
+      LEFT JOIN (SELECT ferret_id, MAX(event_date) AS last_bath_date FROM health_event WHERE event_type = 'bath' GROUP BY ferret_id) lb ON lb.ferret_id = f.Ferret_QR005_id
+      LEFT JOIN (SELECT ferret_id, MAX(event_date) AS last_nail_trim_date FROM health_event WHERE event_type = 'nail_trim' GROUP BY ferret_id) lnt ON lnt.ferret_id = f.Ferret_QR005_id
+      WHERE (f.dead = '0' OR f.dead IS NULL) AND (f.distributed = 0 OR f.distributed IS NULL)
+    `);
+
+    const today = new Date();
+    const daysSince = d => d ? Math.floor((today - new Date(d)) / 864e5) : null;
+
+    const result = rows.map(f => {
+      const weightDays = daysSince(f.last_weight_date);
+      const bathDays = daysSince(f.last_bath_date);
+      const nailDays = daysSince(f.last_nail_trim_date);
+      const ageDays = daysSince(f.birth_date);
+
+      let weight_status = 'ok';
+      if (weightDays === null) weight_status = 'never';
+      else if (weightDays >= s.weight_critical_days) weight_status = 'red';
+      else if (weightDays >= s.weight_warn_days) weight_status = 'yellow';
+
+      let nail_status = 'ok';
+      if (nailDays === null) { if (ageDays !== null && ageDays >= s.nail_trim_interval_days) nail_status = 'overdue'; }
+      else if (nailDays >= s.nail_trim_interval_days) nail_status = 'overdue';
+
+      let bath_status = 'ok';
+      if (bathDays === null) { if (ageDays !== null && ageDays >= s.bath_interval_days) bath_status = 'overdue'; }
+      else if (bathDays >= s.bath_interval_days) bath_status = 'overdue';
+
+      return {
+        id: f.id, name: f.name, animal_id: f.animal_id,
+        room_id: f.room_id, room_name: f.room_name, cage_address: f.cage_address,
+        last_weight_date: f.last_weight_date, weight_days: weightDays, weight_status,
+        last_bath_date: f.last_bath_date, bath_days: bathDays, bath_status,
+        last_nail_trim_date: f.last_nail_trim_date, nail_days: nailDays, nail_status
+      };
+    }).filter(f => f.weight_status !== 'ok' || f.nail_status !== 'ok' || f.bath_status !== 'ok');
+
+    res.json({ settings: s, ferrets: result });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Submit a cleaning report (any authenticated user)
 app.post('/api/cleaning-reports', authenticate, async (req, res) => {
   const {
