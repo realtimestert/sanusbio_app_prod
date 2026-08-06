@@ -1,4 +1,4 @@
-// SanusBio v1.10.2 | 2026-08-03 | app-core.js
+// SanusBio v1.10.4 | 2026-08-06 | app-core.js
 // State, API, Auth, Init, Navigation, Dashboard, Helpers
 // v1.9.4: added weeksSince() helper for light-schedule duration display
 // v1.10.0: estrus board shows expected litter range for mated females;
@@ -10,6 +10,13 @@
 //          handlers and loadDashCareAlerts() was never invoked, leaving the
 //          Weight & Grooming Alerts card permanently hidden. Moved to
 //          top-level scope and wired the call into loadDashboard().
+// v1.10.4: FIX — Reproductive Status Board and Weight & Grooming Alerts row
+//          clicks called loadFerretDetail(id) immediately followed by
+//          nav('ferrets'), which re-ran the ferrets grid loader and switched
+//          the page back to the grid, undoing the detail view that had just
+//          been opened. Removed the nav('ferrets') call from both row
+//          onclick handlers so clicking a row goes straight to that
+//          ferret's detail page.
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let TOKEN = localStorage.getItem('sb_token');
@@ -221,7 +228,7 @@ function renderDashReproTable() {
       if (start && end) litterLabel = (fmtDate(start) === fmtDate(end)) ? fmtDate(start) : `${fmtDate(start)} – ${fmtDate(end)}`;
       else if (start) litterLabel = fmtDate(start) + ' (est.)';
     }
-    return `<tr class="${urgency ? 'table-danger' : ''}" style="cursor:pointer" onclick="loadFerretDetail(${f.id}); nav('ferrets');">
+    return `<tr class="${urgency ? 'table-danger' : ''}" style="cursor:pointer" onclick="loadFerretDetail(${f.id});">
       <td><strong>${f.name}</strong><br><span class="text-muted small">${f.animal_id || '—'}</span></td>
       <td><span class="badge bg-${m.color}">${m.label}</span></td>
       <td>${f.status_since ? fmtDate(f.status_since) : '—'}</td>
@@ -303,7 +310,7 @@ function renderDashCareTable() {
     ? `<span class="badge bg-danger">${days !== null ? days + 'd ago' : 'Never'}</span>`
     : (days !== null ? `<span class="text-muted small">${days}d ago</span>` : '<span class="text-muted small">—</span>');
   tbody.innerHTML = filtered.map(f => `
-    <tr style="cursor:pointer" onclick="loadFerretDetail(${f.id}); nav('ferrets');">
+    <tr style="cursor:pointer" onclick="loadFerretDetail(${f.id});">
       <td><strong>${f.name}</strong><br><span class="text-muted small">${f.animal_id || '—'}</span></td>
       <td>${weightBadge(f)}</td>
       <td>${groomBadge(f.nail_status, f.nail_days)}</td>

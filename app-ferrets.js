@@ -1,10 +1,12 @@
-// SanusBio v1.10.1 | 2026-07-28 | app-ferrets.js
+// SanusBio v1.10.2 | 2026-08-06 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 // v1.9.4: ages always shown in weeks (no Y/mo breakdown); Age at Death added next to Date of Death
 // v1.9.5: light cycle moved to per-ferret tracking (auto/manual), duration + edit controls on ferret detail
 // v1.10.0: new Location History tab (every former room, via ferret_location_history);
 //          Mating History + Estrus Status tabs show pulled-date + expected litter range
 // v1.10.1: ferret-detail Litters tab uses litterCreatableCount() (excludes stillborn)
+// v1.10.2: age in weeks now shown next to Animal ID on the ferret detail page
+//          (reuses ferretAge(); shows "Lived Xwk" if deceased, current age otherwise)
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
 async function loadFerrets(search = '') {
@@ -173,7 +175,7 @@ async function loadFerretDetail(id) {
           ${isAdmin ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteFerret(${id})">Delete</button>` : ''}
         </div>
       </div>
-      <div class="text-muted mb-2">Animal ID: ${f.animal_id || '—'}</div>
+      <div class="text-muted mb-2">Animal ID: ${f.animal_id || '—'} &nbsp;·&nbsp; <strong>${f.dead === '1' ? 'Lived ' + ferretAge(f.birth_date, f.death_date) : ferretAge(f.birth_date)}</strong></div>
       <div class="row g-2 small">
         <div class="col-6 col-md-4"><span class="text-muted">Birth Date</span><br>
           ${canEdit
