@@ -1,4 +1,4 @@
-// SanusBio v1.10.1 | 2026-07-28 | server.js
+// SanusBio v1.10.3 | 2026-08-05 | server.js
 // v1.9.5: light-cycle duration tracking moved from rooms to ferrets
 //         (light_mode auto/manual); moves now take a move_date; room toggle
 //         cascades to auto-mode ferrets in that room
@@ -11,6 +11,15 @@
 //          she was active on the Reproductive Status Board at time of death
 // v1.10.1: stillborn kits no longer count toward individuals left to create —
 //          surviving_litter_count is now computed on litter create/edit
+// v1.10.2: care-alerts weight check now also considers exam_note.weight_grams
+//          entries (Medical Info tab), taking whichever is more recent vs.
+//          health_event weight logs — previously exam-note weights were
+//          invisible to the Weight & Grooming Alerts card
+// v1.10.3: FIX — GET /api/ferrets/care-alerts was registered AFTER
+//          GET /api/ferrets/:id, so Express matched :id first (id="care-alerts")
+//          and returned 404 "Ferret not found" on every request. The Weight &
+//          Grooming Alerts card has likely never worked as a result. Moved
+//          care-alerts route to register before the :id route.
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -203,6 +212,70 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
       `, [q, q]);
     }
     res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Weight & Grooming Care Alerts ────────────────────────────────────────────
+// NOTE: this route MUST be registered before /api/ferrets/:id below — Express
+// matches routes in registration order, so if this were placed after :id,
+// a request to /api/ferrets/care-alerts would match :id with id="care-alerts"
+// and 404 with "Ferret not found" (this was a real bug, fixed 2026-08-05).
+app.get('/api/ferrets/care-alerts', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [[settingsRow]] = await pool.query('SELECT * FROM care_schedule_settings WHERE id = 1');
+    const s = settingsRow || { nail_trim_interval_days: 180, bath_interval_days: 180, weight_warn_days: 30, weight_critical_days: 45 };
+
+    const [rows] = await pool.query(`
+      SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id, f.birth_date,
+             a.room_id, a.room_name, a.cage_address,
+             GREATEST(
+               COALESCE(lw.last_weight_date, '1900-01-01'),
+               COALESCE(len.last_exam_weight_date, '1900-01-01')
+             ) AS last_weight_date_raw,
+             lb.last_bath_date, lnt.last_nail_trim_date
+      FROM ferret_qr005 f
+      LEFT JOIN address a ON f.address_id = a.address_id
+      LEFT JOIN (SELECT ferret_id, MAX(event_date) AS last_weight_date FROM health_event WHERE event_type = 'weight' GROUP BY ferret_id) lw ON lw.ferret_id = f.Ferret_QR005_id
+      LEFT JOIN (SELECT ferret_id, MAX(exam_date) AS last_exam_weight_date FROM exam_note WHERE weight_grams IS NOT NULL GROUP BY ferret_id) len ON len.ferret_id = f.Ferret_QR005_id
+      LEFT JOIN (SELECT ferret_id, MAX(event_date) AS last_bath_date FROM health_event WHERE event_type = 'bath' GROUP BY ferret_id) lb ON lb.ferret_id = f.Ferret_QR005_id
+      LEFT JOIN (SELECT ferret_id, MAX(event_date) AS last_nail_trim_date FROM health_event WHERE event_type = 'nail_trim' GROUP BY ferret_id) lnt ON lnt.ferret_id = f.Ferret_QR005_id
+      WHERE (f.dead = '0' OR f.dead IS NULL) AND (f.distributed = 0 OR f.distributed IS NULL)
+    `);
+
+    const today = new Date();
+    const daysSince = d => d ? Math.floor((today - new Date(d)) / 864e5) : null;
+
+    const result = rows.map(f => {
+      const lastWeightDate = (f.last_weight_date_raw && String(f.last_weight_date_raw).slice(0, 4) !== '1900')
+        ? f.last_weight_date_raw : null;
+      const weightDays = daysSince(lastWeightDate);
+      const bathDays = daysSince(f.last_bath_date);
+      const nailDays = daysSince(f.last_nail_trim_date);
+      const ageDays = daysSince(f.birth_date);
+
+      let weight_status = 'ok';
+      if (weightDays === null) weight_status = 'never';
+      else if (weightDays >= s.weight_critical_days) weight_status = 'red';
+      else if (weightDays >= s.weight_warn_days) weight_status = 'yellow';
+
+      let nail_status = 'ok';
+      if (nailDays === null) { if (ageDays !== null && ageDays >= s.nail_trim_interval_days) nail_status = 'overdue'; }
+      else if (nailDays >= s.nail_trim_interval_days) nail_status = 'overdue';
+
+      let bath_status = 'ok';
+      if (bathDays === null) { if (ageDays !== null && ageDays >= s.bath_interval_days) bath_status = 'overdue'; }
+      else if (bathDays >= s.bath_interval_days) bath_status = 'overdue';
+
+      return {
+        id: f.id, name: f.name, animal_id: f.animal_id,
+        room_id: f.room_id, room_name: f.room_name, cage_address: f.cage_address,
+        last_weight_date: lastWeightDate, weight_days: weightDays, weight_status,
+        last_bath_date: f.last_bath_date, bath_days: bathDays, bath_status,
+        last_nail_trim_date: f.last_nail_trim_date, nail_days: nailDays, nail_status
+      };
+    }).filter(f => f.weight_status !== 'ok' || f.nail_status !== 'ok' || f.bath_status !== 'ok');
+
+    res.json({ settings: s, ferrets: result });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1442,59 +1515,6 @@ app.put('/api/care-schedule', authenticate, admin_or_research, async (req, res) 
     );
     await log_activity(req.user.user_id, 'UPDATE', 'care_schedule_settings', 1, 'Care schedule settings updated');
     res.json({ message: 'Care schedule settings updated' });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// ─── Weight & Grooming Care Alerts ────────────────────────────────────────────
-app.get('/api/ferrets/care-alerts', authenticate, require_perm('read'), async (req, res) => {
-  try {
-    const [[settingsRow]] = await pool.query('SELECT * FROM care_schedule_settings WHERE id = 1');
-    const s = settingsRow || { nail_trim_interval_days: 180, bath_interval_days: 180, weight_warn_days: 30, weight_critical_days: 45 };
-
-    const [rows] = await pool.query(`
-      SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id, f.birth_date,
-             a.room_id, a.room_name, a.cage_address,
-             lw.last_weight_date, lb.last_bath_date, lnt.last_nail_trim_date
-      FROM ferret_qr005 f
-      LEFT JOIN address a ON f.address_id = a.address_id
-      LEFT JOIN (SELECT ferret_id, MAX(event_date) AS last_weight_date FROM health_event WHERE event_type = 'weight' GROUP BY ferret_id) lw ON lw.ferret_id = f.Ferret_QR005_id
-      LEFT JOIN (SELECT ferret_id, MAX(event_date) AS last_bath_date FROM health_event WHERE event_type = 'bath' GROUP BY ferret_id) lb ON lb.ferret_id = f.Ferret_QR005_id
-      LEFT JOIN (SELECT ferret_id, MAX(event_date) AS last_nail_trim_date FROM health_event WHERE event_type = 'nail_trim' GROUP BY ferret_id) lnt ON lnt.ferret_id = f.Ferret_QR005_id
-      WHERE (f.dead = '0' OR f.dead IS NULL) AND (f.distributed = 0 OR f.distributed IS NULL)
-    `);
-
-    const today = new Date();
-    const daysSince = d => d ? Math.floor((today - new Date(d)) / 864e5) : null;
-
-    const result = rows.map(f => {
-      const weightDays = daysSince(f.last_weight_date);
-      const bathDays = daysSince(f.last_bath_date);
-      const nailDays = daysSince(f.last_nail_trim_date);
-      const ageDays = daysSince(f.birth_date);
-
-      let weight_status = 'ok';
-      if (weightDays === null) weight_status = 'never';
-      else if (weightDays >= s.weight_critical_days) weight_status = 'red';
-      else if (weightDays >= s.weight_warn_days) weight_status = 'yellow';
-
-      let nail_status = 'ok';
-      if (nailDays === null) { if (ageDays !== null && ageDays >= s.nail_trim_interval_days) nail_status = 'overdue'; }
-      else if (nailDays >= s.nail_trim_interval_days) nail_status = 'overdue';
-
-      let bath_status = 'ok';
-      if (bathDays === null) { if (ageDays !== null && ageDays >= s.bath_interval_days) bath_status = 'overdue'; }
-      else if (bathDays >= s.bath_interval_days) bath_status = 'overdue';
-
-      return {
-        id: f.id, name: f.name, animal_id: f.animal_id,
-        room_id: f.room_id, room_name: f.room_name, cage_address: f.cage_address,
-        last_weight_date: f.last_weight_date, weight_days: weightDays, weight_status,
-        last_bath_date: f.last_bath_date, bath_days: bathDays, bath_status,
-        last_nail_trim_date: f.last_nail_trim_date, nail_days: nailDays, nail_status
-      };
-    }).filter(f => f.weight_status !== 'ok' || f.nail_status !== 'ok' || f.bath_status !== 'ok');
-
-    res.json({ settings: s, ferrets: result });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
