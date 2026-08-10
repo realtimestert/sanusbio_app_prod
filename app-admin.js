@@ -1,7 +1,10 @@
-// SanusBio v1.9.5 | 2026-07-24 | app-admin.js
-// Locations, Suppliers, Assignments, Users, Activity Log, Distribution Page
+// SanusBio v1.9.6 | 2026-08-07 | app-admin.js
+// Locations, Suppliers, Users, Activity Log, Distribution Page
 // v1.9.5: room light schedule reverted to on/off only — duration now tracked
 //         per ferret (see app-ferrets.js) since it must follow the animal
+// v1.9.6: removed Assignments tab functions (feature unused, tab removed
+//         from navigation) — the /api/assignments backend routes are left
+//         in place but are no longer called from the UI
 
 // ─── Locations ────────────────────────────────────────────────────────────────
 async function loadLocations() {
@@ -212,60 +215,6 @@ async function submitSupplier() {
     }
     bootstrap.Modal.getInstance(document.getElementById('supplierModal')).hide();
     loadSuppliers();
-  } catch (err) { alert(err.message); }
-}
-
-// ─── Assignments ──────────────────────────────────────────────────────────────
-async function loadAssignments() {
-  if (roleIs('admin', 'research')) document.getElementById('btnAddAssign').classList.remove('d-none');
-  try {
-    const data = await api('/assignments');
-    const tbody = document.getElementById('assignTable');
-    if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-4">No assignments</td></tr>'; return; }
-    tbody.innerHTML = data.map(a => {
-      const overdue = !a.completed && a.due_date && new Date(a.due_date) < new Date();
-      const canComplete = !a.completed && (roleIs('admin') || a.assigned_to === USER.user_id);
-      return `<tr class="${a.completed ? 'text-muted' : ''}">
-    <td><span class="badge bg-secondary">${a.assignment_type}</span></td>
-    <td>${a.assigned_full_name || a.assigned_username}</td>
-    <td>${a.description || '—'}</td>
-    <td class="${overdue ? 'text-danger fw-bold' : ''}">${a.due_date || '—'}</td>
-    <td>${a.completed ? `<span class="badge bg-success">Completed</span>` : `<span class="badge bg-warning text-dark">Pending</span>`}</td>
-    <td>${canComplete ? `<button class="btn btn-sm btn-outline-success" onclick="completeAssign(${a.assignment_id})"><i class="bi bi-check2"></i></button>` : ''}</td>
-  </tr>`;
-    }).join('');
-  } catch (err) { console.error(err); }
-}
-
-async function completeAssign(id) {
-  try { await api(`/assignments/${id}/complete`, { method: 'PUT' }); loadAssignments(); }
-  catch (err) { alert(err.message); }
-}
-
-async function openAssignModal() {
-  try {
-    const users = await api('/users');
-    document.getElementById('aAssignTo').innerHTML = users
-      .filter(u => u.active)
-      .map(u => `<option value="${u.user_id}">${u.full_name || u.username} (${u.role})</option>`).join('');
-    document.getElementById('aDue').value = today();
-    document.getElementById('aDesc').value = '';
-    new bootstrap.Modal(document.getElementById('assignModal')).show();
-  } catch (err) { alert(err.message); }
-}
-
-async function submitAssign() {
-  try {
-    await api('/assignments', {
-      method: 'POST', body: {
-        assigned_to: parseInt(document.getElementById('aAssignTo').value),
-        assignment_type: document.getElementById('aType').value,
-        description: document.getElementById('aDesc').value,
-        due_date: document.getElementById('aDue').value
-      }
-    });
-    bootstrap.Modal.getInstance(document.getElementById('assignModal')).hide();
-    loadAssignments();
   } catch (err) { alert(err.message); }
 }
 

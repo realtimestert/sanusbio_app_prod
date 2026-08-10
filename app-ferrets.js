@@ -1,4 +1,4 @@
-// SanusBio v1.10.2 | 2026-08-06 | app-ferrets.js
+// SanusBio v1.10.3 | 2026-08-07 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 // v1.9.4: ages always shown in weeks (no Y/mo breakdown); Age at Death added next to Date of Death
 // v1.9.5: light cycle moved to per-ferret tracking (auto/manual), duration + edit controls on ferret detail
@@ -7,6 +7,12 @@
 // v1.10.1: ferret-detail Litters tab uses litterCreatableCount() (excludes stillborn)
 // v1.10.2: age in weeks now shown next to Animal ID on the ferret detail page
 //          (reuses ferretAge(); shows "Lived Xwk" if deceased, current age otherwise)
+// v1.10.3: (1) Health Events tab now has Edit/Delete buttons for admin/
+//          research/maternity — health rows are cached in
+//          window._currentHealthEvents so app-medical.js's edit modal can
+//          look them up without stuffing notes text through onclick attrs;
+//          (2) new "Litters (as Father)" tab for males, showing every litter
+//          where this ferret is recorded as father plus kit/surviving totals
 
 // ─── Ferrets ──────────────────────────────────────────────────────────────────
 async function loadFerrets(search = '') {
@@ -137,7 +143,7 @@ async function loadFerretDetail(id) {
   const el = document.getElementById('ferretDetail');
   el.innerHTML = '<div class="text-center py-5 text-muted"><div class="spinner-border" role="status"></div></div>';
   try {
-    const [f, health, vacc, litters, history, repro, examNotes, matings] = await Promise.all([
+    const [f, health, vacc, litters, history, repro, examNotes, matings, fatherLitters] = await Promise.all([
       api(`/ferrets/${id}`),
       api(`/ferrets/${id}/health`),
       api(`/ferrets/${id}/vaccinations`),
@@ -145,8 +151,10 @@ async function loadFerretDetail(id) {
       api(`/ferrets/${id}/history`),
       api(`/ferrets/${id}/reproductive`).catch(() => []),
       api(`/ferrets/${id}/exam-notes`).catch(() => []),
-      api(`/ferrets/${id}/matings`).catch(() => [])
+      api(`/ferrets/${id}/matings`).catch(() => []),
+      api(`/ferrets/${id}/litters-as-father`).catch(() => [])
     ]);
+    window._currentHealthEvents = health;
     const isAdmin = roleIs('admin', 'research');
     const isMat = roleIs('admin', 'maternity');
     const canEdit = roleIs('admin', 'research');
@@ -294,6 +302,7 @@ async function loadFerretDetail(id) {
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tVacc">Vaccinations</button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMating"><i class="bi bi-heart-fill me-1"></i>Mating History</button></li>
     ${isMat && f.sex === 'female' ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tLitter">Litters</button></li>` : ''}
+    ${isMat && f.sex === 'male' ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tLitterFather"><i class="bi bi-egg me-1"></i>Litters (as Father)</button></li>` : ''}
     ${canUpdate() ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMed">Medical Info</button></li>` : ''}
     ${f.sex === 'female' ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tRepro"><i class="bi bi-heart me-1"></i>Estrus Status</button></li>` : ''}
     ${canUpdate() ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMatingRestriction">Mating Restrictions</button></li>` : ''}
@@ -315,7 +324,7 @@ async function loadFerretDetail(id) {
         <canvas id="weightChart" height="220"></canvas>
       </div>` : ''}
       <table class="table table-sm">
-        <thead><tr><th>Date</th><th>Time</th><th>Type</th><th>Weight</th><th>Notes</th><th>By</th></tr></thead>
+        <thead><tr><th>Date</th><th>Time</th><th>Type</th><th>Weight</th><th>Notes</th><th>By</th>${canUpdate() ? '<th></th>' : ''}</tr></thead>
         <tbody>${health.length ? health.map(h => `
           <tr>
             <td>${fmtDate(h.event_date)}</td>
@@ -324,7 +333,13 @@ async function loadFerretDetail(id) {
             <td>${h.weight ? h.weight + ' g' : '—'}</td>
             <td>${h.notes || '—'}</td>
             <td class="text-muted">${h.recorded_by || '—'}</td>
-          </tr>`).join('') : '<tr><td colspan="6" class="text-muted text-center py-3">No health events</td></tr>'}
+            ${canUpdate() ? `<td>
+              <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-outline-secondary" onclick="openEditHealthModal(${h.health_event_id})" title="Edit"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteHealthEvent(${h.health_event_id}, ${id})" title="Delete"><i class="bi bi-trash"></i></button>
+              </div>
+            </td>` : ''}
+          </tr>`).join('') : `<tr><td colspan="${canUpdate() ? 7 : 6}" class="text-muted text-center py-3">No health events</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -402,6 +417,35 @@ async function loadFerretDetail(id) {
         }).join('') : '<tr><td colspan="8" class="text-muted text-center py-3">No litter records</td></tr>'}
         </tbody>
       </table>
+    </div>` : ''}
+
+    <!-- Litters (as Father) — males only -->
+    ${isMat && f.sex === 'male' ? `
+    <div id="tLitterFather" class="tab-pane">
+      ${(function () {
+        const totalKits = fatherLitters.reduce((sum, l) => sum + (l.kit_count || 0), 0);
+        const totalSurviving = fatherLitters.reduce((sum, l) => sum + litterCreatableCount(l), 0);
+        return `<div class="alert alert-info small mb-3">
+          <strong>${fatherLitters.length}</strong> litter(s) fathered &nbsp;·&nbsp;
+          <strong>${totalKits}</strong> total kit(s) &nbsp;·&nbsp;
+          <strong>${totalSurviving}</strong> surviving
+        </div>`;
+      })()}
+      <table class="table table-sm">
+        <thead><tr><th>Date</th><th>Litter ID</th><th>Mother</th><th>Kits</th><th>Stillborn</th><th>Surviving</th><th>Notes</th></tr></thead>
+        <tbody>${fatherLitters.length ? fatherLitters.map(l => `
+          <tr style="cursor:pointer" onclick="loadFerretDetail(${l.ferret_id})">
+            <td>${fmtDate(l.litter_date)}</td>
+            <td>${l.litter_id || '—'}</td>
+            <td><strong>${l.jill_name}</strong></td>
+            <td>${l.kit_count ?? '—'}</td>
+            <td>${l.stillborn ?? '—'}</td>
+            <td>${litterCreatableCount(l)}</td>
+            <td class="small">${l.anomalies_and_notes || '—'}</td>
+          </tr>`).join('') : '<tr><td colspan="7" class="text-muted text-center py-3">No litters recorded with this ferret as father</td></tr>'}
+        </tbody>
+      </table>
+      <div class="text-muted small mt-2"><i class="bi bi-info-circle me-1"></i>Matched by this ferret's current name against each litter's recorded father — renaming a ferret after litters are logged won't retroactively update older matches.</div>
     </div>` : ''}
 
     <!-- Medical Info -->

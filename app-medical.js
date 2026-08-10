@@ -9,15 +9,41 @@
 //          silently overriding the original (photo-upload-capable) version,
 //          which meant photos attached in the Record Reproductive Event
 //          modal were never actually uploaded
+// v1.10.3: health events can now be edited (openEditHealthModal — mainly for
+//          correcting event_date entry errors) and deleted (deleteHealthEvent)
+//          from the Health Events tab; both restricted to admin/research/
+//          maternity (canUpdate()) in the ferret-detail UI
 
 // ─── Health Event Modal ───────────────────────────────────────────────────────
 function openHealthModal(ferretId) {
   document.getElementById('heFerretId').value = ferretId;
+  document.getElementById('heEventId').value = '';
+  document.getElementById('healthModalTitle').textContent = 'Record Health Event';
+  document.getElementById('heType').disabled = false;
   document.getElementById('heDate').value = today();
   document.getElementById('heTime').value = nowTime();
   document.getElementById('heWeight').value = '';
   document.getElementById('heNotes').value = '';
   document.getElementById('heType').value = 'weight';
+  toggleWeightRow();
+  new bootstrap.Modal(document.getElementById('healthModal')).show();
+}
+
+// Edit an existing health event — looks it up from _currentHealthEvents
+// (populated by loadFerretDetail) rather than passing data through onclick
+// attributes, to avoid quoting/escaping issues with notes text.
+function openEditHealthModal(eventId) {
+  const h = (window._currentHealthEvents || []).find(x => x.health_event_id === eventId);
+  if (!h) return alert('Health event not found.');
+  document.getElementById('heFerretId').value = h.ferret_id;
+  document.getElementById('heEventId').value = h.health_event_id;
+  document.getElementById('healthModalTitle').textContent = 'Edit Health Event';
+  document.getElementById('heType').value = h.event_type;
+  document.getElementById('heType').disabled = true; // event type isn't editable, only date/weight/notes
+  document.getElementById('heDate').value = h.event_date ? String(h.event_date).slice(0, 10) : today();
+  document.getElementById('heTime').value = nowTime();
+  document.getElementById('heWeight').value = h.weight != null ? h.weight : '';
+  document.getElementById('heNotes').value = h.notes || '';
   toggleWeightRow();
   new bootstrap.Modal(document.getElementById('healthModal')).show();
 }
@@ -29,21 +55,44 @@ function toggleWeightRow() {
 
 async function submitHealthEvent() {
   const ferret_id = document.getElementById('heFerretId').value;
+  const eventId = document.getElementById('heEventId').value;
+  const type = document.getElementById('heType').value;
   const wt = parseFloat(document.getElementById('heWeight').value);
-  if (isNaN(wt) && document.getElementById('heType').value === 'weight') return alert('Please enter a valid weight.');
+  if (isNaN(wt) && type === 'weight') return alert('Please enter a valid weight.');
+  const event_date = document.getElementById('heDate').value;
+  if (!event_date) return alert('Please enter a date.');
   try {
-    await api('/health-events', {
-      method: 'POST', body: {
-        ferret_id: parseInt(ferret_id),
-        event_type: document.getElementById('heType').value,
-        weight: document.getElementById('heType').value === 'weight' ? wt : null,
-        event_date: document.getElementById('heDate').value,
-        event_time: document.getElementById('heTime').value,
-        notes: document.getElementById('heNotes').value
-      }
-    });
+    if (eventId) {
+      await api(`/health-events/${eventId}`, {
+        method: 'PUT', body: {
+          event_date,
+          weight: type === 'weight' ? wt : undefined,
+          notes: document.getElementById('heNotes').value
+        }
+      });
+    } else {
+      await api('/health-events', {
+        method: 'POST', body: {
+          ferret_id: parseInt(ferret_id),
+          event_type: type,
+          weight: type === 'weight' ? wt : null,
+          event_date,
+          event_time: document.getElementById('heTime').value,
+          notes: document.getElementById('heNotes').value
+        }
+      });
+    }
     bootstrap.Modal.getInstance(document.getElementById('healthModal')).hide();
+    document.getElementById('heType').disabled = false;
     loadFerretDetail(ferret_id);
+  } catch (err) { alert(err.message); }
+}
+
+async function deleteHealthEvent(eventId, ferretId) {
+  if (!confirm('Delete this health event record? This cannot be undone.')) return;
+  try {
+    await api(`/health-events/${eventId}`, { method: 'DELETE' });
+    loadFerretDetail(ferretId);
   } catch (err) { alert(err.message); }
 }
 

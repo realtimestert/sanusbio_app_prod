@@ -1,4 +1,4 @@
-<!-- SanusBio v1.10.0 | 2026-07-28 | index.html -->
+<!-- SanusBio v1.10.1 | 2026-08-07 | index.html -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -48,7 +48,6 @@
         <a class="nav-link" href="#" data-page="locations"><i class="bi bi-geo-alt"></i>Locations</a>
         <a class="nav-link" href="#" data-page="suppliers"><i class="bi bi-truck"></i>Suppliers</a>
         <a class="nav-link" href="#" data-page="distribution"><i class="bi bi-box-arrow-right"></i>Distribution</a>
-        <a class="nav-link" href="#" data-page="assignments"><i class="bi bi-clipboard-check"></i>Assignments</a>
         <a class="nav-link admin-research-only" href="#" data-page="users"><i class="bi bi-people"></i>Users</a>
         <a class="nav-link admin-only" href="#" data-page="activity"><i class="bi bi-journal-text"></i>Activity Log</a>
         <a class="nav-link" href="#" data-page="cleaning-reports"><i class="bi bi-check2-square"></i>Cleaning
@@ -330,32 +329,6 @@
                 </tr>
               </thead>
               <tbody id="distTable"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- Assignments -->
-      <div id="page-assignments" class="page">
-        <div class="page-header">
-          <h2 class="h4"><i class="bi bi-clipboard-check me-2"></i>Assignments</h2>
-          <button id="btnAddAssign" class="btn btn-primary ms-auto d-none" onclick="openAssignModal()"><i
-              class="bi bi-plus-lg me-1"></i>Create</button>
-        </div>
-        <div class="card">
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Assigned To</th>
-                  <th>Description</th>
-                  <th>Due</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="assignTable"></tbody>
             </table>
           </div>
         </div>
@@ -929,10 +902,11 @@
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
-          <h3 class="modal-title">Record Health Event</h3><button class="btn-close" data-bs-dismiss="modal"></button>
+          <h3 class="modal-title" id="healthModalTitle">Record Health Event</h3><button class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
           <input type="hidden" id="heFerretId">
+          <input type="hidden" id="heEventId">
           <div class="mb-2"><label class="form-label">Event Type</label>
             <select id="heType" class="form-select" onchange="toggleWeightRow()">
               <option value="weight">Weight Check</option>
@@ -1163,7 +1137,6 @@
     </div>
   </div>
 
-  <!-- Assignment Modal -->
   <!-- Exam / Health Check Note Modal -->
   <div class="modal fade" id="examNoteModal" tabindex="-1">
     <div class="modal-dialog">

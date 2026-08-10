@@ -1,4 +1,4 @@
-// SanusBio v1.10.3 | 2026-08-05 | server.js
+// SanusBio v1.10.5 | 2026-08-07 | server.js
 // v1.9.5: light-cycle duration tracking moved from rooms to ferrets
 //         (light_mode auto/manual); moves now take a move_date; room toggle
 //         cascades to auto-mode ferrets in that room
@@ -20,6 +20,16 @@
 //          and returned 404 "Ferret not found" on every request. The Weight &
 //          Grooming Alerts card has likely never worked as a result. Moved
 //          care-alerts route to register before the :id route.
+// v1.10.5: (1) health events can now be edited (event_date correction, plus
+//          weight/notes) via PUT /api/health-events/:id, and deleted via
+//          DELETE /api/health-events/:id — both restricted to admin/research/
+//          maternity (require_perm('update')); editing/deleting the most
+//          recent weight entry re-syncs ferret_qr005.weight to the new
+//          latest value; (2) new GET /api/ferrets/:id/litters-as-father —
+//          matches litter_log.father (free-text) against the ferret's name,
+//          used for a male's "Litters (as Father)" tab; (3) Assignments
+//          feature is no longer exposed in the UI (tab removed) — the
+//          underlying /api/assignments routes are left in place unused.
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -691,6 +701,90 @@ app.post('/api/health-events', authenticate, require_perm('write'), async (req, 
   } finally { conn.release(); }
 });
 
+// Edit a health event — primarily for correcting event_date entry errors,
+// but also allows fixing weight/notes. Restricted to admin/research/maternity.
+app.put('/api/health-events/:id', authenticate, require_perm('update'), async (req, res) => {
+  const { event_date, weight, notes } = req.body;
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[existing]] = await conn.query('SELECT * FROM health_event WHERE health_event_id = ?', [req.params.id]);
+    if (!existing) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Health event not found' }); }
+
+    const sets = [], vals = [];
+    if (event_date !== undefined && event_date) { sets.push('event_date = ?'); vals.push(event_date); }
+    if (notes !== undefined) { sets.push('notes = ?'); vals.push(notes || null); }
+
+    let weightVal = existing.weight;
+    if (weight !== undefined && existing.event_type === 'weight') {
+      weightVal = parseFloat(weight);
+      if (isNaN(weightVal) || weightVal < 0 || weightVal > 9999.99) {
+        await conn.rollback(); conn.release();
+        return res.status(400).json({ error: 'Weight must be between 0 and 9999.99 grams' });
+      }
+      sets.push('weight = ?'); vals.push(weightVal);
+    }
+    if (!sets.length) { await conn.rollback(); conn.release(); return res.status(400).json({ error: 'Nothing to update' }); }
+
+    vals.push(req.params.id);
+    await conn.query(`UPDATE health_event SET ${sets.join(', ')} WHERE health_event_id = ?`, vals);
+
+    // Keep ferret_qr005.weight in sync if this was (or still is) the most
+    // recent weight entry for the ferret.
+    if (existing.event_type === 'weight') {
+      const [[latest]] = await conn.query(
+        `SELECT health_event_id, weight FROM health_event WHERE ferret_id = ? AND event_type = 'weight'
+         ORDER BY event_date DESC, health_event_id DESC LIMIT 1`,
+        [existing.ferret_id]
+      );
+      if (latest && latest.health_event_id == req.params.id) {
+        await conn.query('UPDATE ferret_qr005 SET weight = ? WHERE Ferret_QR005_id = ?', [Math.round(weightVal), existing.ferret_id]);
+      }
+    }
+
+    await conn.commit();
+    await log_activity(req.user.user_id, 'UPDATE', 'health_event', req.params.id,
+      `Edited health event #${req.params.id} for ferret #${existing.ferret_id}`);
+    res.json({ message: 'Health event updated' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
+});
+
+// Delete a health event — restricted to admin/research/maternity.
+app.delete('/api/health-events/:id', authenticate, require_perm('update'), async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[existing]] = await conn.query('SELECT * FROM health_event WHERE health_event_id = ?', [req.params.id]);
+    if (!existing) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Health event not found' }); }
+
+    await conn.query('DELETE FROM health_event WHERE health_event_id = ?', [req.params.id]);
+
+    // If the deleted row was a weight entry, resync ferret_qr005.weight to
+    // whatever is now the most recent remaining weight entry (if any).
+    if (existing.event_type === 'weight') {
+      const [[latest]] = await conn.query(
+        `SELECT weight FROM health_event WHERE ferret_id = ? AND event_type = 'weight'
+         ORDER BY event_date DESC, health_event_id DESC LIMIT 1`,
+        [existing.ferret_id]
+      );
+      if (latest) {
+        await conn.query('UPDATE ferret_qr005 SET weight = ? WHERE Ferret_QR005_id = ?', [Math.round(latest.weight), existing.ferret_id]);
+      }
+    }
+
+    await conn.commit();
+    await log_activity(req.user.user_id, 'DELETE', 'health_event', req.params.id,
+      `Deleted health event #${req.params.id} for ferret #${existing.ferret_id}`);
+    res.json({ message: 'Health event deleted' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
+});
+
 // ─── Vaccinations ─────────────────────────────────────────────────────────────
 app.get('/api/ferrets/:id/vaccinations', authenticate, require_perm('read'), async (req, res) => {
   try {
@@ -830,6 +924,25 @@ app.get('/api/ferrets/:id/litters', authenticate, require_perm('read'), async (r
     const [rows] = await pool.query(
       'SELECT * FROM litter_log WHERE Ferret_QR005_id = ? ORDER BY litter_date DESC', [req.params.id]
     );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Litters a male ferret helped produce — litter_log.father is a free-text
+// field (no father_id column exists), so we match it against this ferret's
+// current name. Renaming a ferret after litters are logged would break the
+// match for those older rows; that's a pre-existing data-model limitation.
+app.get('/api/ferrets/:id/litters-as-father', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [[ferret]] = await pool.query('SELECT ferret_name FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]);
+    if (!ferret) return res.status(404).json({ error: 'Ferret not found' });
+    const [rows] = await pool.query(`
+      SELECT ll.*, f.ferret_name AS jill_name, f.Ferret_QR005_id AS ferret_id
+      FROM litter_log ll
+      JOIN ferret_qr005 f ON ll.Ferret_QR005_id = f.Ferret_QR005_id
+      WHERE ll.father = ?
+      ORDER BY ll.litter_date DESC
+    `, [ferret.ferret_name]);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

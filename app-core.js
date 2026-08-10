@@ -1,4 +1,6 @@
-// SanusBio v1.10.4 | 2026-08-06 | app-core.js
+// SanusBio v1.10.5 | 2026-08-07 | app-core.js
+// v1.10.5: Assignments tab removed from navigation (feature unused); the
+//          nav() loader map no longer routes to loadAssignments
 // State, API, Auth, Init, Navigation, Dashboard, Helpers
 // v1.9.4: added weeksSince() helper for light-schedule duration display
 // v1.10.0: estrus board shows expected litter range for mated females;
@@ -115,7 +117,7 @@ function nav(page) {
   if (link) link.classList.add('active');
   const loaders = {
     dashboard: loadDashboard, ferrets: loadFerrets, litters: loadLitters,
-    locations: loadLocations, suppliers: loadSuppliers, assignments: loadAssignments,
+    locations: loadLocations, suppliers: loadSuppliers,
     users: loadUsers, activity: loadActivity, 'cleaning-reports': loadCleaningReports,
     distribution: loadDistribution
   };
