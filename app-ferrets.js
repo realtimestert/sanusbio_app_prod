@@ -1,5 +1,7 @@
-// SanusBio v1.10.3 | 2026-08-07 | app-ferrets.js
+// SanusBio v1.10.4 | 2026-08-10 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
+// v1.10.4: ferretAge() now returns weeks with one decimal place (was whole
+//          weeks only) — affects every age display across the app
 // v1.9.4: ages always shown in weeks (no Y/mo breakdown); Age at Death added next to Date of Death
 // v1.9.5: light cycle moved to per-ferret tracking (auto/manual), duration + edit controls on ferret detail
 // v1.10.0: new Location History tab (every former room, via ferret_location_history);
@@ -43,7 +45,7 @@ function ferretAge(birthDate, endDate) {
   const end = endDate ? new Date(endDate) : new Date();
   const totalDays = Math.floor((end - birth) / 864e5);
   if (totalDays < 0) return '—';
-  const totalWeeks = Math.floor(totalDays / 7);
+  const totalWeeks = (totalDays / 7).toFixed(1);
   return totalWeeks + 'wk';
 }
 
