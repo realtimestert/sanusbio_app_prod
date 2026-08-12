@@ -1,4 +1,5 @@
-/* SanusBio v1.9.1 | 2026-07-16 | style.css */
+/* SanusBio v1.9.2 | 2026-08-10 | style.css */
+/* v1.9.2: added @media print rules for the new Reports page (.no-print) */
 
 :root {
   --sidebar-w: 230px;
@@ -256,4 +257,34 @@ body {
   font-size: 1.1rem;
   flex-shrink: 0;
   transition: all .15s;
+}
+/* ─── Print (Reports page) ────────────────────────────────────────────────── */
+@media print {
+  #sidebar, .no-print {
+    display: none !important;
+  }
+  #app {
+    display: block !important;
+  }
+  .main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  .page {
+    display: none !important;
+  }
+  .page.show {
+    display: block !important;
+  }
+  .card {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+    break-inside: avoid;
+  }
+  .table {
+    font-size: .85rem;
+  }
 }
