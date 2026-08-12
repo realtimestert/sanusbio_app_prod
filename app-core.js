@@ -1,6 +1,11 @@
-// SanusBio v1.10.5 | 2026-08-07 | app-core.js
+// SanusBio v1.10.6 | 2026-08-10 | app-core.js
 // v1.10.5: Assignments tab removed from navigation (feature unused); the
 //          nav() loader map no longer routes to loadAssignments
+// v1.10.6: (1) Weight & Grooming Alerts table is now sortable by Name,
+//          Location, or Urgency (default); (2) dashboard "Overdue Tasks"
+//          stat card removed — it was powered by the unused Assignments
+//          feature and always read 0; (3) wired in the new Reports page
+//          (loadReports, in app-reports.js) via the nav() loader map
 // State, API, Auth, Init, Navigation, Dashboard, Helpers
 // v1.9.4: added weeksSince() helper for light-schedule duration display
 // v1.10.0: estrus board shows expected litter range for mated females;
@@ -35,7 +40,7 @@ const DASH_REPRO_STATUS_META = {
   no_litter: { label: 'No Litter',  color: 'secondary' },
 };
 
-let _dashCareData = [], _dashCareFilter = null, _dashCareSettings = null;
+let _dashCareData = [], _dashCareFilter = null, _dashCareSettings = null, _dashCareSort = 'urgency';
 
 // ─── API Helper ───────────────────────────────────────────────────────────────
 async function api(path, opts = {}) {
@@ -119,7 +124,7 @@ function nav(page) {
     dashboard: loadDashboard, ferrets: loadFerrets, litters: loadLitters,
     locations: loadLocations, suppliers: loadSuppliers,
     users: loadUsers, activity: loadActivity, 'cleaning-reports': loadCleaningReports,
-    distribution: loadDistribution
+    distribution: loadDistribution, reports: loadReports
   };
   if (loaders[page]) loaders[page]();
 }
@@ -130,11 +135,10 @@ async function loadDashboard() {
     const d = await api('/dashboard');
     document.getElementById('statCards').innerHTML = [
       { label: 'Active Ferrets', val: d.total, icon: 'bi-emoji-smile', color: 'primary' },
-      { label: 'Overdue Tasks', val: d.overdue, icon: 'bi-exclamation-circle', color: 'danger' },
       { label: 'Vaccines Due 30d', val: d.vacc_due, icon: 'bi-syringe', color: 'warning' },
       { label: 'Litters This Month', val: d.litters_this_month, icon: 'bi-egg', color: 'success' }
     ].map(s => `
-  <div class="col-md-3 col-6">
+  <div class="col-md-4 col-6">
     <div class="card stat-card p-3 d-flex flex-row align-items-center gap-3">
       <div class="icon bg-${s.color} bg-opacity-10 text-${s.color}"><i class="bi ${s.icon}"></i></div>
       <div><div class="fs-3 fw-bold">${s.val}</div><div class="text-muted small">${s.label}</div></div>
@@ -294,10 +298,31 @@ function setDashCareFilter(key) {
   renderDashCareTable();
 }
 
+function setDashCareSort(val) {
+  _dashCareSort = val;
+  renderDashCareTable();
+}
+
+function sortDashCareData(arr) {
+  const sorted = [...arr];
+  if (_dashCareSort === 'name') {
+    sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  } else if (_dashCareSort === 'location') {
+    sorted.sort((a, b) => {
+      const ra = a.room_id ?? 9999, rb = b.room_id ?? 9999;
+      if (ra !== rb) return ra - rb;
+      return (a.cage_address || '').localeCompare(b.cage_address || '');
+    });
+  }
+  // 'urgency' — leave in the order the API returned (already worst-first)
+  return sorted;
+}
+
 function renderDashCareTable() {
   const tbody = document.getElementById('dashCareList');
   if (!tbody) return;
-  const filtered = _dashCareFilter ? _dashCareData.filter(DASH_CARE_FILTERS[_dashCareFilter]) : _dashCareData;
+  const base = _dashCareFilter ? _dashCareData.filter(DASH_CARE_FILTERS[_dashCareFilter]) : _dashCareData;
+  const filtered = sortDashCareData(base);
   if (!filtered.length) {
     tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-3">No ferrets need attention 🎉</td></tr>';
     return;
