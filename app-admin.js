@@ -1,10 +1,14 @@
-// SanusBio v1.9.6 | 2026-08-07 | app-admin.js
+// SanusBio v1.9.7 | 2026-08-10 | app-admin.js
 // Locations, Suppliers, Users, Activity Log, Distribution Page
 // v1.9.5: room light schedule reverted to on/off only — duration now tracked
 //         per ferret (see app-ferrets.js) since it must follow the animal
 // v1.9.6: removed Assignments tab functions (feature unused, tab removed
 //         from navigation) — the /api/assignments backend routes are left
 //         in place but are no longer called from the UI
+// v1.9.7: Move Location modal no longer asks for cage position (Top/Middle/
+//         Bottom/None) — the position is already fixed to the cage letter
+//         when the location is created, so re-selecting it on every move
+//         was redundant and risked accidentally clearing it
 
 // ─── Locations ────────────────────────────────────────────────────────────────
 async function loadLocations() {
@@ -67,7 +71,6 @@ async function deleteLocation(id, label) {
 async function openMoveModal(ferretId) {
   document.getElementById('moveFerretId').value = ferretId;
   document.getElementById('moveDate').value = today();
-  document.getElementById('movePosNone').checked = true;
   try {
     const addresses = await api('/addresses');
     document.getElementById('moveAddrId').innerHTML = addresses.map(a => {
@@ -81,10 +84,9 @@ async function openMoveModal(ferretId) {
 async function submitMove() {
   const ferretId = document.getElementById('moveFerretId').value;
   const address_id = document.getElementById('moveAddrId').value;
-  const position = document.querySelector('input[name="movePosition"]:checked')?.value || null;
   const move_date = document.getElementById('moveDate').value || today();
   try {
-    await api(`/ferrets/${ferretId}/location`, { method: 'PUT', body: { address_id: parseInt(address_id), position, move_date } });
+    await api(`/ferrets/${ferretId}/location`, { method: 'PUT', body: { address_id: parseInt(address_id), move_date } });
     bootstrap.Modal.getInstance(document.getElementById('moveModal')).hide();
     loadFerretDetail(ferretId);
   } catch (err) { alert(err.message); }
