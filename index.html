@@ -1,4 +1,4 @@
-<!-- SanusBio v1.10.1 | 2026-08-07 | index.html -->
+<!-- SanusBio v1.10.2 | 2026-08-10 | index.html -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -50,6 +50,7 @@
         <a class="nav-link" href="#" data-page="distribution"><i class="bi bi-box-arrow-right"></i>Distribution</a>
         <a class="nav-link admin-research-only" href="#" data-page="users"><i class="bi bi-people"></i>Users</a>
         <a class="nav-link admin-only" href="#" data-page="activity"><i class="bi bi-journal-text"></i>Activity Log</a>
+        <a class="nav-link admin-research-only" href="#" data-page="reports"><i class="bi bi-file-earmark-bar-graph"></i>Reports</a>
         <a class="nav-link" href="#" data-page="cleaning-reports"><i class="bi bi-check2-square"></i>Cleaning
           Reports</a>
       </nav>
@@ -158,7 +159,12 @@
           <div class="card-header bg-white d-flex align-items-center py-3">
             <span class="fw-semibold"><i class="bi bi-clipboard2-pulse text-primary me-2"></i>Weight &amp; Grooming Alerts</span>
             <span class="text-muted small ms-2">(needs weighing, nail trim, or bath)</span>
-            <button class="btn btn-sm btn-outline-secondary ms-auto admin-research-only" onclick="openCareScheduleModal()">
+            <select id="dashCareSort" class="form-select form-select-sm ms-auto" style="max-width:170px" onchange="setDashCareSort(this.value)">
+              <option value="urgency">Sort: Most Urgent</option>
+              <option value="name">Sort: Name</option>
+              <option value="location">Sort: Location</option>
+            </select>
+            <button class="btn btn-sm btn-outline-secondary admin-research-only" onclick="openCareScheduleModal()">
               <i class="bi bi-gear me-1"></i>Schedule Settings
             </button>
           </div>
@@ -332,6 +338,38 @@
             </table>
           </div>
         </div>
+      </div>
+
+      <!-- Reports -->
+      <div id="page-reports" class="page admin-research-only">
+        <div class="page-header">
+          <h2 class="h4"><i class="bi bi-file-earmark-bar-graph me-2"></i>Reports</h2>
+          <button class="btn btn-outline-secondary ms-auto no-print" onclick="window.print()">
+            <i class="bi bi-printer me-1"></i>Print</button>
+        </div>
+
+        <ul class="nav nav-tabs mb-3 no-print" id="reportTabs">
+          <li class="nav-item"><button class="nav-link active" onclick="switchReportTab('room')">Ferrets by Room</button></li>
+          <li class="nav-item"><button class="nav-link" onclick="switchReportTab('repro')">Reproductive Status</button></li>
+          <li class="nav-item"><button class="nav-link" onclick="switchReportTab('deaths')">Deaths</button></li>
+          <li class="nav-item"><button class="nav-link" onclick="switchReportTab('infant')">Infant Mortality</button></li>
+        </ul>
+
+        <div class="card p-3 mb-3 no-print" id="reportDateFilterCard" style="display:none">
+          <div class="d-flex gap-3 align-items-end flex-wrap">
+            <div>
+              <label class="form-label small fw-semibold mb-1">From</label>
+              <input type="date" id="repDateFrom" class="form-control form-control-sm">
+            </div>
+            <div>
+              <label class="form-label small fw-semibold mb-1">To</label>
+              <input type="date" id="repDateTo" class="form-control form-control-sm">
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="loadCurrentReport()"><i class="bi bi-search me-1"></i>Apply</button>
+          </div>
+        </div>
+
+        <div id="reportContent"></div>
       </div>
 
       <!-- Users -->
@@ -1044,22 +1082,10 @@
             <label class="form-label">Date Moved</label>
             <input id="moveDate" type="date" class="form-control">
           </div>
-          <div class="mb-3">
+          <div class="mb-2">
             <label class="form-label">Select New Location</label>
             <select id="moveAddrId" class="form-select"></select>
-          </div>
-          <div class="mb-2">
-            <label class="form-label">Position in Cage</label>
-            <div class="d-flex gap-3 flex-wrap mt-1">
-              <div class="form-check"><input class="form-check-input" type="radio" name="movePosition" id="movePosTop"
-                  value="Top"><label class="form-check-label" for="movePosTop">Top</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="movePosition" id="movePosMid"
-                  value="Middle"><label class="form-check-label" for="movePosMid">Middle</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="movePosition" id="movePosBot"
-                  value="Bottom"><label class="form-check-label" for="movePosBot">Bottom</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="movePosition" id="movePosNone"
-                  value="" checked><label class="form-check-label" for="movePosNone">None</label></div>
-            </div>
+            <div class="form-text">Cage position (Top/Middle/Bottom) is already set when the location is created — no need to re-select it here.</div>
           </div>
         </div>
         <div class="modal-footer">
@@ -1739,6 +1765,7 @@
   <script src="/app-medical.js"></script>
   <script src="/app-admin.js"></script>
   <script src="/app-cleaning.js"></script>
+  <script src="/app-reports.js"></script>
 </body>
 
 </html>
