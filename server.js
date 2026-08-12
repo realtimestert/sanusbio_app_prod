@@ -1,4 +1,14 @@
-// SanusBio v1.10.5 | 2026-08-07 | server.js
+// SanusBio v1.10.6 | 2026-08-10 | server.js
+// v1.10.6: (1) removed the unused /api/assignments routes (tab was already
+//          gone from the UI — this is the cleanup); (2) dashboard no longer
+//          queries the assignments table for "Overdue Tasks" (always read 0
+//          since the feature has no writers left); (3) new /api/reports/*
+//          endpoints — ferrets-by-room, deaths, infant-mortality — backing
+//          the new Reports page (reproductive-status reuses the existing
+//          /api/females/estrus endpoint); (4) PUT /ferrets/:id/location no
+//          longer requires/expects a `position` field from the client (Move
+//          modal in the UI no longer sends one) — existing cage positions
+//          are left untouched unless explicitly provided
 // v1.9.5: light-cycle duration tracking moved from rooms to ferrets
 //         (light_mode auto/manual); moves now take a move_date; room toggle
 //         cascades to auto-mode ferrets in that room
@@ -162,7 +172,6 @@ app.get('/api/me', authenticate, (req, res) => res.json(req.user));
 app.get('/api/dashboard', authenticate, require_perm('read'), async (req, res) => {
   try {
     const [[{ total }]] = await pool.query("SELECT COUNT(*) as total FROM ferret_qr005 WHERE (dead='0' OR dead IS NULL) AND (distributed = 0 OR distributed IS NULL)");
-    const [[{ overdue }]] = await pool.query("SELECT COUNT(*) as overdue FROM assignments WHERE completed=0 AND due_date < CURDATE()");
     const [[{ vacc_due }]] = await pool.query("SELECT COUNT(*) as vacc_due FROM ferret_qr005 WHERE next_rabies_vaccine_due <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND (dead='0' OR dead IS NULL)");
     const [[{ litters_this_month }]] = await pool.query("SELECT COUNT(*) as litters_this_month FROM litter_log WHERE litter_date >= DATE_FORMAT(CURDATE(),'%Y-%m-01')");
     const [recent_activity] = await pool.query(`
@@ -170,7 +179,7 @@ app.get('/api/dashboard', authenticate, require_perm('read'), async (req, res) =
       FROM activity_log al JOIN users u ON al.user_id = u.user_id
       ORDER BY al.created_at DESC LIMIT 10
     `);
-    res.json({ total, overdue, vacc_due, litters_this_month, recent_activity });
+    res.json({ total, vacc_due, litters_this_month, recent_activity });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1224,55 +1233,6 @@ app.delete('/api/litters/:id/care-events/:eventId', authenticate, admin_only, as
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ─── Assignments ──────────────────────────────────────────────────────────────
-app.get('/api/assignments', authenticate, require_perm('read'), async (req, res) => {
-  try {
-    let q = `
-      SELECT a.*,
-             u.username AS assigned_username, u.full_name AS assigned_full_name,
-             c.username AS creator_username,
-             f.ferret_name
-      FROM assignments a
-      JOIN  users u ON a.assigned_to = u.user_id
-      JOIN  users c ON a.created_by  = c.user_id
-      LEFT JOIN ferret_qr005 f ON a.ferret_id = f.Ferret_QR005_id
-    `;
-    const params = [];
-    if (!['admin', 'research'].includes(req.user.role)) {
-      q += ` WHERE a.assigned_to = ? AND (a.completed = 0 OR a.completed_at > DATE_SUB(NOW(), INTERVAL 7 DAY))`;
-      params.push(req.user.user_id);
-    }
-    q += ' ORDER BY a.completed ASC, a.due_date ASC';
-    const [rows] = await pool.query(q, params);
-    res.json(rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/assignments', authenticate, admin_or_research, async (req, res) => {
-  const { assigned_to, assignment_type, address_id, ferret_id, description, due_date } = req.body;
-  try {
-    const [r] = await pool.query(
-      `INSERT INTO assignments (assigned_to, assignment_type, address_id, ferret_id, description, due_date, created_by)
-       VALUES (?,?,?,?,?,?,?)`,
-      [assigned_to, assignment_type, address_id || null, ferret_id || null, description || null, due_date, req.user.user_id]
-    );
-    await log_activity(req.user.user_id, 'CREATE', 'assignments', r.insertId, `Assigned to user #${assigned_to}`);
-    res.json({ id: r.insertId, message: 'Assignment created' });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.put('/api/assignments/:id/complete', authenticate, async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT * FROM assignments WHERE assignment_id = ?', [req.params.id]);
-    if (!rows.length) return res.status(404).json({ error: 'Assignment not found' });
-    if (req.user.role !== 'admin' && rows[0].assigned_to !== req.user.user_id)
-      return res.status(403).json({ error: 'You can only complete your own assignments' });
-    await pool.query('UPDATE assignments SET completed = 1, completed_at = NOW() WHERE assignment_id = ?', [req.params.id]);
-    await log_activity(req.user.user_id, 'COMPLETE', 'assignments', req.params.id, 'Assignment marked complete');
-    res.json({ message: 'Assignment completed' });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 // ─── Suppliers ────────────────────────────────────────────────────────────────
 app.get('/api/suppliers', authenticate, require_perm('read'), async (req, res) => {
   try {
@@ -1447,6 +1407,91 @@ app.get('/api/activity-log', authenticate, admin_only, async (req, res) => {
     );
 
     res.json({ rows, total, page, page_size: PAGE_SIZE, pages: Math.ceil(total / PAGE_SIZE) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+// All report endpoints are restricted to admin/research (sensitive data:
+// death causes, kit mortality). Reproductive-status data reuses the existing
+// GET /api/females/estrus endpoint on the frontend rather than duplicating it.
+
+// Active ferret count per room
+app.get('/api/reports/ferrets-by-room', authenticate, admin_or_research, async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT room_id, MAX(room_name) AS room_name, COUNT(Ferret_QR005_id) AS ferret_count
+      FROM (
+        SELECT a.room_id, a.room_name, f.Ferret_QR005_id
+        FROM address a
+        LEFT JOIN ferret_qr005 f ON f.address_id = a.address_id
+          AND (f.dead = '0' OR f.dead IS NULL) AND (f.distributed = 0 OR f.distributed IS NULL)
+        WHERE a.room_id IS NOT NULL AND a.room_id > 0
+      ) t
+      GROUP BY room_id
+      ORDER BY room_id
+    `);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Deaths within an optional date range — name, age in weeks (computed client-side
+// from birth_date/death_date), date of death, and cause_of_death as the notes field
+app.get('/api/reports/deaths', authenticate, admin_or_research, async (req, res) => {
+  try {
+    const { date_from, date_to } = req.query;
+    const where = ["f.dead = '1'"];
+    const params = [];
+    if (date_from) { where.push('f.death_date >= ?'); params.push(date_from); }
+    if (date_to) { where.push('f.death_date <= ?'); params.push(date_to); }
+    const [rows] = await pool.query(`
+      SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
+             f.birth_date, f.death_date, mi.cause_of_death,
+             a.room_id, a.cage_address
+      FROM ferret_qr005 f
+      LEFT JOIN medical_info mi ON f.medical_info_id = mi.medical_info_id
+      LEFT JOIN address a ON f.address_id = a.address_id
+      WHERE ${where.join(' AND ')}
+      ORDER BY f.death_date DESC
+    `, params);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Infant mortality — post-birth kit deaths (litter_kit_death, filtered by
+// death_date) plus stillborn counts (litter_log.stillborn, filtered by
+// litter_date, since a stillborn kit has no separate death_date of its own)
+app.get('/api/reports/infant-mortality', authenticate, admin_or_research, async (req, res) => {
+  try {
+    const { date_from, date_to } = req.query;
+
+    const kdWhere = []; const kdParams = [];
+    if (date_from) { kdWhere.push('kd.death_date >= ?'); kdParams.push(date_from); }
+    if (date_to) { kdWhere.push('kd.death_date <= ?'); kdParams.push(date_to); }
+    const kdWhereClause = kdWhere.length ? 'WHERE ' + kdWhere.join(' AND ') : '';
+
+    const [kit_deaths] = await pool.query(`
+      SELECT kd.kit_death_id, kd.death_date, kd.cause_category, kd.notes, kd.treatments,
+             ll.litter_id, ll.litter_date, f.ferret_name AS jill_name
+      FROM litter_kit_death kd
+      JOIN litter_log ll ON kd.litter_log_id = ll.litter_log_id
+      JOIN ferret_qr005 f ON ll.Ferret_QR005_id = f.Ferret_QR005_id
+      ${kdWhereClause}
+      ORDER BY kd.death_date DESC
+    `, kdParams);
+
+    const slWhere = ['ll.stillborn > 0']; const slParams = [];
+    if (date_from) { slWhere.push('ll.litter_date >= ?'); slParams.push(date_from); }
+    if (date_to) { slWhere.push('ll.litter_date <= ?'); slParams.push(date_to); }
+
+    const [stillborns] = await pool.query(`
+      SELECT ll.litter_log_id, ll.litter_id, ll.litter_date, ll.stillborn, f.ferret_name AS jill_name
+      FROM litter_log ll
+      JOIN ferret_qr005 f ON ll.Ferret_QR005_id = f.Ferret_QR005_id
+      WHERE ${slWhere.join(' AND ')}
+      ORDER BY ll.litter_date DESC
+    `, slParams);
+
+    res.json({ kit_deaths, stillborns });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
