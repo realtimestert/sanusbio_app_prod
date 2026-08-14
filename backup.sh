@@ -1,4 +1,6 @@
 #!/bin/bash
+set -euo pipefail
+
 DATE=$(date +%Y%m%d-%H%M%S)
 BACKUP_DIR="$HOME/sanusbio-backups/$DATE"
 mkdir -p "$BACKUP_DIR"
@@ -26,4 +28,3 @@ tar -czf "$BACKUP_DIR/sanusbio-uploads-$DATE.tar.gz" \
 echo "Backup complete."
 echo "Files saved to:"
 echo "$BACKUP_DIR"
-ls -lh "$BACKUP_DIR"
