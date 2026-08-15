@@ -1,4 +1,19 @@
-// SanusBio v1.10.6 | 2026-08-10 | server.js
+// SanusBio v1.10.7 | 2026-08-13 | server.js
+// v1.10.7: (1) added missing GET /api/rooms — app-cleaning.js has always
+//          called this to populate the "what room(s) did you clean" picker
+//          and the report-history room filter, but the route never existed,
+//          so that fetch 404'd. Because loadCrHistory() awaited it BEFORE
+//          fetching /cleaning-reports, the whole history load was silently
+//          aborted too — this single missing route explains both "no rooms
+//          to pick" and "history shows nothing"; (2) marking a ferret
+//          deceased now unassigns it from its physical room (moves it to
+//          the shared "N/A" address used for new/unassigned ferrets, and
+//          closes/opens the matching ferret_location_history rows) — dead
+//          ferrets were staying parked in their last room forever, which
+//          blocked deleting empty test rooms (DELETE /addresses/:id refuses
+//          if ANY ferret, dead or alive, still references that address_id);
+//          see migration 20 for a one-time backfill of already-deceased
+//          ferrets that predate this fix.
 // v1.10.6: (1) removed the unused /api/assignments routes (tab was already
 //          gone from the UI — this is the cleanup); (2) dashboard no longer
 //          queries the assignments table for "Overdue Tasks" (always read 0
@@ -132,6 +147,16 @@ function admin_or_research(req, res, next) {
   if (!['admin', 'research'].includes(req.user.role))
     return res.status(403).json({ error: 'Admin or Research access required' });
   next();
+}
+
+// Shared "unassigned" address (room_id 0, cage_address 'N/A') — used both
+// for brand-new ferrets created without a location, and (as of v1.10.7) for
+// ferrets that are marked deceased, so they don't stay parked in a real room.
+async function getUnassignedAddressId(conn) {
+  const [[existing]] = await conn.query("SELECT address_id FROM address WHERE cage_address = 'N/A' LIMIT 1");
+  if (existing) return existing.address_id;
+  const [newAddr] = await conn.query("INSERT INTO address (room_id, cage_address) VALUES (0, 'N/A')");
+  return newAddr.insertId;
 }
 
 async function log_activity(user_id, action, table_name = null, record_id = null, details = null) {
@@ -422,7 +447,7 @@ app.put('/api/ferrets/:id/deceased', authenticate, require_perm('update'), async
     await conn.beginTransaction();
 
     const [[before]] = await conn.query(
-      'SELECT medical_info_id, ferret_name, sex, female_status, breeding_retired FROM ferret_qr005 WHERE Ferret_QR005_id = ?',
+      'SELECT medical_info_id, ferret_name, sex, female_status, breeding_retired, address_id FROM ferret_qr005 WHERE Ferret_QR005_id = ?',
       [req.params.id]
     );
     if (!before) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Ferret not found' }); }
@@ -434,19 +459,41 @@ app.put('/api/ferrets/:id/deceased', authenticate, require_perm('update'), async
       && before.female_status && before.female_status !== 'baseline'
       && !before.breeding_retired;
 
+    const deathDateVal = death_date || null;
+    const closeDate = deathDateVal || new Date().toISOString().slice(0, 10);
+
+    // Unassign the ferret from its physical room — it moves to the shared
+    // "N/A" address (same one new/unassigned ferrets use). Without this,
+    // deceased ferrets stay parked in their last room forever, which blocks
+    // deleting rooms (DELETE /addresses/:id refuses if any ferret, dead or
+    // alive, still references that address_id).
+    const unassignedAddrId = await getUnassignedAddressId(conn);
+
     await conn.query(
-      "UPDATE ferret_qr005 SET dead = '1', death_date = ?, death_female_status = ? WHERE Ferret_QR005_id = ?",
-      [death_date || null, diedOnBoard ? before.female_status : null, req.params.id]
+      "UPDATE ferret_qr005 SET dead = '1', death_date = ?, death_female_status = ?, address_id = ? WHERE Ferret_QR005_id = ?",
+      [deathDateVal, diedOnBoard ? before.female_status : null, unassignedAddrId, req.params.id]
     );
     await conn.query(
       "UPDATE medical_info SET cause_of_death = ?, date_of_death = ?, dead = 'y' WHERE medical_info_id = ?",
-      [cause_of_death || null, death_date || null, before.medical_info_id]
+      [cause_of_death || null, deathDateVal, before.medical_info_id]
     );
+
+    if (String(before.address_id) !== String(unassignedAddrId)) {
+      await conn.query(
+        `UPDATE ferret_location_history SET move_out = ?
+         WHERE ferret_id = ? AND move_out IS NULL`,
+        [closeDate, req.params.id]
+      );
+      await conn.query(
+        'INSERT INTO ferret_location_history (move_in, ferret_id, address_id) VALUES (?,?,?)',
+        [closeDate, req.params.id, unassignedAddrId]
+      );
+    }
 
     await conn.commit();
     const boardNote = diedOnBoard ? ` — died while ${before.female_status} on the Reproductive Status Board` : '';
     await log_activity(req.user.user_id, 'UPDATE', 'ferret_qr005', req.params.id,
-      `Marked deceased: ferret #${req.params.id}${cause_of_death ? ' — ' + cause_of_death : ''}${boardNote}`);
+      `Marked deceased: ferret #${req.params.id}${cause_of_death ? ' — ' + cause_of_death : ''}${boardNote} — unassigned from former location`);
     res.json({ message: 'Ferret marked as deceased', died_on_board: diedOnBoard });
   } catch (err) {
     await conn.rollback();
@@ -1594,6 +1641,20 @@ app.put('/api/ferrets/:id/rfid/unassign', authenticate, require_perm('update'), 
 });
 
 // ─── Cleaning Reports ─────────────────────────────────────────────────────────
+
+// Plain list of distinct room IDs — used by the Cleaning Reports "what
+// room(s) did you clean" picker and the report-history room filter. This
+// route was missing entirely (app-cleaning.js has called it since it was
+// written), which 404'd and — because loadCrHistory() awaits it before
+// fetching /cleaning-reports — silently aborted the history load too.
+app.get('/api/rooms', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT DISTINCT room_id FROM address WHERE room_id IS NOT NULL AND room_id > 0 ORDER BY room_id'
+    );
+    res.json(rows.map(r => r.room_id));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // ─── Room Light Schedule ──────────────────────────────────────────────────────
 app.get('/api/rooms/light-schedule', authenticate, require_perm('read'), async (req, res) => {

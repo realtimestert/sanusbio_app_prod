@@ -1,5 +1,9 @@
-// SanusBio v1.10.4 | 2026-08-10 | app-ferrets.js
+// SanusBio v1.10.5 | 2026-08-13 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
+// v1.10.5: ferret name is now editable on the ferret detail page for
+//          admin/research (canEdit), matching the existing Birth Date / Sex
+//          inline-edit pattern — saveFerretName() PUTs ferret_name (already
+//          accepted server-side) and reloads the detail view
 // v1.10.4: ferretAge() now returns weeks with one decimal place (was whole
 //          weeks only) — affects every age display across the app
 // v1.9.4: ages always shown in weeks (no Y/mo breakdown); Age at Death added next to Date of Death
@@ -173,7 +177,14 @@ async function loadFerretDetail(id) {
     </div>
     <div class="col-md-9">
       <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
-        <h3 class="mb-0 fw-bold">${f.ferret_name}</h3>
+        ${canEdit ? `
+        <div class="d-flex align-items-center gap-2">
+          <input type="text" id="editFerretName" class="form-control form-control-sm fw-bold"
+            style="max-width:220px;font-size:1.15rem" value="${f.ferret_name.replace(/"/g, '&quot;')}">
+          <button class="btn btn-sm btn-outline-primary" onclick="saveFerretName(${id})" title="Save name">
+            <i class="bi bi-check2"></i>
+          </button>
+        </div>` : `<h3 class="mb-0 fw-bold">${f.ferret_name}</h3>`}
         ${f.distributed == 1 ? `<span class="badge" style="background:#7c3aed">Distributed</span>` : f.dead === '1' ? `<span class="badge bg-danger">Deceased</span>` : `<span class="badge bg-success">Active</span>`}
         <div class="ms-auto d-flex gap-2 flex-wrap">
           ${canUpdate() && !f.distributed ? (f.dead === '1'
@@ -1059,6 +1070,15 @@ async function submitPhoto() {
 }
 
 // ─── Ferret Actions ───────────────────────────────────────────────────────────
+async function saveFerretName(id) {
+  const val = document.getElementById('editFerretName').value.trim();
+  if (!val) return alert('Ferret name cannot be empty.');
+  try {
+    await api(`/ferrets/${id}`, { method: 'PUT', body: { ferret_name: val } });
+    loadFerretDetail(id);
+  } catch (err) { alert(err.message); }
+}
+
 async function saveBirthDate(id) {
   const val = document.getElementById('editBirthDate').value;
   if (!val) return alert('Please enter a valid date.');
