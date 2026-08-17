@@ -1,3 +1,4 @@
+// 1.10.6 2026-08-17 Current version
 // SanusBio v1.0.0 | 2026-08-11 | app-reports.js
 // Reports tab: Ferrets by Room, Reproductive Status, Deaths, Infant Mortality.
 // Every report renders as a plain table inside #reportContent so the browser's
