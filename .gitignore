@@ -10,9 +10,6 @@
 backups/
 node_modules/
 dist/
-<<<<<<< Updated upstream
-copy.sh
-=======
 *.csv
 # Secrets & env
 .env
@@ -35,4 +32,3 @@ uploads/
 # Editor
 .vscode/
 .DS_Store
->>>>>>> Stashed changes
