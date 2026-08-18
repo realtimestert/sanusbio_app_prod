@@ -1,4 +1,8 @@
-// SanusBio v1.11.3 | 2026-08-18 | server.js
+// SanusBio v1.12.0 | 2026-08-18 | server.js
+// v1.12.0: room_light_history audit trail; move handler only resets
+//          light_state_since when the cycle actually changes (same-state
+//          room moves continue the continuous period); live room toggles
+//          also write to room_light_history; Weeks into/out of Dark boards.
 // v1.11.3: GET /api/ferrets/vaccinations-due for dashboard Vaccinations Due board
 // v1.11.2: Reproductive Status Board — exclude weaned (treated as baseline);
 //          board row can record no_litter to return a mated female to baseline.
@@ -288,6 +292,35 @@ app.get('/api/ferrets/vaccinations-due', authenticate, require_perm('read'), asy
       ORDER BY f.next_rabies_vaccine_due ASC, f.ferret_name
     `, [days]);
     res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+
+// ─── Light Cycle Boards (Weeks into Dark / Weeks out of Dark) ─────────────────
+// Continuous weeks on the current 8-hour (dark) or 16-hour (standard) cycle.
+// light_state_since is the start of the continuous period (survives same-state
+// room moves). Weeks = FLOOR(days / 7). Matches Smartsheet admin boards.
+app.get('/api/ferrets/light-cycle-boards', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
+             f.sex, f.birth_date, f.photo_url,
+             COALESCE(f.eight_hour_light, 0) AS eight_hour_light,
+             f.light_state_since, f.light_mode,
+             a.room_id, a.room_name, a.cage_address, a.room_lighting,
+             DATEDIFF(CURDATE(), f.light_state_since) AS days_on_cycle,
+             FLOOR(DATEDIFF(CURDATE(), f.light_state_since) / 7) AS weeks_on_cycle,
+             TIMESTAMPDIFF(WEEK, f.birth_date, CURDATE()) AS age_weeks
+      FROM ferret_qr005 f
+      LEFT JOIN address a ON f.address_id = a.address_id
+      WHERE f.light_state_since IS NOT NULL
+        AND (f.dead = '0' OR f.dead IS NULL)
+        AND (f.distributed = 0 OR f.distributed IS NULL)
+      ORDER BY eight_hour_light DESC, weeks_on_cycle DESC, f.ferret_name
+    `);
+    const intoDark = rows.filter(r => r.eight_hour_light === 1);
+    const outOfDark = rows.filter(r => r.eight_hour_light === 0);
+    res.json({ intoDark, outOfDark });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -592,7 +625,7 @@ app.put('/api/ferrets/:id/location', authenticate, async (req, res) => {
   try {
     await conn.beginTransaction();
     const [[ferret]] = await conn.query(
-      'SELECT dead, distributed, light_mode, address_id FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]
+      'SELECT dead, distributed, light_mode, address_id, eight_hour_light FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]
     );
     if (!ferret) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Ferret not found' }); }
     if (ferret.dead === '1') { await conn.rollback(); conn.release(); return res.status(400).json({ error: 'Cannot change location of a deceased ferret' }); }
@@ -617,17 +650,31 @@ app.put('/api/ferrets/:id/location', authenticate, async (req, res) => {
       );
     }
 
-    // Auto light-cycle sync: adopt the destination room's current schedule,
-    // dated to the move (not necessarily today, if this is being logged after the fact)
+    // Auto light-cycle sync: adopt the destination room's current schedule.
+    // Only reset light_state_since when the *cycle actually changes* so that
+    // moves between rooms that share the same schedule (e.g. Room 5 dark →
+    // Room 16 dark) continue the continuous period instead of restarting it.
     if (ferret.light_mode !== 'manual') {
       const [[destRoom]] = await conn.query(`
         SELECT rls.eight_hour_light
         FROM address a LEFT JOIN room_light_schedule rls ON a.room_id = rls.room_id
         WHERE a.address_id = ?`, [address_id]);
-      await conn.query(
-        'UPDATE ferret_qr005 SET eight_hour_light = ?, light_state_since = ? WHERE Ferret_QR005_id = ?',
-        [destRoom?.eight_hour_light ? 1 : 0, moveDate, req.params.id]
-      );
+      const newState = destRoom?.eight_hour_light ? 1 : 0;
+      const prevState = ferret.eight_hour_light ? 1 : 0;
+      if (newState !== prevState) {
+        await conn.query(
+          'UPDATE ferret_qr005 SET eight_hour_light = ?, light_state_since = ? WHERE Ferret_QR005_id = ?',
+          [newState, moveDate, req.params.id]
+        );
+      } else if (ferret.eight_hour_light == null) {
+        // First time we know the state — set it without inventing a since date
+        // (recompute from history is preferred; this is a safe fallback)
+        await conn.query(
+          'UPDATE ferret_qr005 SET eight_hour_light = ? WHERE Ferret_QR005_id = ?',
+          [newState, req.params.id]
+        );
+      }
+      // else: same cycle → leave light_state_since untouched (continuous)
     }
     await conn.commit();
     await log_activity(req.user.user_id, 'MOVE', 'ferret_qr005', req.params.id,
@@ -1719,6 +1766,18 @@ app.put('/api/rooms/:room_id/light', authenticate, require_perm('update'), async
          ON DUPLICATE KEY UPDATE eight_hour_light = VALUES(eight_hour_light), light_state_since = CURDATE()`,
         [roomId, newVal]
       );
+      // Keep the audit trail complete so continuous-period recompute stays correct
+      // for future periods (table may not exist yet on older deploys — ignore error)
+      try {
+        await conn.query(
+          `INSERT INTO room_light_history (room_id, change_date, eight_hour_light, source)
+           VALUES (?, CURDATE(), ?, 'app')
+           ON DUPLICATE KEY UPDATE eight_hour_light = VALUES(eight_hour_light), source = 'app'`,
+          [roomId, newVal]
+        );
+      } catch (histErr) {
+        if (histErr.code !== 'ER_NO_SUCH_TABLE') throw histErr;
+      }
       // Cascade to every auto-mode ferret currently housed in this room —
       // flipping the room's actual light schedule is itself a trigger event
       // (e.g. to induce estrus) even if no ferret physically moves.

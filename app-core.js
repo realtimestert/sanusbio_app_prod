@@ -1,5 +1,5 @@
-// SanusBio v1.11.3 | 2026-08-18 | app-core.js
-// v1.11.3: Dashboard boards collapsible (repro, care, vacc); Vaccinations Due
+// SanusBio v1.10.7 | 2026-08-18 | app-core.js
+// v1.10.7: Dashboard boards collapsible (repro, care, vacc); Vaccinations Due
 //          board; count badges on board headers; collapse state in localStorage
 // v1.10.5: Assignments tab removed from navigation (feature unused); the
 //          nav() loader map no longer routes to loadAssignments
@@ -206,6 +206,9 @@ async function loadDashboard() {
   // Weight & Grooming Care Alerts
   await loadDashCareAlerts();
 
+  // Weeks into / out of Dark boards
+  await loadDashLightCycleBoards();
+
   // Vaccinations Due board
   await loadDashVaccAlerts();
 
@@ -331,6 +334,65 @@ async function loadDashCareAlerts() {
     const footer = document.getElementById('dashCareFooter');
     if (footer) footer.innerHTML = `<i class="bi bi-info-circle me-1"></i>Nail trim every ${_dashCareSettings.nail_trim_interval_days}d · Bath every ${_dashCareSettings.bath_interval_days}d · Weight check every ${_dashCareSettings.weight_warn_days}d (yellow) / ${_dashCareSettings.weight_critical_days}d (red)`;
   } catch (err) { console.error('Care alerts:', err); }
+}
+
+async function loadDashLightCycleBoards() {
+  const inCard = document.getElementById('dashDarkInCard');
+  const outCard = document.getElementById('dashDarkOutCard');
+  if (!inCard && !outCard) return;
+  if (USER?.role === 'cleaner') {
+    if (inCard) inCard.style.display = 'none';
+    if (outCard) outCard.style.display = 'none';
+    return;
+  }
+  try {
+    const data = await api('/ferrets/light-cycle-boards');
+    const intoDark = data.into_dark || data.intoDark || [];
+    const outOfDark = data.out_of_dark || data.outOfDark || [];
+
+    const renderRow = (f) => {
+      const loc = `Room ${f.room_id || '?'}${f.cage_address ? ' · ' + f.cage_address : ''}${f.room_lighting ? ' · ' + f.room_lighting : ''}`;
+      const ageLabel = f.age_weeks != null ? `${f.age_weeks}w` : '—';
+      return `<tr style="cursor:pointer" onclick="loadFerretDetail(${f.id})">
+        <td><strong>${f.name}</strong><br><span class="text-muted small">${f.animal_id != null ? 'AID' + String(f.animal_id).padStart(5, '0') : '—'}</span></td>
+        <td><strong>${f.weeks_on_cycle != null ? f.weeks_on_cycle : '—'}</strong>
+            <span class="text-muted small ms-1">(${f.days_on_cycle != null ? f.days_on_cycle + 'd' : '—'})</span></td>
+        <td>${fmtDate(f.light_state_since)}</td>
+        <td class="small">${ageLabel}</td>
+        <td class="small text-muted">${loc}</td>
+      </tr>`;
+    };
+
+    if (inCard) {
+      if (!intoDark.length) {
+        inCard.style.display = 'none';
+      } else {
+        inCard.style.display = '';
+        const cnt = document.getElementById('dashDarkInCount');
+        if (cnt) cnt.textContent = intoDark.length;
+        const tbody = document.getElementById('dashDarkInList');
+        if (tbody) tbody.innerHTML = intoDark.map(renderRow).join('');
+        applySavedCollapse('dashDarkInBody');
+      }
+    }
+
+    if (outCard) {
+      if (!outOfDark.length) {
+        outCard.style.display = 'none';
+      } else {
+        outCard.style.display = '';
+        const cnt = document.getElementById('dashDarkOutCount');
+        if (cnt) cnt.textContent = outOfDark.length;
+        const tbody = document.getElementById('dashDarkOutList');
+        if (tbody) tbody.innerHTML = outOfDark.map(renderRow).join('');
+        applySavedCollapse('dashDarkOutBody');
+      }
+    }
+  } catch (err) {
+    console.error('Light cycle boards:', err);
+    if (inCard) inCard.style.display = 'none';
+    if (outCard) outCard.style.display = 'none';
+  }
 }
 
 async function loadDashVaccAlerts() {
