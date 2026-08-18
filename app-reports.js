@@ -1,10 +1,8 @@
-// 1.10.6 2026-08-17 Current version
-// SanusBio v1.0.0 | 2026-08-11 | app-reports.js
-// Reports tab: Ferrets by Room, Reproductive Status, Deaths, Infant Mortality.
-// Every report renders as a plain table inside #reportContent so the browser's
-// native print (window.print(), wired to the page's Print button) produces a
-// clean printout — .no-print elements (tabs, filters, print button itself)
-// are hidden via the @media print rules in style.css.
+// SanusBio v1.11.3 | 2026-08-18 | app-reports.js
+// Reports tab: Ferrets by Room, Reproductive Status, Deaths, Infant Mortality,
+// Distribution. Every report renders as a plain table inside #reportContent so
+// the browser's native print (window.print()) produces a clean printout —
+// .no-print elements are hidden via @media print rules in style.css.
 
 let _reportTab = 'room';
 
@@ -18,12 +16,12 @@ function loadReports() {
 
 function switchReportTab(tab) {
   _reportTab = tab;
-  const order = ['room', 'repro', 'deaths', 'infant'];
+  const order = ['room', 'repro', 'deaths', 'infant', 'distribution'];
   document.querySelectorAll('#reportTabs .nav-link').forEach((btn, i) => {
     btn.classList.toggle('active', order[i] === tab);
   });
   const dateCard = document.getElementById('reportDateFilterCard');
-  if (dateCard) dateCard.style.display = (tab === 'deaths' || tab === 'infant') ? '' : 'none';
+  if (dateCard) dateCard.style.display = (tab === 'deaths' || tab === 'infant' || tab === 'distribution') ? '' : 'none';
   loadCurrentReport();
 }
 
@@ -36,6 +34,7 @@ async function loadCurrentReport() {
     else if (_reportTab === 'repro') await renderReproReport(el);
     else if (_reportTab === 'deaths') await renderDeathsReport(el);
     else if (_reportTab === 'infant') await renderInfantMortalityReport(el);
+    else if (_reportTab === 'distribution') await renderDistributionReport(el);
   } catch (err) {
     el.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
   }
@@ -145,6 +144,79 @@ async function renderDeathsReport(el) {
               <td>${fmtDate(f.death_date)}</td>
               <td class="small">${f.cause_of_death || '—'}</td>
             </tr>`).join('') : '<tr><td colspan="4" class="text-muted text-center py-3">No deaths in this range.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ─── Distribution ────────────────────────────────────────────────────────────
+async function renderDistributionReport(el) {
+  const from = document.getElementById('repDateFrom')?.value;
+  const to = document.getElementById('repDateTo')?.value;
+  // Use existing distribution-events endpoint (limit high for report)
+  let rows = await api('/distribution-events?limit=2000');
+  if (from) rows = rows.filter(r => r.distribution_date && String(r.distribution_date).slice(0, 10) >= from);
+  if (to) rows = rows.filter(r => r.distribution_date && String(r.distribution_date).slice(0, 10) <= to);
+
+  // Group by distributor for summary
+  const byDist = {};
+  rows.forEach(r => {
+    const k = r.distributor_name || 'Unknown';
+    if (!byDist[k]) byDist[k] = { name: k, count: 0, total: 0 };
+    byDist[k].count++;
+    if (r.price != null) byDist[k].total += Number(r.price) || 0;
+  });
+  const summary = Object.values(byDist).sort((a, b) => b.count - a.count);
+
+  el.innerHTML = `
+    <div class="card mb-3">
+      <div class="card-header bg-white py-3 d-flex align-items-center">
+        <span class="fw-semibold">Distribution Summary</span>
+        <span class="badge bg-secondary ms-2">${rows.length}</span>
+        <span class="text-muted small ms-2">${reportDateRangeLabel(from, to)}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead><tr><th>Distributor</th><th>Ferrets</th><th>Total Price</th></tr></thead>
+          <tbody>${summary.length ? summary.map(s => `
+            <tr>
+              <td>${s.name}</td>
+              <td>${s.count}</td>
+              <td>${s.total ? '$' + s.total.toFixed(2) : '—'}</td>
+            </tr>`).join('') : '<tr><td colspan="3" class="text-muted text-center py-3">No distributions in this range.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header bg-white py-3">
+        <span class="fw-semibold">Distribution Detail</span>
+        <span class="text-muted small ms-2">Generated ${fmtDate(today())}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Ferret</th>
+              <th>Sex</th>
+              <th>Distributor</th>
+              <th>Price</th>
+              <th>Notes</th>
+              <th>Recorded By</th>
+            </tr>
+          </thead>
+          <tbody>${rows.length ? rows.map(r => `
+            <tr>
+              <td>${fmtDate(r.distribution_date)}</td>
+              <td><strong>${r.ferret_name}</strong> <span class="text-muted small">${r.animal_id || ''}</span></td>
+              <td>${r.sex || '—'}</td>
+              <td>${r.distributor_name || '—'}</td>
+              <td>${r.price != null ? '$' + Number(r.price).toFixed(2) : '—'}</td>
+              <td class="small">${r.dist_notes || r.notes || '—'}</td>
+              <td class="small text-muted">${r.recorded_by || '—'}</td>
+            </tr>`).join('') : '<tr><td colspan="7" class="text-muted text-center py-3">No distributions in this range.</td></tr>'}
           </tbody>
         </table>
       </div>

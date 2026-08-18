@@ -1,4 +1,4 @@
-<!-- SanusBio v1.10.2 | 2026-08-10 | index.html -->
+<!-- SanusBio v1.11.3 | 2026-08-18 | index.html -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -113,31 +113,37 @@
 
         <!-- Estrus / Reproductive Status Board -->
         <div class="card" id="dashEstrusCard" style="display:none">
-          <div class="card-header bg-white d-flex align-items-center py-3">
+          <div class="card-header bg-white d-flex align-items-center py-3" role="button"
+               data-bs-toggle="collapse" data-bs-target="#dashEstrusBody" aria-expanded="true"
+               onclick="toggleDashCollapse('dashEstrusBody', this)">
             <span class="fw-semibold"><i class="bi bi-heart-fill text-danger me-2"></i>Female Reproductive Status
               Board</span>
             <span class="text-muted small ms-2">(females with active status)</span>
+            <span class="badge bg-secondary ms-2" id="dashEstrusCount"></span>
+            <i class="bi bi-chevron-up ms-auto text-muted dash-collapse-icon"></i>
           </div>
-          <div class="px-3 pt-3 pb-1 d-flex flex-wrap gap-2" id="dashReproFilterBtns"></div>
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead>
-                <tr>
-                  <th>Female</th>
-                  <th>Status</th>
-                  <th>Since</th>
-                  <th>Days</th>
-                  <th>Expected Litter</th>
-                  <th>Location</th>
-                  <th>Notes</th>
-                </tr>
-              </thead>
-              <tbody id="dashEstrusList"></tbody>
-            </table>
-          </div>
-          <div class="card-footer bg-white text-muted small py-2">
-            <i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>
-            Females in estrus for 8+ days are highlighted — aim to mate within 10 days of estrus onset.
+          <div id="dashEstrusBody" class="collapse show">
+            <div class="px-3 pt-3 pb-1 d-flex flex-wrap gap-2" id="dashReproFilterBtns"></div>
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th>Female</th>
+                    <th>Status</th>
+                    <th>Since</th>
+                    <th>Days</th>
+                    <th>Expected Litter</th>
+                    <th>Location</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody id="dashEstrusList"></tbody>
+              </table>
+            </div>
+            <div class="card-footer bg-white text-muted small py-2">
+              <i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>
+              Females in estrus for 8+ days are highlighted — aim to mate within 10 days of estrus onset.
+            </div>
           </div>
         </div>
 
@@ -156,26 +162,65 @@
 
         <!-- Weight & Grooming Care Alerts -->
         <div class="card mt-3 hide-cleaner" id="dashCareCard" style="display:none">
-          <div class="card-header bg-white d-flex align-items-center py-3">
-            <span class="fw-semibold"><i class="bi bi-clipboard2-pulse text-primary me-2"></i>Weight &amp; Grooming Alerts</span>
-            <span class="text-muted small ms-2">(needs weighing, nail trim, or bath)</span>
-            <select id="dashCareSort" class="form-select form-select-sm ms-auto" style="max-width:170px" onchange="setDashCareSort(this.value)">
+          <div class="card-header bg-white d-flex align-items-center py-3 gap-2">
+            <div class="d-flex align-items-center flex-grow-1" role="button"
+                 data-bs-toggle="collapse" data-bs-target="#dashCareBody" aria-expanded="true"
+                 onclick="toggleDashCollapse('dashCareBody', this)">
+              <span class="fw-semibold"><i class="bi bi-clipboard2-pulse text-primary me-2"></i>Weight &amp; Grooming Alerts</span>
+              <span class="text-muted small ms-2">(needs weighing, nail trim, or bath)</span>
+              <span class="badge bg-secondary ms-2" id="dashCareCount"></span>
+              <i class="bi bi-chevron-up ms-auto text-muted dash-collapse-icon"></i>
+            </div>
+            <select id="dashCareSort" class="form-select form-select-sm" style="max-width:170px" onchange="event.stopPropagation(); setDashCareSort(this.value)">
               <option value="urgency">Sort: Most Urgent</option>
               <option value="name">Sort: Name</option>
               <option value="location">Sort: Location</option>
             </select>
-            <button class="btn btn-sm btn-outline-secondary admin-research-only" onclick="openCareScheduleModal()">
+            <button class="btn btn-sm btn-outline-secondary admin-research-only" onclick="event.stopPropagation(); openCareScheduleModal()">
               <i class="bi bi-gear me-1"></i>Schedule Settings
             </button>
           </div>
-          <div class="px-3 pt-3 pb-1 d-flex flex-wrap gap-2" id="dashCareFilterBtns"></div>
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead><tr><th>Ferret</th><th>Weight</th><th>Nail Trim</th><th>Bath</th><th>Location</th></tr></thead>
-              <tbody id="dashCareList"></tbody>
-            </table>
+          <div id="dashCareBody" class="collapse show">
+            <div class="px-3 pt-3 pb-1 d-flex flex-wrap gap-2" id="dashCareFilterBtns"></div>
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead><tr><th>Ferret</th><th>Weight</th><th>Nail Trim</th><th>Bath</th><th>Location</th></tr></thead>
+                <tbody id="dashCareList"></tbody>
+              </table>
+            </div>
+            <div class="card-footer bg-white text-muted small py-2" id="dashCareFooter"></div>
           </div>
-          <div class="card-footer bg-white text-muted small py-2" id="dashCareFooter"></div>
+        </div>
+
+        <!-- Vaccinations Due Board -->
+        <div class="card mt-3 hide-cleaner" id="dashVaccCard" style="display:none">
+          <div class="card-header bg-white d-flex align-items-center py-3" role="button"
+               data-bs-toggle="collapse" data-bs-target="#dashVaccBody" aria-expanded="true"
+               onclick="toggleDashCollapse('dashVaccBody', this)">
+            <span class="fw-semibold"><i class="bi bi-syringe text-warning me-2"></i>Vaccinations Due</span>
+            <span class="text-muted small ms-2">(rabies due within 30 days or overdue)</span>
+            <span class="badge bg-warning text-dark ms-2" id="dashVaccCount"></span>
+            <i class="bi bi-chevron-up ms-auto text-muted dash-collapse-icon"></i>
+          </div>
+          <div id="dashVaccBody" class="collapse show">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th>Ferret</th>
+                    <th>Due Date</th>
+                    <th>Days</th>
+                    <th>Location</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="dashVaccList"></tbody>
+              </table>
+            </div>
+            <div class="card-footer bg-white text-muted small py-2">
+              Overdue rows are highlighted. Click a row to open the ferret and record a vaccination.
+            </div>
+          </div>
         </div>
       </div>
 
@@ -353,6 +398,7 @@
           <li class="nav-item"><button class="nav-link" onclick="switchReportTab('repro')">Reproductive Status</button></li>
           <li class="nav-item"><button class="nav-link" onclick="switchReportTab('deaths')">Deaths</button></li>
           <li class="nav-item"><button class="nav-link" onclick="switchReportTab('infant')">Infant Mortality</button></li>
+          <li class="nav-item"><button class="nav-link" onclick="switchReportTab('distribution')">Distribution</button></li>
         </ul>
 
         <div class="card p-3 mb-3 no-print" id="reportDateFilterCard" style="display:none">

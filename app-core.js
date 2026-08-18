@@ -1,4 +1,6 @@
-// SanusBio v1.10.6 | 2026-08-10 | app-core.js
+// SanusBio v1.11.3 | 2026-08-18 | app-core.js
+// v1.11.3: Dashboard boards collapsible (repro, care, vacc); Vaccinations Due
+//          board; count badges on board headers; collapse state in localStorage
 // v1.10.5: Assignments tab removed from navigation (feature unused); the
 //          nav() loader map no longer routes to loadAssignments
 // v1.10.6: (1) Weight & Grooming Alerts table is now sortable by Name,
@@ -41,6 +43,42 @@ const DASH_REPRO_STATUS_META = {
 };
 
 let _dashCareData = [], _dashCareFilter = null, _dashCareSettings = null, _dashCareSort = 'urgency';
+let _dashVaccData = [];
+
+/** Toggle dashboard board collapse and remember preference. */
+function toggleDashCollapse(bodyId, headerEl) {
+  const body = document.getElementById(bodyId);
+  if (!body) return;
+  // Bootstrap handles the collapse via data-bs-toggle; we just sync icon + storage after animation
+  setTimeout(() => {
+    const open = body.classList.contains('show');
+    const icon = headerEl?.querySelector?.('.dash-collapse-icon')
+      || headerEl?.closest?.('.card-header')?.querySelector?.('.dash-collapse-icon');
+    if (icon) {
+      icon.classList.toggle('bi-chevron-up', open);
+      icon.classList.toggle('bi-chevron-down', !open);
+    }
+    try { localStorage.setItem('sb_collapse_' + bodyId, open ? '1' : '0'); } catch (_) {}
+  }, 350);
+}
+
+function applySavedCollapse(bodyId) {
+  const body = document.getElementById(bodyId);
+  if (!body) return;
+  let saved = null;
+  try { saved = localStorage.getItem('sb_collapse_' + bodyId); } catch (_) {}
+  if (saved === null) return;
+  const open = saved === '1';
+  body.classList.toggle('show', open);
+  const card = body.closest('.card');
+  const icon = card?.querySelector?.('.dash-collapse-icon');
+  if (icon) {
+    icon.classList.toggle('bi-chevron-up', open);
+    icon.classList.toggle('bi-chevron-down', !open);
+  }
+  const header = card?.querySelector?.('[data-bs-toggle="collapse"]');
+  if (header) header.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
 
 // ─── API Helper ───────────────────────────────────────────────────────────────
 async function api(path, opts = {}) {
@@ -155,8 +193,11 @@ async function loadDashboard() {
     estrusCard.style.display = '';
     try {
       _dashReproData = await api('/females/estrus');
+      const cnt = document.getElementById('dashEstrusCount');
+      if (cnt) cnt.textContent = _dashReproData.length;
       renderDashReproFilterBtns();
       renderDashReproTable();
+      applySavedCollapse('dashEstrusBody');
     } catch (err) { console.error('Estrus board:', err); }
   } else if (estrusCard) {
     estrusCard.style.display = 'none';
@@ -164,6 +205,9 @@ async function loadDashboard() {
 
   // Weight & Grooming Care Alerts
   await loadDashCareAlerts();
+
+  // Vaccinations Due board
+  await loadDashVaccAlerts();
 
   // Females who died while active on the board
   const diedCard = document.getElementById('dashDiedOnBoardCard');
@@ -194,7 +238,7 @@ function renderDashReproFilterBtns() {
   if (!wrap) return;
   const counts = {};
   _dashReproData.forEach(f => { counts[f.status] = (counts[f.status] || 0) + 1; });
-  const cats = ['estrus', 'mated', 'littered', 'weaned'];
+  const cats = ['estrus', 'mated', 'littered'];
   wrap.innerHTML = `
     <button class="btn btn-sm ${_dashReproFilter === null ? 'btn-primary' : 'btn-outline-secondary'}"
       onclick="setDashReproFilter(null)">
@@ -234,16 +278,34 @@ function renderDashReproTable() {
       if (start && end) litterLabel = (fmtDate(start) === fmtDate(end)) ? fmtDate(start) : `${fmtDate(start)} – ${fmtDate(end)}`;
       else if (start) litterLabel = fmtDate(start) + ' (est.)';
     }
+    // Mated with no litter: allow return to baseline without opening the full ferret page
+    const noLitterBtn = (f.status === 'mated' && typeof canUpdate === 'function' && canUpdate())
+      ? `<button class="btn btn-sm btn-outline-secondary py-0 px-1" title="No litter — return to baseline"
+           onclick="event.stopPropagation(); returnToBaseline(${f.id}, '${(f.name || '').replace(/'/g, "\\'")}')">
+           <i class="bi bi-arrow-counterclockwise"></i></button>`
+      : '';
     return `<tr class="${urgency ? 'table-danger' : ''}" style="cursor:pointer" onclick="loadFerretDetail(${f.id});">
       <td><strong>${f.name}</strong><br><span class="text-muted small">${f.animal_id || '—'}</span></td>
-      <td><span class="badge bg-${m.color}">${m.label}</span></td>
+      <td><span class="badge bg-${m.color}">${m.label}</span> ${noLitterBtn}</td>
       <td>${f.status_since ? fmtDate(f.status_since) : '—'}</td>
       <td>${daysSince !== null ? daysSince + 'd' : '—'}${urgency ? ' <i class="bi bi-exclamation-triangle-fill text-danger ms-1"></i>' : ''}</td>
       <td class="small">${litterLabel}</td>
       <td class="small text-muted">Room ${f.room_id || '?'} · ${f.cage_address || '?'}</td>
-      <td class="small text-muted">${f.status_notes || '—'}</td>
+      <td class="small text-muted">${(f.status_notes || '—').toString().slice(0, 80)}</td>
     </tr>`;
   }).join('');
+}
+
+/** Record no_litter and refresh the Reproductive Status Board. */
+async function returnToBaseline(ferretId, name) {
+  if (!confirm(`Mark ${name || 'this female'} as no litter and return her to baseline?\n\nShe will leave the Reproductive Status Board.`)) return;
+  try {
+    await api(`/ferrets/${ferretId}/no-litter`, { method: 'POST', body: { notes: 'No litter — returned to baseline (board)' } });
+    // Refresh board in place
+    _dashReproData = await api('/females/estrus');
+    renderDashReproFilterBtns();
+    renderDashReproTable();
+  } catch (err) { alert(err.message); }
 }
 
 // ─── Weight & Grooming Care Alerts ──────────────────────────────────────────────
@@ -261,11 +323,52 @@ async function loadDashCareAlerts() {
     const data = await api('/ferrets/care-alerts');
     _dashCareSettings = data.settings;
     _dashCareData = data.ferrets;
+    const cnt = document.getElementById('dashCareCount');
+    if (cnt) cnt.textContent = _dashCareData.length;
     renderDashCareFilterBtns();
     renderDashCareTable();
+    applySavedCollapse('dashCareBody');
     const footer = document.getElementById('dashCareFooter');
     if (footer) footer.innerHTML = `<i class="bi bi-info-circle me-1"></i>Nail trim every ${_dashCareSettings.nail_trim_interval_days}d · Bath every ${_dashCareSettings.bath_interval_days}d · Weight check every ${_dashCareSettings.weight_warn_days}d (yellow) / ${_dashCareSettings.weight_critical_days}d (red)`;
   } catch (err) { console.error('Care alerts:', err); }
+}
+
+async function loadDashVaccAlerts() {
+  const card = document.getElementById('dashVaccCard');
+  if (!card) return;
+  if (USER?.role === 'cleaner') { card.style.display = 'none'; return; }
+  try {
+    _dashVaccData = await api('/ferrets/vaccinations-due?days=30');
+    if (!_dashVaccData.length) {
+      card.style.display = 'none';
+      return;
+    }
+    card.style.display = '';
+    const cnt = document.getElementById('dashVaccCount');
+    if (cnt) cnt.textContent = _dashVaccData.length;
+    const tbody = document.getElementById('dashVaccList');
+    if (!tbody) return;
+    tbody.innerHTML = _dashVaccData.map(f => {
+      const overdue = f.days_until != null && f.days_until < 0;
+      const dueToday = f.days_until === 0;
+      const daysLabel = f.days_until == null ? '—'
+        : overdue ? `${Math.abs(f.days_until)}d overdue`
+        : dueToday ? 'Due today'
+        : `in ${f.days_until}d`;
+      return `<tr class="${overdue ? 'table-danger' : (dueToday ? 'table-warning' : '')}"
+                  style="cursor:pointer" onclick="loadFerretDetail(${f.id})">
+        <td><strong>${f.name}</strong><br><span class="text-muted small">${f.animal_id || '—'}</span></td>
+        <td>${fmtDate(f.next_rabies_vaccine_due)}</td>
+        <td>${daysLabel}</td>
+        <td class="small text-muted">Room ${f.room_id || '?'} · ${f.cage_address || '?'}</td>
+        <td class="small">${canUpdate() ? '<span class="text-muted">Open to record →</span>' : ''}</td>
+      </tr>`;
+    }).join('');
+    applySavedCollapse('dashVaccBody');
+  } catch (err) {
+    console.error('Vaccinations due:', err);
+    card.style.display = 'none';
+  }
 }
 
 const DASH_CARE_FILTERS = {

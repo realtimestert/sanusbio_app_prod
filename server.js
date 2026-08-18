@@ -1,4 +1,5 @@
-// SanusBio v1.11.2 | 2026-08-18 | server.js
+// SanusBio v1.11.3 | 2026-08-18 | server.js
+// v1.11.3: GET /api/ferrets/vaccinations-due for dashboard Vaccinations Due board
 // v1.11.2: Reproductive Status Board — exclude weaned (treated as baseline);
 //          board row can record no_litter to return a mated female to baseline.
 //          Migration 23 recomputes female_status, marks imported litter kits
@@ -264,6 +265,28 @@ app.get('/api/ferrets', authenticate, require_perm('read'), async (req, res) => 
         ORDER BY f.ferret_name
       `, [q, q]);
     }
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Vaccinations due within N days (default 30) or overdue — dashboard board
+// MUST be registered before /api/ferrets/:id
+app.get('/api/ferrets/vaccinations-due', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const days = Math.min(365, Math.max(1, parseInt(req.query.days, 10) || 30));
+    const [rows] = await pool.query(`
+      SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
+             f.next_rabies_vaccine_due, f.sex, f.birth_date, f.photo_url,
+             a.room_id, a.room_name, a.cage_address,
+             DATEDIFF(f.next_rabies_vaccine_due, CURDATE()) AS days_until
+      FROM ferret_qr005 f
+      LEFT JOIN address a ON f.address_id = a.address_id
+      WHERE f.next_rabies_vaccine_due IS NOT NULL
+        AND f.next_rabies_vaccine_due <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+        AND (f.dead = '0' OR f.dead IS NULL)
+        AND (f.distributed = 0 OR f.distributed IS NULL)
+      ORDER BY f.next_rabies_vaccine_due ASC, f.ferret_name
+    `, [days]);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -690,6 +713,13 @@ app.delete('/api/ferrets/:id', authenticate, admin_only, async (req, res) => {
     await conn.query('UPDATE reproductive_event SET partner_id = NULL WHERE partner_id = ?', [id]);
 
     // Delete all dependent child records
+    await conn.query('DELETE FROM ferret_location_history WHERE ferret_id = ?', [id]);
+    await conn.query('DELETE FROM health_event WHERE ferret_id = ?', [id]);
+    await conn.query('DELETE FROM litter_log WHERE Ferret_QR005_id = ?', [id]);
+    await conn.query('DELETE FROM rfid_assignment WHERE ferret_id = ?', [id]);
+    await conn.query('DELETE FROM vaccination_event WHERE ferret_id = ?', [id]);
+    await conn.query('DELETE FROM distribution_event WHERE ferret_id = ?', [id]);
+    await conn.query('DELETE FROM reproductive_event WHERE ferret_id = ?', [id]);
 
     await conn.query('DELETE FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [id]);
 
@@ -2306,79 +2336,6 @@ app.put('/api/ferrets/:id/breeding-retired', authenticate, require_perm('update'
       `${breeding_retired ? 'Retired from breeding' : 'Reinstated to breeding tracking'}: ${ferret.ferret_name}`);
     res.json({ message: 'Breeding retired status updated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// All females currently on the Reproductive Status Board
-// Latest event drives status. no_litter and weaned = off the board (baseline).
-app.get('/api/females/estrus', authenticate, require_perm('read'), async (req, res) => {
-  try {
-    const [rows] = await pool.query(`
-      SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
-             f.birth_date, f.weight, f.color, f.photo_url, f.female_status,
-             a.room_id, a.room_name, a.cage_address, a.room_lighting,
-             re.event_id AS status_event_id,
-             re.event_type AS status,
-             re.event_date AS status_since,
-             re.pulled_date,
-             re.notes AS status_notes,
-             DATE_ADD(re.event_date, INTERVAL 42 DAY) AS expected_litter_start,
-             CASE WHEN re.event_type = 'mated' AND re.pulled_date IS NOT NULL
-                  THEN DATE_ADD(re.pulled_date, INTERVAL 42 DAY) ELSE NULL END AS expected_litter_end
-      FROM ferret_qr005 f
-      LEFT JOIN address a ON f.address_id = a.address_id
-      JOIN reproductive_event re ON re.event_id = (
-        SELECT r2.event_id FROM reproductive_event r2
-        WHERE r2.ferret_id = f.Ferret_QR005_id
-        ORDER BY r2.event_date DESC, r2.event_id DESC LIMIT 1
-      )
-      WHERE f.sex = 'female'
-        AND (f.dead = '0' OR f.dead IS NULL)
-        AND (f.distributed = 0 OR f.distributed IS NULL)
-        AND (f.breeding_retired = 0 OR f.breeding_retired IS NULL)
-        AND re.event_type NOT IN ('no_litter', 'weaned')
-      ORDER BY
-        FIELD(re.event_type, 'estrus', 'mated', 'littered'),
-        re.event_date ASC
-    `);
-    res.json(rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Quick action: mated (or estrus) female produced no litter → back to baseline
-app.post('/api/ferrets/:id/no-litter', authenticate, require_perm('update'), async (req, res) => {
-  const event_date = req.body.event_date || new Date().toISOString().slice(0, 10);
-  const notes = req.body.notes || 'No litter — returned to baseline';
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    const [[ferret]] = await conn.query(
-      'SELECT ferret_name, sex FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]
-    );
-    if (!ferret) { await conn.rollback(); return res.status(404).json({ error: 'Ferret not found' }); }
-    if (ferret.sex !== 'female') { await conn.rollback(); return res.status(400).json({ error: 'Only females' }); }
-
-    const [r] = await conn.query(
-      `INSERT INTO reproductive_event (ferret_id, event_type, event_date, notes, recorded_by)
-       VALUES (?,'no_litter',?,?,?)`,
-      [req.params.id, event_date, notes, req.user.username]
-    );
-    const [events] = await conn.query(
-      'SELECT event_type FROM reproductive_event WHERE ferret_id = ? ORDER BY event_date DESC, event_id DESC',
-      [req.params.id]
-    );
-    const newStatus = deriveStatus(events);
-    await conn.query(
-      'UPDATE ferret_qr005 SET female_status = ? WHERE Ferret_QR005_id = ?',
-      [newStatus === 'baseline' ? null : newStatus, req.params.id]
-    );
-    await conn.commit();
-    await log_activity(req.user.user_id, 'REPRO_EVENT', 'reproductive_event', r.insertId,
-      `No litter / return to baseline: ${ferret.ferret_name}`);
-    res.json({ id: r.insertId, status: newStatus, message: 'Returned to baseline' });
-  } catch (err) {
-    await conn.rollback();
-    res.status(500).json({ error: err.message });
-  } finally { conn.release(); }
 });
 
 // All distribution events (for the Distribution page overview)
