@@ -10,4 +10,29 @@
 backups/
 node_modules/
 dist/
+<<<<<<< Updated upstream
 copy.sh
+=======
+*.csv
+# Secrets & env
+.env
+.env.*
+!.env.example
+
+# Dependencies & build
+node_modules/
+
+# Data exports (do not commit)
+*.csv
+QR005*.csv
+
+# Backups & uploads
+sanusbio-backups/
+uploads/
+*.sql.gz
+*.tar.gz
+
+# Editor
+.vscode/
+.DS_Store
+>>>>>>> Stashed changes

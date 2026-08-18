@@ -1,4 +1,17 @@
+<<<<<<< Updated upstream
 // SanusBio v1.10.7 | 2026-08-13 | server.js
+=======
+// SanusBio v1.11.2 | 2026-08-18 | server.js
+// v1.11.2: Reproductive Status Board — exclude weaned (treated as baseline);
+//          board row can record no_litter to return a mated female to baseline.
+//          Migration 23 recomputes female_status, marks imported litter kits
+//          as already created, and auto-clears mated>70d with no litter.
+// v1.11.1: Dropped three orphaned/retired tables via migration 21
+//          (push_subscriptions, estrus_&_mating_summary, assignments).
+//          Removed residual DELETE statements and the 'assignments' entry
+//          from the ferret activity-history filter. Feature had already
+//          been retired from UI and routes in earlier 1.10.x work.
+>>>>>>> Stashed changes
 // v1.10.7: (1) added missing GET /api/rooms — app-cleaning.js has always
 //          called this to populate the "what room(s) did you clean" picker
 //          and the report-history room filter, but the route never existed,
@@ -681,7 +694,10 @@ app.delete('/api/ferrets/:id', authenticate, admin_only, async (req, res) => {
     await conn.query('UPDATE reproductive_event SET partner_id = NULL WHERE partner_id = ?', [id]);
 
     // Delete all dependent child records
+<<<<<<< Updated upstream
     await conn.query('DELETE FROM assignments WHERE ferret_id = ?', [id]);
+=======
+>>>>>>> Stashed changes
     await conn.query('DELETE FROM ferret_location_history WHERE ferret_id = ?', [id]);
     await conn.query('DELETE FROM health_event WHERE ferret_id = ?', [id]);
     await conn.query('DELETE FROM litter_log WHERE Ferret_QR005_id = ?', [id]);
@@ -689,9 +705,12 @@ app.delete('/api/ferrets/:id', authenticate, admin_only, async (req, res) => {
     await conn.query('DELETE FROM vaccination_event WHERE ferret_id = ?', [id]);
     await conn.query('DELETE FROM distribution_event WHERE ferret_id = ?', [id]);
     await conn.query('DELETE FROM reproductive_event WHERE ferret_id = ?', [id]);
+<<<<<<< Updated upstream
     try {
       await conn.query('DELETE FROM `estrus_&_mating_summary` WHERE Ferret_QR005_id = ?', [id]);
     } catch { /* table may not exist on every deployment — non-fatal */ }
+=======
+>>>>>>> Stashed changes
 
     await conn.query('DELETE FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [id]);
 
@@ -711,7 +730,7 @@ app.get('/api/ferrets/:id/history', authenticate, require_perm('read'), async (r
       SELECT al.log_id, al.action, al.table_name, al.details, al.created_at, u.username
       FROM activity_log al
       JOIN users u ON al.user_id = u.user_id
-      WHERE al.record_id = ? AND al.table_name IN ('ferret_qr005','health_event','vaccination_event','litter_log','medical_info','assignments')
+      WHERE al.record_id = ? AND al.table_name IN ('ferret_qr005','health_event','vaccination_event','litter_log','medical_info')
       ORDER BY al.created_at DESC
       LIMIT 200
     `, [req.params.id]);
@@ -2191,13 +2210,24 @@ app.post('/api/ferrets/:id/reproductive/:eventId/photo', authenticate, require_p
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+<<<<<<< Updated upstream
 // All females currently in estrus (for estrus board)
+=======
+// All females currently on the Reproductive Status Board
+// Latest event drives status. no_litter and weaned = off the board (baseline).
+>>>>>>> Stashed changes
 app.get('/api/females/estrus', authenticate, require_perm('read'), async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
+<<<<<<< Updated upstream
              f.birth_date, f.weight, f.color, f.photo_url,
              a.room_id, a.room_name, a.cage_address, a.room_lighting,
+=======
+             f.birth_date, f.weight, f.color, f.photo_url, f.female_status,
+             a.room_id, a.room_name, a.cage_address, a.room_lighting,
+             re.event_id AS status_event_id,
+>>>>>>> Stashed changes
              re.event_type AS status,
              re.event_date AS status_since,
              re.pulled_date,
@@ -2216,15 +2246,61 @@ app.get('/api/females/estrus', authenticate, require_perm('read'), async (req, r
         AND (f.dead = '0' OR f.dead IS NULL)
         AND (f.distributed = 0 OR f.distributed IS NULL)
         AND (f.breeding_retired = 0 OR f.breeding_retired IS NULL)
+<<<<<<< Updated upstream
         AND re.event_type <> 'no_litter'
       ORDER BY
         FIELD(re.event_type, 'estrus', 'mated', 'littered', 'weaned'),
+=======
+        AND re.event_type NOT IN ('no_litter', 'weaned')
+      ORDER BY
+        FIELD(re.event_type, 'estrus', 'mated', 'littered'),
+>>>>>>> Stashed changes
         re.event_date ASC
     `);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+<<<<<<< Updated upstream
+=======
+// Quick action: mated (or estrus) female produced no litter → back to baseline
+app.post('/api/ferrets/:id/no-litter', authenticate, require_perm('update'), async (req, res) => {
+  const event_date = req.body.event_date || new Date().toISOString().slice(0, 10);
+  const notes = req.body.notes || 'No litter — returned to baseline';
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[ferret]] = await conn.query(
+      'SELECT ferret_name, sex FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]
+    );
+    if (!ferret) { await conn.rollback(); return res.status(404).json({ error: 'Ferret not found' }); }
+    if (ferret.sex !== 'female') { await conn.rollback(); return res.status(400).json({ error: 'Only females' }); }
+
+    const [r] = await conn.query(
+      `INSERT INTO reproductive_event (ferret_id, event_type, event_date, notes, recorded_by)
+       VALUES (?,'no_litter',?,?,?)`,
+      [req.params.id, event_date, notes, req.user.username]
+    );
+    const [events] = await conn.query(
+      'SELECT event_type FROM reproductive_event WHERE ferret_id = ? ORDER BY event_date DESC, event_id DESC',
+      [req.params.id]
+    );
+    const newStatus = deriveStatus(events);
+    await conn.query(
+      'UPDATE ferret_qr005 SET female_status = ? WHERE Ferret_QR005_id = ?',
+      [newStatus === 'baseline' ? null : newStatus, req.params.id]
+    );
+    await conn.commit();
+    await log_activity(req.user.user_id, 'REPRO_EVENT', 'reproductive_event', r.insertId,
+      `No litter / return to baseline: ${ferret.ferret_name}`);
+    res.json({ id: r.insertId, status: newStatus, message: 'Returned to baseline' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
+});
+
+>>>>>>> Stashed changes
 // Females who died while active on the Reproductive Status Board (estrus/mated/littered/weaned)
 app.get('/api/females/died-on-board', authenticate, require_perm('read'), async (req, res) => {
   try {
