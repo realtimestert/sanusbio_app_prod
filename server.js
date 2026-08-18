@@ -2189,10 +2189,15 @@ app.post('/api/ferrets/:id/reproductive/:eventId/photo', authenticate, require_p
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// All females currently on the Reproductive Status Board
+// Latest event drives status. no_litter and weaned = off the board (baseline).
 app.get('/api/females/estrus', authenticate, require_perm('read'), async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT f.Ferret_QR005_id AS id, f.ferret_name AS name, f.animal_id,
+             f.birth_date, f.weight, f.color, f.photo_url, f.female_status,
+             a.room_id, a.room_name, a.cage_address, a.room_lighting,
+             re.event_id AS status_event_id,
              re.event_type AS status,
              re.event_date AS status_since,
              re.pulled_date,
@@ -2211,10 +2216,50 @@ app.get('/api/females/estrus', authenticate, require_perm('read'), async (req, r
         AND (f.dead = '0' OR f.dead IS NULL)
         AND (f.distributed = 0 OR f.distributed IS NULL)
         AND (f.breeding_retired = 0 OR f.breeding_retired IS NULL)
+        AND re.event_type NOT IN ('no_litter', 'weaned')
+      ORDER BY
+        FIELD(re.event_type, 'estrus', 'mated', 'littered'),
         re.event_date ASC
     `);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Quick action: mated (or estrus) female produced no litter → back to baseline
+app.post('/api/ferrets/:id/no-litter', authenticate, require_perm('update'), async (req, res) => {
+  const event_date = req.body.event_date || new Date().toISOString().slice(0, 10);
+  const notes = req.body.notes || 'No litter — returned to baseline';
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[ferret]] = await conn.query(
+      'SELECT ferret_name, sex FROM ferret_qr005 WHERE Ferret_QR005_id = ?', [req.params.id]
+    );
+    if (!ferret) { await conn.rollback(); return res.status(404).json({ error: 'Ferret not found' }); }
+    if (ferret.sex !== 'female') { await conn.rollback(); return res.status(400).json({ error: 'Only females' }); }
+
+    const [r] = await conn.query(
+      `INSERT INTO reproductive_event (ferret_id, event_type, event_date, notes, recorded_by)
+       VALUES (?,'no_litter',?,?,?)`,
+      [req.params.id, event_date, notes, req.user.username]
+    );
+    const [events] = await conn.query(
+      'SELECT event_type FROM reproductive_event WHERE ferret_id = ? ORDER BY event_date DESC, event_id DESC',
+      [req.params.id]
+    );
+    const newStatus = deriveStatus(events);
+    await conn.query(
+      'UPDATE ferret_qr005 SET female_status = ? WHERE Ferret_QR005_id = ?',
+      [newStatus === 'baseline' ? null : newStatus, req.params.id]
+    );
+    await conn.commit();
+    await log_activity(req.user.user_id, 'REPRO_EVENT', 'reproductive_event', r.insertId,
+      `No litter / return to baseline: ${ferret.ferret_name}`);
+    res.json({ id: r.insertId, status: newStatus, message: 'Returned to baseline' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally { conn.release(); }
 });
 
 // Females who died while active on the Reproductive Status Board (estrus/mated/littered/weaned)
