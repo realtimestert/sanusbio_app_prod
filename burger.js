@@ -8,6 +8,6 @@ menuButton.addEventListener("click", function () {
     if (menuButton.classList.contains("open")) {
         menuButton.textContent = "✖";
     } else {
-        menuButton.textContent = "☰";
+        menuButton.textContent = "🐾";
     }
 })
