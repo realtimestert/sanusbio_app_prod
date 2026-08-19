@@ -1,4 +1,8 @@
-// SanusBio v2.0-beta.0 | 2026-08-19 | server.js
+// SanusBio v2.0-beta.1 | 2026-08-19 | server.js
+// v2.0-beta.1: GET /api/ferrets/:id/light-history — reconstructs continuous
+//          light-cycle periods for a ferret from location history +
+//          room_light_history (same-state room moves merge). New Light
+//          History tab on the ferret detail card.
 // v1.12.0: room_light_history audit trail; move handler only resets
 //          light_state_since when the cycle actually changes (same-state
 //          room moves continue the continuous period); live room toggles
@@ -180,6 +184,114 @@ async function log_activity(user_id, action, table_name = null, record_id = null
       [user_id, action, table_name, record_id, details]
     );
   } catch { /* non-fatal */ }
+}
+
+/**
+ * Reconstruct continuous light-cycle periods for one ferret from location
+ * stays + room schedule transitions. Same-state consecutive segments merge
+ * (moves between rooms that share the schedule do not reset the clock).
+ *
+ * @param {Array<{move_in:string, move_out:string|null, room_id:number}>} stays
+ *   oldest → newest
+ * @param {Map<number, Array<{change_date:string, eight_hour_light:0|1}>>} roomTransitions
+ *   each room's transitions sorted ascending by change_date
+ * @param {string} endCap  YYYY-MM-DD (today, death_date, or distribution_date)
+ * @param {boolean} treatCapAsOngoing  true only for living non-distributed animals
+ * @returns {Array<{start_date, end_date:null|string, eight_hour_light, days, weeks, rooms:number[]}>}
+ *   newest-first. Completed periods use exclusive end_date (first day of the
+ *   next schedule). Ongoing living periods have end_date = null.
+ */
+function computeAllLightPeriods(stays, roomTransitions, endCap, treatCapAsOngoing = true) {
+  if (!stays || !stays.length) return [];
+
+  function stateOn(hist, dateStr) {
+    let state = null;
+    for (const t of hist) {
+      if (t.change_date <= dateStr) state = t.eight_hour_light;
+      else break;
+    }
+    // Pre-history fallback: earliest known state for this room
+    if (state === null && hist.length) state = hist[0].eight_hour_light;
+    return state;
+  }
+
+  function daysBetween(a, b) {
+    const da = new Date(a + 'T12:00:00Z');
+    const db = new Date(b + 'T12:00:00Z');
+    return Math.round((db - da) / 864e5);
+  }
+
+  // 1. Fine-grained segments per stay (end exclusive for intermediate flips)
+  const segments = []; // {start, end, state, room_id}
+  for (const stay of stays) {
+    const start = stay.move_in;
+    const end = stay.move_out || endCap;
+    if (!start || end <= start) continue;
+    const rid = stay.room_id;
+    if (rid == null) continue;
+    const hist = roomTransitions.get(rid) || [];
+
+    const flips = hist.filter(t => t.change_date > start && t.change_date <= end);
+    let cursor = start;
+    for (const flip of flips) {
+      const st = stateOn(hist, cursor);
+      if (st !== null) {
+        segments.push({ start: cursor, end: flip.change_date, state: st, room_id: rid });
+      }
+      cursor = flip.change_date;
+    }
+    const st = stateOn(hist, cursor);
+    // Strict < so a flip that lands exactly on stay end does not create a zero-length segment
+    if (st !== null && cursor < end) {
+      segments.push({ start: cursor, end, state: st, room_id: rid });
+    }
+  }
+
+  if (!segments.length) return [];
+
+  // 2. Merge consecutive same-state segments (continuous across rooms)
+  const merged = [];
+  let cur = {
+    start_date: segments[0].start,
+    end_date: segments[0].end,
+    eight_hour_light: segments[0].state,
+    rooms: new Set([segments[0].room_id])
+  };
+  for (let i = 1; i < segments.length; i++) {
+    const s = segments[i];
+    if (s.state === cur.eight_hour_light && s.start === cur.end_date) {
+      cur.end_date = s.end;
+      cur.rooms.add(s.room_id);
+    } else {
+      merged.push(cur);
+      cur = {
+        start_date: s.start,
+        end_date: s.end,
+        eight_hour_light: s.state,
+        rooms: new Set([s.room_id])
+      };
+    }
+  }
+  merged.push(cur);
+
+  // 3. Finalize days/weeks; null end only for the trailing period of a living animal.
+  //    (A flip on endCap day would otherwise make the previous period also match
+  //    endCap and incorrectly become "ongoing".)
+  const lastIdx = merged.length - 1;
+  const result = merged.map((p, i) => {
+    const isOngoing = (i === lastIdx) && treatCapAsOngoing && (p.end_date === endCap);
+    const days = Math.max(0, daysBetween(p.start_date, p.end_date));
+    return {
+      start_date: p.start_date,
+      end_date: isOngoing ? null : p.end_date,
+      eight_hour_light: p.eight_hour_light,
+      days,
+      weeks: Math.floor(days / 7),
+      rooms: [...p.rooms].filter(r => r != null).sort((a, b) => a - b)
+    };
+  }).filter(p => p.days > 0 || p.end_date === null); // drop zero-length completed periods
+
+  return result.reverse(); // newest first
 }
 
 // ─── Serve Frontend ───────────────────────────────────────────────────────────
@@ -699,6 +811,103 @@ app.get('/api/ferrets/:id/location-history', authenticate, require_perm('read'),
     `, [req.params.id]);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Light history for a ferret — continuous periods reconstructed from
+// ferret_location_history + room_light_history (same-state room moves merge).
+// Completed periods use exclusive end_date (first day of the next schedule).
+// Ongoing living periods have end_date = null.
+app.get('/api/ferrets/:id/light-history', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const ferretId = req.params.id;
+
+    // Ferret status for endCap
+    const [[ferret]] = await pool.query(`
+      SELECT f.dead, f.death_date, f.distributed,
+             (SELECT MAX(de.distribution_date) FROM distribution_event de WHERE de.ferret_id = f.Ferret_QR005_id) AS distribution_date
+      FROM ferret_qr005 f
+      WHERE f.Ferret_QR005_id = ?
+    `, [ferretId]);
+    if (!ferret) return res.status(404).json({ error: 'Ferret not found' });
+
+    const today = new Date().toISOString().slice(0, 10);
+    let endCap = today;
+    let treatCapAsOngoing = true;
+    if (ferret.dead === '1' || ferret.dead === 1) {
+      endCap = (ferret.death_date && String(ferret.death_date).slice(0, 10)) || today;
+      treatCapAsOngoing = false;
+    } else if (ferret.distributed) {
+      endCap = (ferret.distribution_date && String(ferret.distribution_date).slice(0, 10)) || today;
+      treatCapAsOngoing = false;
+    }
+
+    // Stays oldest → newest (need room_id)
+    const [stayRows] = await pool.query(`
+      SELECT flh.move_in, flh.move_out, a.room_id
+      FROM ferret_location_history flh
+      LEFT JOIN address a ON flh.address_id = a.address_id
+      WHERE flh.ferret_id = ?
+      ORDER BY flh.move_in ASC, flh.location_event_id ASC
+    `, [ferretId]);
+
+    const toDate = (v) => {
+      if (v == null) return null;
+      if (v instanceof Date) return v.toISOString().slice(0, 10);
+      return String(v).slice(0, 10);
+    };
+    const stays = stayRows
+      .filter(r => r.room_id != null && r.room_id > 0)
+      .map(r => ({
+        move_in: toDate(r.move_in),
+        move_out: toDate(r.move_out),
+        room_id: r.room_id
+      }))
+      .filter(s => s.move_in);
+
+    if (!stays.length) return res.json([]);
+
+    // Room transitions for rooms that appear in the stays
+    const roomIds = [...new Set(stays.map(s => s.room_id))];
+    const [histRows] = await pool.query(`
+      SELECT room_id, change_date, eight_hour_light
+      FROM room_light_history
+      WHERE room_id IN (?)
+      ORDER BY room_id ASC, change_date ASC
+    `, [roomIds]);
+
+    const roomTransitions = new Map();
+    for (const rid of roomIds) roomTransitions.set(rid, []);
+    for (const h of histRows) {
+      const list = roomTransitions.get(h.room_id) || [];
+      list.push({
+        change_date: toDate(h.change_date),
+        eight_hour_light: h.eight_hour_light ? 1 : 0
+      });
+      roomTransitions.set(h.room_id, list);
+    }
+
+    // Synthetic fallback for rooms that have a live schedule but no history rows yet
+    const [schedRows] = await pool.query(`
+      SELECT room_id, eight_hour_light, light_state_since
+      FROM room_light_schedule
+      WHERE room_id IN (?)
+    `, [roomIds]);
+    for (const s of schedRows) {
+      const list = roomTransitions.get(s.room_id) || [];
+      if (!list.length) {
+        list.push({
+          change_date: toDate(s.light_state_since) || '1900-01-01',
+          eight_hour_light: s.eight_hour_light ? 1 : 0
+        });
+        roomTransitions.set(s.room_id, list);
+      }
+    }
+
+    const periods = computeAllLightPeriods(stays, roomTransitions, endCap, treatCapAsOngoing);
+    res.json(periods);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Set a ferret's light-cycle mode/state — 'manual' lets staff set the exact

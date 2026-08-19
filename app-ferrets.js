@@ -1,4 +1,7 @@
-// SanusBio v2.0-beta.0 | 2026-08-19 | app-ferrets.js
+// SanusBio v2.0-beta.1 | 2026-08-19 | app-ferrets.js
+// v2.0-beta.1: Light History tab on ferret detail — continuous schedule periods
+//          from location history + room_light_history (GET /api/ferrets/:id/light-history)
+// SanusBio v1.10.5 | 2026-08-13 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 // v1.10.5: ferret name is now editable on the ferret detail page for
 //          admin/research (canEdit), matching the existing Birth Date / Sex
@@ -321,6 +324,7 @@ async function loadFerretDetail(id) {
     ${canUpdate() ? `<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tMatingRestriction">Mating Restrictions</button></li>` : ''}
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tDist">Distribution</button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tLocHistory"><i class="bi bi-geo-alt me-1"></i>Location History</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tLightHistory"><i class="bi bi-lightbulb me-1"></i>Light History</button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tHistory">History</button></li>
   </ul>
 
@@ -638,6 +642,17 @@ async function loadFerretDetail(id) {
       </table>
     </div>
 
+    <!-- Light History -->
+    <div id="tLightHistory" class="tab-pane">
+      <p class="text-muted small mb-2">Continuous periods on each light schedule (same-schedule room moves do not reset the clock). "Until" is the day the schedule changed or the animal left the colony.</p>
+      <table class="table table-sm">
+        <thead><tr><th>Schedule</th><th>From</th><th>Until</th><th>Duration</th><th>Rooms</th></tr></thead>
+        <tbody id="lightHistoryTable">
+          <tr><td colspan="5" class="text-muted text-center py-3"><div class="spinner-border spinner-border-sm" role="status"></div> Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
     <!-- History -->
     <div id="tHistory" class="tab-pane">
       <div class="timeline ps-2">
@@ -682,6 +697,7 @@ async function loadFerretDetail(id) {
     loadRfidDisplay(id);
     loadFerretDistHistory(id);
     loadLocationHistory(id);
+    loadLightHistory(id);
   } catch (err) { el.innerHTML = `<div class="alert alert-danger">${err.message}</div>`; }
 }
 
@@ -704,6 +720,42 @@ async function loadLocationHistory(ferretId) {
       </tr>`).join('');
   } catch (err) {
     el.innerHTML = `<tr><td colspan="4" class="text-danger text-center py-2">${err.message}</td></tr>`;
+  }
+}
+
+// ─── Light History (continuous schedule periods) ──────────────────────────────
+async function loadLightHistory(ferretId) {
+  const el = document.getElementById('lightHistoryTable');
+  if (!el) return;
+  try {
+    const rows = await api(`/ferrets/${ferretId}/light-history`);
+    if (!rows || !rows.length) {
+      el.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-3">No light history available (no location or room schedule data).</td></tr>';
+      return;
+    }
+    el.innerHTML = rows.map(r => {
+      const isOngoing = !r.end_date;
+      const scheduleLabel = r.eight_hour_light
+        ? '<span class="badge bg-warning text-dark">8-Hour (Winter)</span>'
+        : '<span class="badge bg-secondary">Standard (Summer)</span>';
+      const until = isOngoing
+        ? '<span class="badge bg-success">Ongoing</span>'
+        : fmtDate(r.end_date);
+      const duration = `${r.weeks ?? 0} wk · ${r.days ?? 0} d`;
+      const rooms = (r.rooms && r.rooms.length)
+        ? r.rooms.map(id => `Room ${id}`).join(', ')
+        : '—';
+      return `
+      <tr class="${isOngoing ? 'table-success bg-opacity-25' : ''}">
+        <td>${scheduleLabel}</td>
+        <td>${fmtDate(r.start_date)}</td>
+        <td>${until}</td>
+        <td>${duration}</td>
+        <td class="text-muted small">${rooms}</td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    el.innerHTML = `<tr><td colspan="5" class="text-danger text-center py-2">${err.message}</td></tr>`;
   }
 }
 
