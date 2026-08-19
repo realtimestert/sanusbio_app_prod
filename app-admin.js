@@ -1,4 +1,4 @@
-// SanusBio v1.9.7 | 2026-08-10 | app-admin.js
+// SanusBio v2.0-beta.0 | 2026-08-19 | app-admin.js
 // Locations, Suppliers, Users, Activity Log, Distribution Page
 // v1.9.5: room light schedule reverted to on/off only — duration now tracked
 //         per ferret (see app-ferrets.js) since it must follow the animal

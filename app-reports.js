@@ -1,4 +1,4 @@
-// SanusBio v1.11.3 | 2026-08-18 | app-reports.js
+// SanusBio v2.0-beta.0 | 2026-08-19 | app-reports.js
 // Reports tab: Ferrets by Room, Reproductive Status, Deaths, Infant Mortality,
 // Distribution. Every report renders as a plain table inside #reportContent so
 // the browser's native print (window.print()) produces a clean printout —

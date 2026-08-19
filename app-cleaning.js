@@ -1,4 +1,4 @@
-// SanusBio v1.6.0 | 2026-06-25 | app-cleaning.js
+// SanusBio v2.0-beta.0 | 2026-08-19 | app-cleaning.js
 // Cleaning Report Form, Speech Input, Signature Pad, Report History
 
 // ─── State ────────────────────────────────────────────────────────────────────

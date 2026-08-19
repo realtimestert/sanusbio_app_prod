@@ -1,4 +1,4 @@
-// SanusBio v1.10.5 | 2026-08-13 | app-ferrets.js
+// SanusBio v2.0-beta.0 | 2026-08-19 | app-ferrets.js
 // Ferrets grid/detail, RFID, Distribution, Photo, Ferret Actions, Add Ferret Modal
 // v1.10.5: ferret name is now editable on the ferret detail page for
 //          admin/research (canEdit), matching the existing Birth Date / Sex

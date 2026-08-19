@@ -1,4 +1,4 @@
-// SanusBio v1.10.7 | 2026-08-18 | app-core.js
+// SanusBio v2.0-beta.0 | 2026-08-19 | app-core.js
 // v1.10.7: Dashboard boards collapsible (repro, care, vacc); Vaccinations Due
 //          board; count badges on board headers; collapse state in localStorage
 // v1.10.5: Assignments tab removed from navigation (feature unused); the

@@ -1,4 +1,4 @@
-// SanusBio v1.12.0 | 2026-08-18 | server.js
+// SanusBio v2.0-beta.0 | 2026-08-19 | server.js
 // v1.12.0: room_light_history audit trail; move handler only resets
 //          light_state_since when the cycle actually changes (same-state
 //          room moves continue the continuous period); live room toggles
