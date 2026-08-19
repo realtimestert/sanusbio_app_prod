@@ -336,12 +336,6 @@ async function loadDashCareAlerts() {
   } catch (err) { console.error('Care alerts:', err); }
 }
 
-// Light-cycle board state (sex filters)
-let _dashDarkInData = [];
-let _dashDarkOutData = [];
-let _dashDarkInSex = null;  // null = all, 'female', 'male'
-let _dashDarkOutSex = null;
-
 function _normSex(s) {
   if (!s) return null;
   const v = String(s).toLowerCase();
@@ -353,11 +347,8 @@ function _normSex(s) {
 function _lightCycleRow(f) {
   const loc = `Room ${f.room_id || '?'}${f.cage_address ? ' · ' + f.cage_address : ''}${f.room_lighting ? ' · ' + f.room_lighting : ''}`;
   const ageLabel = f.age_weeks != null ? `${f.age_weeks}w` : '—';
-  const sex = _normSex(f.sex);
-  const sexLabel = sex === 'female' ? '♀ Female' : sex === 'male' ? '♂ Male' : (f.sex || '—');
   return `<tr style="cursor:pointer" onclick="loadFerretDetail(${f.id})">
     <td><strong>${f.name}</strong><br><span class="text-muted small">${f.animal_id != null ? 'AID' + String(f.animal_id).padStart(5, '0') : '—'}</span></td>
-    <td class="small">${sexLabel}</td>
     <td><strong>${f.weeks_on_cycle != null ? f.weeks_on_cycle : '—'}</strong>
         <span class="text-muted small ms-1">(${f.days_on_cycle != null ? f.days_on_cycle + 'd' : '—'})</span></td>
     <td>${fmtDate(f.light_state_since)}</td>
@@ -366,97 +357,50 @@ function _lightCycleRow(f) {
   </tr>`;
 }
 
-function _renderDarkSexFilters(which) {
-  const isIn = which === 'in';
-  const data = isIn ? _dashDarkInData : _dashDarkOutData;
-  const current = isIn ? _dashDarkInSex : _dashDarkOutSex;
-  const wrapId = isIn ? 'dashDarkInFilterBtns' : 'dashDarkOutFilterBtns';
-  const wrap = document.getElementById(wrapId);
-  if (!wrap) return;
-  const females = data.filter(f => _normSex(f.sex) === 'female').length;
-  const males = data.filter(f => _normSex(f.sex) === 'male').length;
-  const btn = (key, label, count, color) =>
-    `<button class="btn btn-sm ${current === key ? 'btn-' + color : 'btn-outline-secondary'}"
-       onclick="event.stopPropagation(); setDashDarkSexFilter('${which}','${key === null ? '' : key}')">${label}
-       <span class="badge bg-light text-dark ms-1">${count}</span></button>`;
-  wrap.innerHTML =
-    btn(null, 'All', data.length, 'primary') +
-    btn('female', 'Females', females, 'danger') +
-    btn('male', 'Males', males, 'info');
-}
-
-function setDashDarkSexFilter(which, key) {
-  const val = key || null;
-  if (which === 'in') {
-    _dashDarkInSex = val;
-    renderDashDarkInTable();
-  } else {
-    _dashDarkOutSex = val;
-    renderDashDarkOutTable();
+function _fillDarkBoard(cardId, bodyId, listId, countId, rows) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  if (!rows.length) {
+    card.style.display = 'none';
+    return;
   }
-}
-
-function renderDashDarkInTable() {
-  const tbody = document.getElementById('dashDarkInList');
-  const cnt = document.getElementById('dashDarkInCount');
-  if (!tbody) return;
-  const filtered = _dashDarkInSex
-    ? _dashDarkInData.filter(f => _normSex(f.sex) === _dashDarkInSex)
-    : _dashDarkInData;
-  if (cnt) cnt.textContent = filtered.length;
-  tbody.innerHTML = filtered.map(_lightCycleRow).join('');
-  _renderDarkSexFilters('in');
-}
-
-function renderDashDarkOutTable() {
-  const tbody = document.getElementById('dashDarkOutList');
-  const cnt = document.getElementById('dashDarkOutCount');
-  if (!tbody) return;
-  const filtered = _dashDarkOutSex
-    ? _dashDarkOutData.filter(f => _normSex(f.sex) === _dashDarkOutSex)
-    : _dashDarkOutData;
-  if (cnt) cnt.textContent = filtered.length;
-  tbody.innerHTML = filtered.map(_lightCycleRow).join('');
-  _renderDarkSexFilters('out');
+  card.style.display = '';
+  const cnt = document.getElementById(countId);
+  if (cnt) cnt.textContent = rows.length;
+  const tbody = document.getElementById(listId);
+  if (tbody) tbody.innerHTML = rows.map(_lightCycleRow).join('');
+  applySavedCollapse(bodyId);
 }
 
 async function loadDashLightCycleBoards() {
-  const inCard = document.getElementById('dashDarkInCard');
-  const outCard = document.getElementById('dashDarkOutCard');
-  if (!inCard && !outCard) return;
+  const cardIds = ['dashDarkInFCard', 'dashDarkInMCard', 'dashDarkOutFCard', 'dashDarkOutMCard'];
   if (USER?.role === 'cleaner') {
-    if (inCard) inCard.style.display = 'none';
-    if (outCard) outCard.style.display = 'none';
+    cardIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
     return;
   }
   try {
     const data = await api('/ferrets/light-cycle-boards');
-    _dashDarkInData = data.into_dark || data.intoDark || [];
-    _dashDarkOutData = data.out_of_dark || data.outOfDark || [];
+    const intoDark = data.into_dark || data.intoDark || [];
+    const outOfDark = data.out_of_dark || data.outOfDark || [];
 
-    if (inCard) {
-      if (!_dashDarkInData.length) {
-        inCard.style.display = 'none';
-      } else {
-        inCard.style.display = '';
-        renderDashDarkInTable();
-        applySavedCollapse('dashDarkInBody');
-      }
-    }
+    const intoF = intoDark.filter(f => _normSex(f.sex) === 'female');
+    const intoM = intoDark.filter(f => _normSex(f.sex) === 'male');
+    const outF = outOfDark.filter(f => _normSex(f.sex) === 'female');
+    const outM = outOfDark.filter(f => _normSex(f.sex) === 'male');
 
-    if (outCard) {
-      if (!_dashDarkOutData.length) {
-        outCard.style.display = 'none';
-      } else {
-        outCard.style.display = '';
-        renderDashDarkOutTable();
-        applySavedCollapse('dashDarkOutBody');
-      }
-    }
+    _fillDarkBoard('dashDarkInFCard', 'dashDarkInFBody', 'dashDarkInFList', 'dashDarkInFCount', intoF);
+    _fillDarkBoard('dashDarkInMCard', 'dashDarkInMBody', 'dashDarkInMList', 'dashDarkInMCount', intoM);
+    _fillDarkBoard('dashDarkOutFCard', 'dashDarkOutFBody', 'dashDarkOutFList', 'dashDarkOutFCount', outF);
+    _fillDarkBoard('dashDarkOutMCard', 'dashDarkOutMBody', 'dashDarkOutMList', 'dashDarkOutMCount', outM);
   } catch (err) {
     console.error('Light cycle boards:', err);
-    if (inCard) inCard.style.display = 'none';
-    if (outCard) outCard.style.display = 'none';
+    cardIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
   }
 }
 

@@ -10,9 +10,6 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <link rel="icon" type="image/svg+xml" href="/sanusbio_favicon.svg">
   <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/larger.css">
-  <script src="burger.js" defer></script>
-  <script src="darkMode.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 
@@ -195,68 +192,126 @@
           </div>
         </div>
 
-        <!-- Weeks into Dark (8-hour / winter) Board -->
-        <div class="card mt-3 hide-cleaner" id="dashDarkInCard" style="display:none">
+        <!-- Females — Weeks into Dark -->
+        <div class="card mt-3 hide-cleaner" id="dashDarkInFCard" style="display:none">
           <div class="card-header bg-white d-flex align-items-center py-3" role="button"
-               data-bs-toggle="collapse" data-bs-target="#dashDarkInBody" aria-expanded="true"
-               onclick="toggleDashCollapse('dashDarkInBody', this)">
-            <span class="fw-semibold"><i class="bi bi-moon-stars text-primary me-2"></i>Weeks into Dark</span>
-            <span class="text-muted small ms-2">(currently on 8-hour / winter cycle)</span>
-            <span class="badge bg-primary ms-2" id="dashDarkInCount"></span>
+               data-bs-toggle="collapse" data-bs-target="#dashDarkInFBody" aria-expanded="true"
+               onclick="toggleDashCollapse('dashDarkInFBody', this)">
+            <span class="fw-semibold"><i class="bi bi-moon-stars text-primary me-2"></i>Females — Weeks into Dark</span>
+            <span class="text-muted small ms-2">(8-hour / winter cycle)</span>
+            <span class="badge bg-primary ms-2" id="dashDarkInFCount"></span>
             <i class="bi bi-chevron-up ms-auto text-muted dash-collapse-icon"></i>
           </div>
-          <div id="dashDarkInBody" class="collapse show">
-            <div class="px-3 pt-3 pb-1 d-flex flex-wrap gap-2" id="dashDarkInFilterBtns"></div>
+          <div id="dashDarkInFBody" class="collapse show">
             <div class="table-responsive">
               <table class="table table-hover mb-0">
                 <thead>
                   <tr>
                     <th>Ferret</th>
-                    <th>Sex</th>
                     <th>Weeks in Dark</th>
                     <th>Cycle Started</th>
                     <th>Age</th>
                     <th>Location</th>
                   </tr>
                 </thead>
-                <tbody id="dashDarkInList"></tbody>
+                <tbody id="dashDarkInFList"></tbody>
               </table>
             </div>
             <div class="card-footer bg-white text-muted small py-2">
-              Continuous weeks on 8-hour light (moves between dark rooms do not reset the clock). Click a row to open the ferret.
+              Continuous weeks on 8-hour light. Moves between dark rooms do not reset the clock.
             </div>
           </div>
         </div>
 
-        <!-- Weeks out of Dark (standard / summer) Board -->
-        <div class="card mt-3 hide-cleaner" id="dashDarkOutCard" style="display:none">
+        <!-- Males — Weeks into Dark -->
+        <div class="card mt-3 hide-cleaner" id="dashDarkInMCard" style="display:none">
           <div class="card-header bg-white d-flex align-items-center py-3" role="button"
-               data-bs-toggle="collapse" data-bs-target="#dashDarkOutBody" aria-expanded="true"
-               onclick="toggleDashCollapse('dashDarkOutBody', this)">
-            <span class="fw-semibold"><i class="bi bi-sun text-warning me-2"></i>Weeks out of Dark</span>
-            <span class="text-muted small ms-2">(currently on standard / 16-hour cycle)</span>
-            <span class="badge bg-secondary ms-2" id="dashDarkOutCount"></span>
+               data-bs-toggle="collapse" data-bs-target="#dashDarkInMBody" aria-expanded="true"
+               onclick="toggleDashCollapse('dashDarkInMBody', this)">
+            <span class="fw-semibold"><i class="bi bi-moon-stars text-info me-2"></i>Males — Weeks into Dark</span>
+            <span class="text-muted small ms-2">(8-hour / winter cycle)</span>
+            <span class="badge bg-info text-dark ms-2" id="dashDarkInMCount"></span>
             <i class="bi bi-chevron-up ms-auto text-muted dash-collapse-icon"></i>
           </div>
-          <div id="dashDarkOutBody" class="collapse show">
-            <div class="px-3 pt-3 pb-1 d-flex flex-wrap gap-2" id="dashDarkOutFilterBtns"></div>
+          <div id="dashDarkInMBody" class="collapse show">
             <div class="table-responsive">
               <table class="table table-hover mb-0">
                 <thead>
                   <tr>
                     <th>Ferret</th>
-                    <th>Sex</th>
+                    <th>Weeks in Dark</th>
+                    <th>Cycle Started</th>
+                    <th>Age</th>
+                    <th>Location</th>
+                  </tr>
+                </thead>
+                <tbody id="dashDarkInMList"></tbody>
+              </table>
+            </div>
+            <div class="card-footer bg-white text-muted small py-2">
+              Continuous weeks on 8-hour light. Moves between dark rooms do not reset the clock.
+            </div>
+          </div>
+        </div>
+
+        <!-- Females — Weeks out of Dark -->
+        <div class="card mt-3 hide-cleaner" id="dashDarkOutFCard" style="display:none">
+          <div class="card-header bg-white d-flex align-items-center py-3" role="button"
+               data-bs-toggle="collapse" data-bs-target="#dashDarkOutFBody" aria-expanded="true"
+               onclick="toggleDashCollapse('dashDarkOutFBody', this)">
+            <span class="fw-semibold"><i class="bi bi-sun text-warning me-2"></i>Females — Weeks out of Dark</span>
+            <span class="text-muted small ms-2">(standard / 16-hour cycle)</span>
+            <span class="badge bg-secondary ms-2" id="dashDarkOutFCount"></span>
+            <i class="bi bi-chevron-up ms-auto text-muted dash-collapse-icon"></i>
+          </div>
+          <div id="dashDarkOutFBody" class="collapse show">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th>Ferret</th>
                     <th>Weeks out of Dark</th>
                     <th>Cycle Started</th>
                     <th>Age</th>
                     <th>Location</th>
                   </tr>
                 </thead>
-                <tbody id="dashDarkOutList"></tbody>
+                <tbody id="dashDarkOutFList"></tbody>
               </table>
             </div>
             <div class="card-footer bg-white text-muted small py-2">
-              Continuous weeks on standard 16-hour light. Click a row to open the ferret.
+              Continuous weeks on standard 16-hour light.
+            </div>
+          </div>
+        </div>
+
+        <!-- Males — Weeks out of Dark -->
+        <div class="card mt-3 hide-cleaner" id="dashDarkOutMCard" style="display:none">
+          <div class="card-header bg-white d-flex align-items-center py-3" role="button"
+               data-bs-toggle="collapse" data-bs-target="#dashDarkOutMBody" aria-expanded="true"
+               onclick="toggleDashCollapse('dashDarkOutMBody', this)">
+            <span class="fw-semibold"><i class="bi bi-sun text-warning me-2"></i>Males — Weeks out of Dark</span>
+            <span class="text-muted small ms-2">(standard / 16-hour cycle)</span>
+            <span class="badge bg-secondary ms-2" id="dashDarkOutMCount"></span>
+            <i class="bi bi-chevron-up ms-auto text-muted dash-collapse-icon"></i>
+          </div>
+          <div id="dashDarkOutMBody" class="collapse show">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th>Ferret</th>
+                    <th>Weeks out of Dark</th>
+                    <th>Cycle Started</th>
+                    <th>Age</th>
+                    <th>Location</th>
+                  </tr>
+                </thead>
+                <tbody id="dashDarkOutMList"></tbody>
+              </table>
+            </div>
+            <div class="card-footer bg-white text-muted small py-2">
+              Continuous weeks on standard 16-hour light.
             </div>
           </div>
         </div>
@@ -267,7 +322,7 @@
                data-bs-toggle="collapse" data-bs-target="#dashVaccBody" aria-expanded="true"
                onclick="toggleDashCollapse('dashVaccBody', this)">
             <span class="fw-semibold"><i class="bi bi-syringe text-warning me-2"></i>Vaccinations Due</span>
-            <span class="text-muted small ms-2">(due within 30 days or overdue)</span>
+            <span class="text-muted small ms-2">(rabies due within 30 days or overdue)</span>
             <span class="badge bg-warning text-dark ms-2" id="dashVaccCount"></span>
             <i class="bi bi-chevron-up ms-auto text-muted dash-collapse-icon"></i>
           </div>
