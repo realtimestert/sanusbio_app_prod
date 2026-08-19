@@ -1,6 +1,6 @@
 {
   "name": "sanusbio",
-  "version": "2.0-beta.0",
+  "version": "2.0-beta.3",
   "description": "SanusBio Ferret Research Management System",
   "main": "server.js",
   "scripts": {

@@ -1,4 +1,5 @@
-// SanusBio v2.0-beta.0 | 2026-08-19 | app-core.js
+// SanusBio v2.0-beta.3 | 2026-08-19 | app-core.js
+// v2.0-beta.3: weeksSince() returns one-decimal weeks (matches ferretAge / Light History)
 // v1.10.7: Dashboard boards collapsible (repro, care, vacc); Vaccinations Due
 //          board; count badges on board headers; collapse state in localStorage
 // v1.10.5: Assignments tab removed from navigation (feature unused); the
@@ -568,7 +569,8 @@ function weeksSince(dateStr) {
   if (!dateStr) return null;
   const start = new Date(dateStr);
   const days = Math.floor((Date.now() - start) / 864e5);
-  return days < 0 ? 0 : Math.floor(days / 7);
+  if (days < 0) return '0.0';
+  return (days / 7).toFixed(1);
 }
 
 // ─── Stacked Modal Fix ─────────────────────────────────────────────────────────

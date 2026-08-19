@@ -1,4 +1,7 @@
-// SanusBio v2.0-beta.1 | 2026-08-19 | app-ferrets.js
+// SanusBio v2.0-beta.3 | 2026-08-19 | app-ferrets.js
+// v2.0-beta.3: Light History duration = weeks with one decimal only (no days)
+// v2.0-beta.2: Light History notes — continuous periods; non-physical/HIST-only
+//          rooms (e.g. bad import room 15) inherit prior schedule state
 // v2.0-beta.1: Light History tab on ferret detail — continuous schedule periods
 //          from location history + room_light_history (GET /api/ferrets/:id/light-history)
 // SanusBio v1.10.5 | 2026-08-13 | app-ferrets.js
@@ -644,7 +647,7 @@ async function loadFerretDetail(id) {
 
     <!-- Light History -->
     <div id="tLightHistory" class="tab-pane">
-      <p class="text-muted small mb-2">Continuous periods on each light schedule (same-schedule room moves do not reset the clock). "Until" is the day the schedule changed or the animal left the colony.</p>
+      <p class="text-muted small mb-2">Continuous periods on each light schedule — moves between rooms that share the same schedule do <strong>not</strong> reset the clock (From / Duration stay the same; Rooms updates). "Until" is the day the schedule changed or the animal left the colony. Rooms that only exist as historical import placeholders (no physical cages) inherit the previous known schedule rather than inventing one.</p>
       <table class="table table-sm">
         <thead><tr><th>Schedule</th><th>From</th><th>Until</th><th>Duration</th><th>Rooms</th></tr></thead>
         <tbody id="lightHistoryTable">
@@ -741,7 +744,8 @@ async function loadLightHistory(ferretId) {
       const until = isOngoing
         ? '<span class="badge bg-success">Ongoing</span>'
         : fmtDate(r.end_date);
-      const duration = `${r.weeks ?? 0} wk · ${r.days ?? 0} d`;
+      const weeksDec = r.days != null ? (r.days / 7).toFixed(1) : (r.weeks != null ? Number(r.weeks).toFixed(1) : '0.0');
+      const duration = `${weeksDec} wk`;
       const rooms = (r.rooms && r.rooms.length)
         ? r.rooms.map(id => `Room ${id}`).join(', ')
         : '—';

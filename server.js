@@ -1,4 +1,10 @@
-// SanusBio v2.0-beta.1 | 2026-08-19 | server.js
+// SanusBio v2.0-beta.3 | 2026-08-19 | server.js
+// v2.0-beta.3: (UI) Light History duration = weeks with one decimal; no days
+// v2.0-beta.2: Light history hardening for unknown/invalid rooms (e.g. room 15
+//          from bad historical data): carry forward previous schedule state
+//          across stays with no room_light_history/schedule; on move, if the
+//          source room has no known schedule, force-adopt destination cycle
+//          instead of treating null as "same state".
 // v2.0-beta.1: GET /api/ferrets/:id/light-history — reconstructs continuous
 //          light-cycle periods for a ferret from location history +
 //          room_light_history (same-state room moves merge). New Light
@@ -221,8 +227,12 @@ function computeAllLightPeriods(stays, roomTransitions, endCap, treatCapAsOngoin
     return Math.round((db - da) / 864e5);
   }
 
-  // 1. Fine-grained segments per stay (end exclusive for intermediate flips)
+  // 1. Fine-grained segments per stay (end exclusive for intermediate flips).
+  //    If a room has no light history/schedule (bad import data, e.g. room 15),
+  //    carry forward the previous segment's state so the continuous period does
+  //    not silently drop the stay. If there is no previous state either, skip.
   const segments = []; // {start, end, state, room_id}
+  let lastKnownState = null;
   for (const stay of stays) {
     const start = stay.move_in;
     const end = stay.move_out || endCap;
@@ -231,12 +241,21 @@ function computeAllLightPeriods(stays, roomTransitions, endCap, treatCapAsOngoin
     if (rid == null) continue;
     const hist = roomTransitions.get(rid) || [];
 
+    if (!hist.length) {
+      // Unknown room schedule — inherit previous known state if any
+      if (lastKnownState !== null && start < end) {
+        segments.push({ start, end, state: lastKnownState, room_id: rid });
+      }
+      continue;
+    }
+
     const flips = hist.filter(t => t.change_date > start && t.change_date <= end);
     let cursor = start;
     for (const flip of flips) {
       const st = stateOn(hist, cursor);
       if (st !== null) {
         segments.push({ start: cursor, end: flip.change_date, state: st, room_id: rid });
+        lastKnownState = st;
       }
       cursor = flip.change_date;
     }
@@ -244,6 +263,7 @@ function computeAllLightPeriods(stays, roomTransitions, endCap, treatCapAsOngoin
     // Strict < so a flip that lands exactly on stay end does not create a zero-length segment
     if (st !== null && cursor < end) {
       segments.push({ start: cursor, end, state: st, room_id: rid });
+      lastKnownState = st;
     }
   }
 
@@ -766,27 +786,57 @@ app.put('/api/ferrets/:id/location', authenticate, async (req, res) => {
     // Only reset light_state_since when the *cycle actually changes* so that
     // moves between rooms that share the same schedule (e.g. Room 5 dark →
     // Room 16 dark) continue the continuous period instead of restarting it.
+    //
+    // Exception — leaving an "unknown" or non-physical source room:
+    //   • no row in room_light_schedule for the source room, OR
+    //   • the source room_id has no real (non-HIST) address rows
+    //     (e.g. room 15 created only as HIST from a bad CSV import)
+    // In those cases always adopt the destination cycle and reset
+    // light_state_since, so corrective moves don't look like a no-op.
     if (ferret.light_mode !== 'manual') {
-      const [[destRoom]] = await conn.query(`
-        SELECT rls.eight_hour_light
-        FROM address a LEFT JOIN room_light_schedule rls ON a.room_id = rls.room_id
+      const [[srcAddr]] = await conn.query(
+        'SELECT room_id FROM address WHERE address_id = ?', [ferret.address_id]
+      );
+      const [[destInfo]] = await conn.query(`
+        SELECT a.room_id, rls.eight_hour_light AS schedule_state
+        FROM address a
+        LEFT JOIN room_light_schedule rls ON a.room_id = rls.room_id
         WHERE a.address_id = ?`, [address_id]);
-      const newState = destRoom?.eight_hour_light ? 1 : 0;
+      const [[srcSchedule]] = srcAddr?.room_id
+        ? await conn.query(
+            'SELECT eight_hour_light FROM room_light_schedule WHERE room_id = ?',
+            [srcAddr.room_id]
+          )
+        : [null];
+      // Physical room? At least one non-HIST address for this room_id
+      let srcIsPhysical = false;
+      if (srcAddr?.room_id) {
+        const [[phys]] = await conn.query(
+          `SELECT 1 AS ok FROM address
+           WHERE room_id = ? AND (cage_address IS NULL OR cage_address != 'HIST')
+           LIMIT 1`,
+          [srcAddr.room_id]
+        );
+        srcIsPhysical = !!phys;
+      }
+      const destHasSchedule = destInfo != null && destInfo.schedule_state != null;
+      const srcHasSchedule = srcSchedule != null && srcSchedule.eight_hour_light != null;
+      const leavingUnknown = !srcHasSchedule || !srcIsPhysical;
+      const newState = destHasSchedule ? (destInfo.schedule_state ? 1 : 0) : 0;
       const prevState = ferret.eight_hour_light ? 1 : 0;
-      if (newState !== prevState) {
+
+      if (leavingUnknown || newState !== prevState) {
         await conn.query(
           'UPDATE ferret_qr005 SET eight_hour_light = ?, light_state_since = ? WHERE Ferret_QR005_id = ?',
           [newState, moveDate, req.params.id]
         );
-      } else if (ferret.eight_hour_light == null) {
-        // First time we know the state — set it without inventing a since date
-        // (recompute from history is preferred; this is a safe fallback)
+      } else if (ferret.eight_hour_light == null && destHasSchedule) {
         await conn.query(
           'UPDATE ferret_qr005 SET eight_hour_light = ? WHERE Ferret_QR005_id = ?',
           [newState, req.params.id]
         );
       }
-      // else: same cycle → leave light_state_since untouched (continuous)
+      // else: same cycle between two known physical rooms → leave light_state_since
     }
     await conn.commit();
     await log_activity(req.user.user_id, 'MOVE', 'ferret_qr005', req.params.id,
@@ -886,13 +936,24 @@ app.get('/api/ferrets/:id/light-history', authenticate, require_perm('read'), as
       roomTransitions.set(h.room_id, list);
     }
 
-    // Synthetic fallback for rooms that have a live schedule but no history rows yet
+    // Synthetic fallback for rooms that have a live schedule but no history rows yet.
+    // Skip non-physical rooms (only HIST addresses exist — e.g. room 15 from a
+    // bad CSV import): leave their transition list empty so reconstruction
+    // carries forward the previous known state instead of inventing a schedule.
+    const [physRows] = await pool.query(`
+      SELECT DISTINCT room_id FROM address
+      WHERE room_id IN (?)
+        AND (cage_address IS NULL OR cage_address != 'HIST')
+    `, [roomIds]);
+    const physicalRooms = new Set(physRows.map(r => r.room_id));
+
     const [schedRows] = await pool.query(`
       SELECT room_id, eight_hour_light, light_state_since
       FROM room_light_schedule
       WHERE room_id IN (?)
     `, [roomIds]);
     for (const s of schedRows) {
+      if (!physicalRooms.has(s.room_id)) continue; // non-physical → no synthetic
       const list = roomTransitions.get(s.room_id) || [];
       if (!list.length) {
         list.push({
@@ -901,6 +962,13 @@ app.get('/api/ferrets/:id/light-history', authenticate, require_perm('read'), as
         });
         roomTransitions.set(s.room_id, list);
       }
+    }
+
+    // Also drop imported history for non-physical rooms so carry-forward applies
+    // (imported Room 15 columns created real room_light_history rows even though
+    // the physical room does not exist).
+    for (const rid of roomIds) {
+      if (!physicalRooms.has(rid)) roomTransitions.set(rid, []);
     }
 
     const periods = computeAllLightPeriods(stays, roomTransitions, endCap, treatCapAsOngoing);

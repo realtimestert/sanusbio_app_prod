@@ -1,4 +1,4 @@
-// SanusBio v2.0-beta.0 | 2026-08-19 | app-medical.js
+// SanusBio v2.0-beta.3 | 2026-08-19 | app-medical.js
 // Health Events, Vaccinations, Litters, Medical Info, Procedures
 // v1.9.4: added Litter Care Log (kit weighing, nest changes, supplemental feeding)
 //         and pre-ID Kit Death logging, accessed via "Care Log" on litter rows
