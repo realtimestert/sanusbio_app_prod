@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: sanusbio-db-test
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS}
+      MYSQL_DATABASE: sanusbio
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASS}
+    volumes:
+      - db_data_test:/var/lib/mysql
+      # optional: only needed on first empty init — skip if you restore a dump
+      # - ./init:/docker-entrypoint-initdb.d:z
+    ports:
+      - "3307:3306"   # host access if you want mysql client from VS Code
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASS}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  app:
+    build: .
+    container_name: sanusbio-app-test
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DB_HOST: db
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      DB_NAME: sanusbio
+      PORT: 4000
+    ports:
+      - "4001:4000"   # live stays on 4000; test on 4001
+    volumes:
+      # live code from the host — VS Code edits appear immediately
+      - .:/app:Z
+      - /app/node_modules
+      - uploads_data_test:/app/uploads
+
+volumes:
+  db_data_test:
+  uploads_data_test:
