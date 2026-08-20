@@ -1,4 +1,6 @@
-// SanusBio v2.0-beta.3 | 2026-08-19 | app-core.js
+// SanusBio v2.0-beta.5 | 2026-08-20 | app-core.js
+// v2.0-beta.5: weeksSince(dateStr, endDateStr?) accepts optional end date so
+//          Light Cycle weeks freeze at death_date / distribution_date.
 // v2.0-beta.3: weeksSince() returns one-decimal weeks (matches ferretAge / Light History)
 // v1.10.7: Dashboard boards collapsible (repro, care, vacc); Vaccinations Due
 //          board; count badges on board headers; collapse state in localStorage
@@ -565,10 +567,11 @@ function fmtTime(dt) {
   return `${h}:${min.toString().padStart(2, '0')} ${ampm}`;
 }
 function fmtDT(dt) { if (!dt) return '—'; return `${fmtDate(dt)} ${fmtTime(dt)}`; }
-function weeksSince(dateStr) {
+function weeksSince(dateStr, endDateStr) {
   if (!dateStr) return null;
   const start = new Date(dateStr);
-  const days = Math.floor((Date.now() - start) / 864e5);
+  const end = endDateStr ? new Date(endDateStr) : new Date();
+  const days = Math.floor((end - start) / 864e5);
   if (days < 0) return '0.0';
   return (days / 7).toFixed(1);
 }

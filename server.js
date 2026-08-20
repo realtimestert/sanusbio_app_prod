@@ -1,4 +1,9 @@
-// SanusBio v2.0-beta.4 | 2026-08-20 | server.js
+// SanusBio v2.0-beta.6 | 2026-08-20 | server.js
+// v2.0-beta.6: (UI) color on Add Ferret + detail edit — no server schema change
+// v2.0-beta.5: (1) dashboard vacc_due excludes distributed; (2) marking
+//          deceased also resets female_status to baseline (NULL); (3) single
+//          ferret GET includes distribution_date + distributor_name so detail
+//          age and light-cycle weeks freeze correctly for distributed animals.
 // v2.0-beta.4: Light History respects light_mode=manual — trailing/ongoing
 //          period is overridden from the ferret's eight_hour_light +
 //          light_state_since so the tab matches the live Light Cycle card
@@ -411,7 +416,7 @@ app.get('/api/me', authenticate, (req, res) => res.json(req.user));
 app.get('/api/dashboard', authenticate, require_perm('read'), async (req, res) => {
   try {
     const [[{ total }]] = await pool.query("SELECT COUNT(*) as total FROM ferret_qr005 WHERE (dead='0' OR dead IS NULL) AND (distributed = 0 OR distributed IS NULL)");
-    const [[{ vacc_due }]] = await pool.query("SELECT COUNT(*) as vacc_due FROM ferret_qr005 WHERE next_rabies_vaccine_due <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND (dead='0' OR dead IS NULL)");
+    const [[{ vacc_due }]] = await pool.query("SELECT COUNT(*) as vacc_due FROM ferret_qr005 WHERE next_rabies_vaccine_due <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND (dead='0' OR dead IS NULL) AND (distributed = 0 OR distributed IS NULL)");
     const [[{ litters_this_month }]] = await pool.query("SELECT COUNT(*) as litters_this_month FROM litter_log WHERE litter_date >= DATE_FORMAT(CURDATE(),'%Y-%m-01')");
     const [recent_activity] = await pool.query(`
       SELECT al.action, al.details, al.created_at, u.username
@@ -600,13 +605,16 @@ app.get('/api/ferrets/:id', authenticate, require_perm('read'), async (req, res)
               mi.cause_of_death,
               ecl.estrus_status, ecl.in_estrus, ecl.vulva_description,
               ecl.formed_observation, ecl.comments AS estrus_comments,
-              COALESCE(rls.eight_hour_light, 0) AS room_eight_hour_light
+              COALESCE(rls.eight_hour_light, 0) AS room_eight_hour_light,
+              d.distributor_name,
+              (SELECT MAX(de.distribution_date) FROM distribution_event de WHERE de.ferret_id = f.Ferret_QR005_id) AS distribution_date
         FROM ferret_qr005 f
         LEFT JOIN address          a   ON f.address_id          = a.address_id
         LEFT JOIN supplier         s   ON f.supplier_id         = s.supplier_id
         LEFT JOIN medical_info     mi  ON f.medical_info_id     = mi.medical_info_id
         LEFT JOIN estrus_check_log ecl ON f.estrus_check_log_id = ecl.estrus_check_log_id
         LEFT JOIN room_light_schedule rls ON a.room_id = rls.room_id
+        LEFT JOIN distributor      d   ON f.distributor_id     = d.distributor_id
         WHERE f.Ferret_QR005_id = ?
       `, [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Ferret not found' });
@@ -735,7 +743,7 @@ app.put('/api/ferrets/:id/deceased', authenticate, require_perm('update'), async
     const unassignedAddrId = await getUnassignedAddressId(conn);
 
     await conn.query(
-      "UPDATE ferret_qr005 SET dead = '1', death_date = ?, death_female_status = ?, address_id = ? WHERE Ferret_QR005_id = ?",
+      "UPDATE ferret_qr005 SET dead = '1', death_date = ?, death_female_status = ?, female_status = NULL, address_id = ? WHERE Ferret_QR005_id = ?",
       [deathDateVal, diedOnBoard ? before.female_status : null, unassignedAddrId, req.params.id]
     );
     await conn.query(

@@ -1,4 +1,9 @@
-// SanusBio v2.0-beta.4 | 2026-08-20 | app-ferrets.js
+// SanusBio v2.0-beta.6 | 2026-08-20 | app-ferrets.js
+// v2.0-beta.6: Add Ferret form + detail page support color (create + edit)
+// v2.0-beta.5: (1) original photo download uses authenticated blob fetch (fixes 401);
+//          (2) detail age shows "At distribution" for distributed ferrets;
+//          (3) Light Cycle weeks freeze at death/distribution date;
+//          (4) admin/research can edit description on ferret detail page
 // v2.0-beta.4: Light History trailing period follows manual light_cycle when set
 //          (server-side) so the tab matches the live Light Cycle card
 // v2.0-beta.3: Light History duration = weeks with one decimal only (no days)
@@ -60,6 +65,34 @@ function ferretAge(birthDate, endDate) {
   const totalWeeks = (totalDays / 7).toFixed(1);
   return totalWeeks + 'wk';
 }
+
+async function downloadOriginalPhoto(id) {
+  try {
+    const res = await fetch(`/api/ferrets/${id}/photo/original`, {
+      headers: { 'Authorization': 'Bearer ' + TOKEN }
+    });
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { const e = await res.json(); if (e.error) msg = e.error; } catch (_) {}
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const cd = res.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)"?/i);
+    const filename = m ? decodeURIComponent(m[1].replace(/['"]/g, '')) : `ferret_${id}_original.jpg`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) {
+    alert('Could not download original photo: ' + err.message);
+  }
+}
+
 
 function renderFerretGrid() {
   const grid = document.getElementById('ferretGrid');
@@ -180,7 +213,7 @@ async function loadFerretDetail(id) {
         ? `<img src="${f.photo_url}" class="img-fluid rounded-3 shadow-sm w-100" style="height:220px;object-fit:cover">`
         : `<div class="bg-light rounded-3 d-flex align-items-center justify-content-center" style="height:160px;font-size:3.5rem">🐾</div>`}
         ${canUpdate() ? `<button class="btn btn-sm btn-dark position-absolute bottom-0 end-0 m-2 opacity-75" onclick="openPhotoModal(${id})"><i class="bi bi-camera"></i></button>` : ''}
-        ${f.photo_url ? `<a class="btn btn-sm btn-outline-light position-absolute bottom-0 start-0 m-2 opacity-75" href="/api/ferrets/${id}/photo/original" download title="Download original photo"><i class="bi bi-download"></i></a>` : ''}
+        ${f.photo_url ? `<button class="btn btn-sm btn-outline-light position-absolute bottom-0 start-0 m-2 opacity-75" onclick="event.stopPropagation(); downloadOriginalPhoto(${id})" title="Download original photo"><i class="bi bi-download"></i></button>` : ''}
       </div>
     </div>
     <div class="col-md-9">
@@ -204,7 +237,7 @@ async function loadFerretDetail(id) {
           ${isAdmin ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteFerret(${id})">Delete</button>` : ''}
         </div>
       </div>
-      <div class="text-muted mb-2">Animal ID: ${f.animal_id || '—'} &nbsp;·&nbsp; <strong>${f.dead === '1' ? 'Lived ' + ferretAge(f.birth_date, f.death_date) : ferretAge(f.birth_date)}</strong></div>
+      <div class="text-muted mb-2">Animal ID: ${f.animal_id || '—'} &nbsp;·&nbsp; <strong>${f.distributed == 1 ? 'At distribution: ' + ferretAge(f.birth_date, f.distribution_date) : f.dead === '1' ? 'Lived ' + ferretAge(f.birth_date, f.death_date) : ferretAge(f.birth_date)}</strong></div>
       <div class="row g-2 small">
         <div class="col-6 col-md-4"><span class="text-muted">Birth Date</span><br>
           ${canEdit
@@ -257,8 +290,29 @@ async function loadFerretDetail(id) {
         <div class="col-6 col-md-4"><span class="text-muted">Last Exam</span><br><strong>${fmtDate(f.last_exam_date)}</strong></div>
         ${f.treatments ? `<div class="col-12"><span class="text-muted">Treatments</span><br><strong>${f.treatments}</strong></div>` : ''}
         ${f.orders ? `<div class="col-12"><span class="text-muted">Orders</span><br><strong>${f.orders}</strong></div>` : ''}
-        ${f.color ? `<div class="col-6 col-md-4"><span class="text-muted">Color</span><br><strong>${f.color}</strong></div>` : ''}
-        ${f.description ? `<div class="col-12"><span class="text-muted">Description</span><br><div class="mt-1 p-2 bg-light rounded small" style="white-space:pre-wrap;line-height:1.6">${f.description}</div></div>` : ''}
+        <div class="col-6 col-md-4">
+          <span class="text-muted">Color</span><br>
+          ${canEdit
+            ? `<div class="d-flex align-items-center gap-2 mt-1">
+                <input type="text" id="editColor" class="form-control form-control-sm" style="max-width:180px"
+                  value="${(f.color || '').replace(/"/g, '&quot;')}" placeholder="e.g. Color-Cinnamon">
+                <button class="btn btn-sm btn-outline-primary" onclick="saveColor(${id})" title="Save color">
+                  <i class="bi bi-check2"></i>
+                </button>
+              </div>`
+            : `<strong>${f.color || '—'}</strong>`}
+        </div>
+        <div class="col-12">
+          <span class="text-muted">Description</span>
+          ${canEdit ? `
+            <div class="mt-1">
+              <textarea id="editDescription" class="form-control form-control-sm" rows="3" style="white-space:pre-wrap;line-height:1.5">${(f.description || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+              <button class="btn btn-sm btn-outline-primary mt-1" onclick="saveDescription(${id})">
+                <i class="bi bi-check2 me-1"></i>Save Description
+              </button>
+            </div>
+          ` : (f.description ? `<div class="mt-1 p-2 bg-light rounded small" style="white-space:pre-wrap;line-height:1.6">${f.description}</div>` : '<div class="text-muted small mt-1">—</div>')}
+        </div>
       </div>
     </div>
   </div>
@@ -287,7 +341,12 @@ async function loadFerretDetail(id) {
           </span>
         </div>
         <div class="text-muted small">
-          ${f.light_state_since ? `${weeksSince(f.light_state_since)}wk on this cycle (since ${fmtDate(f.light_state_since)})` : 'Duration unknown'}
+          ${f.light_state_since ? (() => {
+            const endCap = f.distributed == 1 ? f.distribution_date : (f.dead === '1' ? f.death_date : null);
+            const wks = weeksSince(f.light_state_since, endCap);
+            const frozen = endCap ? ` (stopped at ${fmtDate(endCap)})` : '';
+            return `${wks}wk on this cycle (since ${fmtDate(f.light_state_since)})${frozen}`;
+          })() : 'Duration unknown'}
         </div>
         <div class="text-muted small mb-2">
           Mode: <strong>${f.light_mode === 'manual' ? 'Manual' : 'Automatic (follows moves & room changes)'}</strong>
@@ -1137,6 +1196,22 @@ async function saveFerretName(id) {
   } catch (err) { alert(err.message); }
 }
 
+async function saveDescription(id) {
+  const val = document.getElementById('editDescription').value;
+  try {
+    await api(`/ferrets/${id}`, { method: 'PUT', body: { description: val || null } });
+    loadFerretDetail(id);
+  } catch (err) { alert(err.message); }
+}
+
+async function saveColor(id) {
+  const val = document.getElementById('editColor').value.trim();
+  try {
+    await api(`/ferrets/${id}`, { method: 'PUT', body: { color: val || null } });
+    loadFerretDetail(id);
+  } catch (err) { alert(err.message); }
+}
+
 async function saveBirthDate(id) {
   const val = document.getElementById('editBirthDate').value;
   if (!val) return alert('Please enter a valid date.');
@@ -1205,7 +1280,7 @@ async function openFerretModal() {
     document.getElementById('fSupplierId').innerHTML =
       '<option value="">— Unknown —</option>' +
       suppliers.map(s => `<option value="${s.supplier_id}">${s.supplier_name}</option>`).join('');
-    ['fName', 'fAnimalId', 'fDesc', 'fMother', 'fFather', 'fAcqBy'].forEach(id => document.getElementById(id).value = '');
+    ['fName', 'fAnimalId', 'fDesc', 'fColor', 'fMother', 'fFather', 'fAcqBy'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('fBirthDate').value = today();
     document.getElementById('fWeight').value = '0';
     document.getElementById('fVaccine').value = '';
@@ -1234,6 +1309,7 @@ async function submitFerret() {
         birth_date: bd,
         weight: parseInt(document.getElementById('fWeight').value) || 0,
         description: document.getElementById('fDesc').value || null,
+        color: document.getElementById('fColor').value.trim() || null,
         address_id: document.getElementById('fAddrId').value || null,
         supplier_id: document.getElementById('fSupplierId').value || null,
         mother_name: document.getElementById('fMother').value || null,
