@@ -1,4 +1,6 @@
-// SanusBio v2.0-beta.3 | 2026-08-19 | app-ferrets.js
+// SanusBio v2.0-beta.4 | 2026-08-20 | app-ferrets.js
+// v2.0-beta.4: Light History trailing period follows manual light_cycle when set
+//          (server-side) so the tab matches the live Light Cycle card
 // v2.0-beta.3: Light History duration = weeks with one decimal only (no days)
 // v2.0-beta.2: Light History notes — continuous periods; non-physical/HIST-only
 //          rooms (e.g. bad import room 15) inherit prior schedule state
@@ -647,7 +649,7 @@ async function loadFerretDetail(id) {
 
     <!-- Light History -->
     <div id="tLightHistory" class="tab-pane">
-      <p class="text-muted small mb-2">Continuous periods on each light schedule — moves between rooms that share the same schedule do <strong>not</strong> reset the clock (From / Duration stay the same; Rooms updates). "Until" is the day the schedule changed or the animal left the colony. Rooms that only exist as historical import placeholders (no physical cages) inherit the previous known schedule rather than inventing one.</p>
+      <p class="text-muted small mb-2">Continuous periods on each light schedule — moves between rooms that share the same schedule do <strong>not</strong> reset the clock (From / Duration stay the same; Rooms updates). "Until" is the day the schedule changed or the animal left the colony. Rooms that only exist as historical import placeholders (no physical cages) inherit the previous known schedule rather than inventing one. When mode is <strong>Manual</strong>, the current (Ongoing) row follows the Light Cycle card above instead of the room schedule.</p>
       <table class="table table-sm">
         <thead><tr><th>Schedule</th><th>From</th><th>Until</th><th>Duration</th><th>Rooms</th></tr></thead>
         <tbody id="lightHistoryTable">

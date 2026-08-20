@@ -1,5 +1,4 @@
 #!/bin/bash
-set -euo pipefail
 
 DATE=$(date +%Y%m%d-%H%M%S)
 BACKUP_DIR="$HOME/sanusbio-backups/$DATE"

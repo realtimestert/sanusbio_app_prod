@@ -1,4 +1,8 @@
-// SanusBio v2.0-beta.3 | 2026-08-19 | server.js
+// SanusBio v2.0-beta.4 | 2026-08-20 | server.js
+// v2.0-beta.4: Light History respects light_mode=manual — trailing/ongoing
+//          period is overridden from the ferret's eight_hour_light +
+//          light_state_since so the tab matches the live Light Cycle card
+//          after corrective imports / manual edits.
 // v2.0-beta.3: (UI) Light History duration = weeks with one decimal; no days
 // v2.0-beta.2: Light history hardening for unknown/invalid rooms (e.g. room 15
 //          from bad historical data): carry forward previous schedule state
@@ -312,6 +316,70 @@ function computeAllLightPeriods(stays, roomTransitions, endCap, treatCapAsOngoin
   }).filter(p => p.days > 0 || p.end_date === null); // drop zero-length completed periods
 
   return result.reverse(); // newest first
+}
+
+/**
+ * When a ferret is in light_mode='manual', the live eight_hour_light +
+ * light_state_since are the source of truth for the *current* continuous
+ * period (corrective CSV imports, staff overrides). Location+room reconstruction
+ * can disagree (wrong room history, room is currently on a different cycle).
+ * Splice the trailing period so Light History matches the live card.
+ *
+ * periods: newest-first from computeAllLightPeriods
+ */
+function applyManualTrailingOverride(periods, manualEight, manualSince, endCap) {
+  if (!manualSince || !endCap || manualSince > endCap) return periods;
+
+  function daysBetween(a, b) {
+    const da = new Date(a + 'T12:00:00Z');
+    const db = new Date(b + 'T12:00:00Z');
+    return Math.round((db - da) / 864e5);
+  }
+
+  // Collect rooms from any reconstructed period that overlaps the manual window
+  const rooms = new Set();
+  for (const p of periods) {
+    const pEnd = p.end_date || endCap;
+    if (p.start_date < endCap && pEnd > manualSince) {
+      for (const r of (p.rooms || [])) rooms.add(r);
+    }
+  }
+
+  const out = [];
+  // New ongoing period from manual since-date
+  const days = Math.max(0, daysBetween(manualSince, endCap));
+  out.push({
+    start_date: manualSince,
+    end_date: null,
+    eight_hour_light: manualEight ? 1 : 0,
+    days,
+    weeks: Math.floor(days / 7),
+    rooms: [...rooms].sort((a, b) => a - b)
+  });
+
+  // Keep / truncate older reconstructed periods that start before manualSince
+  for (const p of periods) {
+    if (p.start_date >= manualSince) continue; // fully superseded by manual
+
+    const origEnd = p.end_date; // null = was ongoing
+    // Cap at manualSince when the period would otherwise run past it
+    let end = origEnd;
+    if (end == null || end > manualSince) end = manualSince;
+    if (!end || end <= p.start_date) continue;
+
+    const d = Math.max(0, daysBetween(p.start_date, end));
+    if (d <= 0) continue;
+    out.push({
+      start_date: p.start_date,
+      end_date: end,
+      eight_hour_light: p.eight_hour_light ? 1 : 0,
+      days: d,
+      weeks: Math.floor(d / 7),
+      rooms: p.rooms || []
+    });
+  }
+
+  return out;
 }
 
 // ─── Serve Frontend ───────────────────────────────────────────────────────────
@@ -871,9 +939,10 @@ app.get('/api/ferrets/:id/light-history', authenticate, require_perm('read'), as
   try {
     const ferretId = req.params.id;
 
-    // Ferret status for endCap
+    // Ferret status for endCap + manual override fields
     const [[ferret]] = await pool.query(`
       SELECT f.dead, f.death_date, f.distributed,
+             f.light_mode, f.eight_hour_light, f.light_state_since,
              (SELECT MAX(de.distribution_date) FROM distribution_event de WHERE de.ferret_id = f.Ferret_QR005_id) AS distribution_date
       FROM ferret_qr005 f
       WHERE f.Ferret_QR005_id = ?
@@ -971,7 +1040,16 @@ app.get('/api/ferrets/:id/light-history', authenticate, require_perm('read'), as
       if (!physicalRooms.has(rid)) roomTransitions.set(rid, []);
     }
 
-    const periods = computeAllLightPeriods(stays, roomTransitions, endCap, treatCapAsOngoing);
+    let periods = computeAllLightPeriods(stays, roomTransitions, endCap, treatCapAsOngoing);
+
+    // Manual mode: live eight_hour_light + light_state_since override the trailing period
+    // so Light History matches the Light Cycle card (corrective imports / staff edits).
+    if (treatCapAsOngoing && ferret.light_mode === 'manual' && ferret.light_state_since) {
+      const manualSince = toDate(ferret.light_state_since);
+      const manualEight = ferret.eight_hour_light ? 1 : 0;
+      periods = applyManualTrailingOverride(periods, manualEight, manualSince, endCap);
+    }
+
     res.json(periods);
   } catch (err) {
     res.status(500).json({ error: err.message });
