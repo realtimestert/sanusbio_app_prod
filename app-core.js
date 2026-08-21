@@ -1,4 +1,5 @@
-// SanusBio v2.0-beta.5 | 2026-08-20 | app-core.js
+// SanusBio v2.1-beta.0 | 2026-08-21 | app-core.js
+// v2.1-beta.0: Statistics tab loader wired (loadStatistics)
 // v2.0-beta.5: weeksSince(dateStr, endDateStr?) accepts optional end date so
 //          Light Cycle weeks freeze at death_date / distribution_date.
 // v2.0-beta.3: weeksSince() returns one-decimal weeks (matches ferretAge / Light History)
@@ -165,7 +166,7 @@ function nav(page) {
     dashboard: loadDashboard, ferrets: loadFerrets, litters: loadLitters,
     locations: loadLocations, suppliers: loadSuppliers,
     users: loadUsers, activity: loadActivity, 'cleaning-reports': loadCleaningReports,
-    distribution: loadDistribution, reports: loadReports
+    distribution: loadDistribution, reports: loadReports, statistics: loadStatistics
   };
   if (loaders[page]) loaders[page]();
 }

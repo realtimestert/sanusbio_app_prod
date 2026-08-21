@@ -1,4 +1,7 @@
-// SanusBio v2.0-beta.6 | 2026-08-20 | server.js
+// SanusBio v2.1-beta.0 | 2026-08-21 | server.js
+// v2.1-beta.0: Statistics tab (age lists, population pyramid 8-wk bins to 256+,
+//          health/death summaries, weight alerts, genetics CoI/CoR, repro stats)
+//          + Distribution print button. (UI + new /api/stats/* endpoints)
 // v2.0-beta.6: (UI) color on Add Ferret + detail edit — no server schema change
 // v2.0-beta.5: (1) dashboard vacc_due excludes distributed; (2) marking
 //          deceased also resets female_status to baseline (NULL); (3) single
@@ -132,6 +135,8 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 app.use(express.static(path.join(__dirname)));  // serves sanusbio_favicon.svg from app root
 
 // ─── Database ─────────────────────────────────────────────────────────────────
+const genetics = require('./genetics');
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
@@ -2781,4 +2786,685 @@ app.get('/api/distribution-events', authenticate, require_perm('read'), async (r
     const [rows] = await pool.query(q, params);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Statistics — Core helpers + endpoints  |  v2.1-beta.0
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Age in weeks (one decimal) between birth and end (or today). */
+function statsAgeWeeks(birthDate, endDate) {
+  if (!birthDate) return null;
+  const birth = new Date(birthDate);
+  const end = endDate ? new Date(endDate) : new Date();
+  if (isNaN(birth.getTime()) || isNaN(end.getTime())) return null;
+  const days = Math.floor((end - birth) / 864e5);
+  if (days < 0) return null;
+  return Math.round((days / 7) * 10) / 10;
+}
+
+/** Life stage from age in weeks. Kit <8, Juvenile 8–52, Adult >52. */
+function statsLifeStage(ageWeeks) {
+  if (ageWeeks == null || isNaN(ageWeeks)) return null;
+  if (ageWeeks < 8) return 'kit';
+  if (ageWeeks <= 52) return 'juvenile';
+  return 'adult';
+}
+
+/** Build 8-week pyramid bins with final open bin at 256+. */
+function statsPyramidBins() {
+  const bins = [];
+  for (let start = 0; start < 256; start += 8) {
+    bins.push({ start, end: start + 8, label: `${start}–${start + 8}`, open: false });
+  }
+  bins.push({ start: 256, end: null, label: '256+', open: true });
+  return bins;
+}
+
+// ── Overview (cards: sex ratio, pedigree completeness, active breeding, etc.) ─
+app.get('/api/stats/overview', authenticate, admin_or_research, async (req, res) => {
+  try {
+    const [[live]] = await pool.query(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(sex = 'female') AS females,
+        SUM(sex = 'male') AS males,
+        SUM(sex IS NULL OR sex NOT IN ('female','male')) AS unknown_sex,
+        SUM(acquisition_class = 'Littered') AS littered,
+        SUM(acquisition_class = 'Sourced') AS sourced
+      FROM ferret_qr005
+      WHERE (dead IS NULL OR dead = '0' OR dead = 0) AND (distributed IS NULL OR distributed = 0)
+    `);
+
+    // Pedigree completeness (live animals)
+    const [[ped]] = await pool.query(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(mother_id IS NOT NULL AND father_id IS NOT NULL) AS both_parents,
+        SUM((mother_id IS NOT NULL) XOR (father_id IS NOT NULL)) AS one_parent,
+        SUM(mother_id IS NULL AND father_id IS NULL) AS no_parents
+      FROM ferret_qr005
+      WHERE (dead IS NULL OR dead = '0' OR dead = 0) AND (distributed IS NULL OR distributed = 0)
+    `);
+    const pctComplete = ped.total ? Math.round((ped.both_parents / ped.total) * 1000) / 10 : 0;
+
+    // Active breeding population (live, non-distributed, not retired)
+    // Males ≥25 wk, females ≥20 wk or with non-baseline female_status
+    const [breedRows] = await pool.query(`
+      SELECT Ferret_QR005_id, sex, birth_date, breeding_retired, female_status
+      FROM ferret_qr005
+      WHERE (dead IS NULL OR dead = '0' OR dead = 0)
+        AND (distributed IS NULL OR distributed = 0)
+        AND (breeding_retired IS NULL OR breeding_retired = 0)
+    `);
+    let breedingMales = 0, breedingFemales = 0;
+    const today = new Date();
+    for (const r of breedRows) {
+      const age = statsAgeWeeks(r.birth_date, today);
+      if (age == null) continue;
+      if (r.sex === 'male' && age >= 25) breedingMales++;
+      else if (r.sex === 'female' && (age >= 20 || (r.female_status && r.female_status !== 'baseline'))) breedingFemales++;
+    }
+
+    // Sex ratio by birth year (live)
+    const [cohorts] = await pool.query(`
+      SELECT YEAR(birth_date) AS birth_year,
+             SUM(sex = 'female') AS females,
+             SUM(sex = 'male') AS males,
+             COUNT(*) AS total
+      FROM ferret_qr005
+      WHERE birth_date IS NOT NULL
+        AND (dead IS NULL OR dead = '0' OR dead = 0)
+        AND (distributed IS NULL OR distributed = 0)
+      GROUP BY YEAR(birth_date)
+      ORDER BY birth_year DESC
+      LIMIT 15
+    `);
+
+    res.json({
+      live: {
+        total: live.total || 0,
+        females: live.females || 0,
+        males: live.males || 0,
+        unknown_sex: live.unknown_sex || 0,
+        littered: live.littered || 0,
+        sourced: live.sourced || 0,
+        sex_ratio_f_to_m: (live.males > 0) ? Math.round((live.females / live.males) * 100) / 100 : null
+      },
+      pedigree: {
+        total: ped.total || 0,
+        both_parents: ped.both_parents || 0,
+        one_parent: ped.one_parent || 0,
+        no_parents: ped.no_parents || 0,
+        pct_complete: pctComplete
+      },
+      active_breeding: {
+        males: breedingMales,
+        females: breedingFemales,
+        total: breedingMales + breedingFemales
+      },
+      sex_ratio_by_cohort: cohorts
+    });
+  } catch (err) {
+    console.error('stats/overview', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Population pyramid (8-wk bins, final 256+) ───────────────────────────────
+app.get('/api/stats/population-pyramid', authenticate, admin_or_research, async (req, res) => {
+  try {
+    const asOf = req.query.as_of || null; // YYYY-MM-DD optional
+    const refDate = asOf ? new Date(asOf) : new Date();
+
+    // Current pyramid = live + not distributed
+    const [rows] = await pool.query(`
+      SELECT Ferret_QR005_id, sex, birth_date
+      FROM ferret_qr005
+      WHERE (dead IS NULL OR dead = '0' OR dead = 0)
+        AND (distributed IS NULL OR distributed = 0)
+        AND birth_date IS NOT NULL
+    `);
+
+    const bins = statsPyramidBins();
+    const data = bins.map(b => ({
+      bin_start: b.start,
+      bin_end: b.end,
+      bin_label: b.label,
+      male: 0,
+      female: 0,
+      unknown: 0,
+      total: 0
+    }));
+
+    for (const r of rows) {
+      const age = statsAgeWeeks(r.birth_date, refDate);
+      if (age == null) continue;
+      let idx = data.findIndex(b => b.bin_end == null ? age >= b.bin_start : (age >= b.bin_start && age < b.bin_end));
+      if (idx < 0) idx = data.length - 1; // safety → 256+
+      data[idx].total++;
+      if (r.sex === 'male') data[idx].male++;
+      else if (r.sex === 'female') data[idx].female++;
+      else data[idx].unknown++;
+    }
+
+    const grandTotal = data.reduce((s, b) => s + b.total, 0) || 1;
+    for (const b of data) {
+      b.pct_male = Math.round((b.male / grandTotal) * 1000) / 10;
+      b.pct_female = Math.round((b.female / grandTotal) * 1000) / 10;
+      b.pct_total = Math.round((b.total / grandTotal) * 1000) / 10;
+    }
+
+    res.json({
+      as_of: asOf || new Date().toISOString().slice(0, 10),
+      total_animals: grandTotal === 1 && data.every(b => b.total === 0) ? 0 : grandTotal,
+      bins: data
+    });
+  } catch (err) {
+    console.error('stats/population-pyramid', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Age-filtered ferret list ──────────────────────────────────────────────────
+app.get('/api/stats/age-list', authenticate, admin_or_research, async (req, res) => {
+  try {
+    let minW = req.query.min_age_weeks != null ? parseFloat(req.query.min_age_weeks) : null;
+    let maxW = req.query.max_age_weeks != null ? parseFloat(req.query.max_age_weeks) : null;
+    // Allow months via unit conversion from client, or accept min_age_months
+    if (req.query.min_age_months != null) minW = parseFloat(req.query.min_age_months) * (365.25 / 12 / 7);
+    if (req.query.max_age_months != null) maxW = parseFloat(req.query.max_age_months) * (365.25 / 12 / 7);
+
+    const sex = req.query.sex || null; // 'female' | 'male'
+    const status = req.query.status || 'active'; // active|deceased|distributed|all
+    const acq = req.query.acquisition_class || null;
+    const limit = Math.min(parseInt(req.query.limit) || 2000, 5000);
+
+    let where = ['f.birth_date IS NOT NULL'];
+    const params = [];
+
+    if (status === 'active') {
+      where.push("(f.dead IS NULL OR f.dead = '0' OR f.dead = 0)");
+      where.push('(f.distributed IS NULL OR f.distributed = 0)');
+    } else if (status === 'deceased') {
+      where.push("(f.dead = '1' OR f.dead = 1)");
+    } else if (status === 'distributed') {
+      where.push('(f.distributed = 1)');
+    }
+    // 'all' → no dead/distributed filter
+
+    if (sex === 'female' || sex === 'male') {
+      where.push('f.sex = ?');
+      params.push(sex);
+    }
+    if (acq === 'Littered' || acq === 'Sourced') {
+      where.push('f.acquisition_class = ?');
+      params.push(acq);
+    }
+
+    const [rows] = await pool.query(`
+      SELECT f.Ferret_QR005_id AS id, f.animal_id, f.ferret_name AS name, f.sex,
+             f.birth_date, f.death_date, f.distribution_date, f.dead, f.distributed,
+             f.weight, f.acquisition_class, f.female_status,
+             a.room_id, a.cage_address, a.room_name
+      FROM ferret_qr005 f
+      LEFT JOIN address a ON f.address_id = a.address_id
+      WHERE ${where.join(' AND ')}
+      ORDER BY f.birth_date ASC
+      LIMIT ${limit}
+    `, params);
+
+    const today = new Date();
+    const out = [];
+    for (const r of rows) {
+      const endCap = (r.dead === '1' || r.dead === 1) ? r.death_date
+        : (r.distributed == 1 ? r.distribution_date : today);
+      const ageW = statsAgeWeeks(r.birth_date, endCap);
+      if (ageW == null) continue;
+      if (minW != null && ageW < minW) continue;
+      if (maxW != null && ageW > maxW) continue;
+
+      let statusLabel = 'Active';
+      if (r.dead === '1' || r.dead === 1) statusLabel = 'Deceased';
+      else if (r.distributed == 1) statusLabel = 'Distributed';
+
+      out.push({
+        id: r.id,
+        animal_id: r.animal_id,
+        name: r.name,
+        sex: r.sex,
+        birth_date: r.birth_date,
+        age_weeks: ageW,
+        age_months: Math.round((ageW * 7 / 30.4375) * 10) / 10,
+        status: statusLabel,
+        weight: r.weight,
+        room_id: r.room_id,
+        cage_address: r.cage_address,
+        room_name: r.room_name,
+        acquisition_class: r.acquisition_class
+      });
+    }
+
+    // Sort by age descending by default
+    out.sort((a, b) => b.age_weeks - a.age_weeks);
+    res.json({ count: out.length, ferrets: out });
+  } catch (err) {
+    console.error('stats/age-list', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Death summary (avg/median age by stage, COD frequencies, mortality by year) ─
+app.get('/api/stats/death-summary', authenticate, admin_or_research, async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT f.Ferret_QR005_id, f.ferret_name, f.animal_id, f.sex, f.birth_date, f.death_date,
+             mi.cause_of_death
+      FROM ferret_qr005 f
+      LEFT JOIN medical_info mi ON f.medical_info_id = mi.medical_info_id
+      WHERE (f.dead = '1' OR f.dead = 1) AND f.birth_date IS NOT NULL AND f.death_date IS NOT NULL
+    `);
+
+    const ages = [];
+    const byStage = { kit: [], juvenile: [], adult: [] };
+    const causes = {};
+    const byYear = {};
+
+    for (const r of rows) {
+      const age = statsAgeWeeks(r.birth_date, r.death_date);
+      if (age == null) continue;
+      ages.push(age);
+      const stage = statsLifeStage(age);
+      if (stage) byStage[stage].push(age);
+
+      const cod = (r.cause_of_death || '').trim() || 'Unknown / not recorded';
+      causes[cod] = (causes[cod] || 0) + 1;
+
+      const y = new Date(r.death_date).getFullYear();
+      if (!byYear[y]) byYear[y] = { year: y, count: 0, ages: [] };
+      byYear[y].count++;
+      byYear[y].ages.push(age);
+    }
+
+    function avg(arr) {
+      if (!arr.length) return null;
+      return Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 10) / 10;
+    }
+    function median(arr) {
+      if (!arr.length) return null;
+      const s = [...arr].sort((a, b) => a - b);
+      const m = Math.floor(s.length / 2);
+      return s.length % 2 ? s[m] : Math.round(((s[m - 1] + s[m]) / 2) * 10) / 10;
+    }
+
+    const causeList = Object.entries(causes)
+      .map(([cause, count]) => ({ cause, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const mortalityByYear = Object.values(byYear)
+      .map(y => ({
+        year: y.year,
+        deaths: y.count,
+        avg_age_weeks: avg(y.ages),
+        median_age_weeks: median(y.ages)
+      }))
+      .sort((a, b) => b.year - a.year);
+
+    res.json({
+      total_deaths: ages.length,
+      overall: { avg_age_weeks: avg(ages), median_age_weeks: median(ages) },
+      by_stage: {
+        kit: { count: byStage.kit.length, avg_age_weeks: avg(byStage.kit), median_age_weeks: median(byStage.kit) },
+        juvenile: { count: byStage.juvenile.length, avg_age_weeks: avg(byStage.juvenile), median_age_weeks: median(byStage.juvenile) },
+        adult: { count: byStage.adult.length, avg_age_weeks: avg(byStage.adult), median_age_weeks: median(byStage.adult) }
+      },
+      causes: causeList,
+      mortality_by_year: mortalityByYear,
+      life_stage_note: 'Kit < 8 weeks · Juvenile 8–52 weeks · Adult > 52 weeks (8-week cutoff used when exact wean date unavailable)'
+    });
+  } catch (err) {
+    console.error('stats/death-summary', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Weight change alerts (configurable sudden / gradual thresholds) ───────────
+app.get('/api/stats/weight-alerts', authenticate, admin_or_research, async (req, res) => {
+  try {
+    const suddenPct = parseFloat(req.query.sudden_pct) || 10;
+    const suddenDays = parseInt(req.query.sudden_days) || 14;
+    const gradualPct = parseFloat(req.query.gradual_pct) || 5;
+    const gradualDays = parseInt(req.query.gradual_days) || 28;
+
+    // Live animals only
+    const [ferrets] = await pool.query(`
+      SELECT Ferret_QR005_id AS id, animal_id, ferret_name AS name, sex, weight, birth_date
+      FROM ferret_qr005
+      WHERE (dead IS NULL OR dead = '0' OR dead = 0) AND (distributed IS NULL OR distributed = 0)
+    `);
+
+    // All weight events for live ferrets (recent first)
+    const [events] = await pool.query(`
+      SELECT he.ferret_id, he.weight, he.event_date
+      FROM health_event he
+      JOIN ferret_qr005 f ON he.ferret_id = f.Ferret_QR005_id
+      WHERE he.event_type = 'weight' AND he.weight IS NOT NULL
+        AND (f.dead IS NULL OR f.dead = '0' OR f.dead = 0)
+        AND (f.distributed IS NULL OR f.distributed = 0)
+      ORDER BY he.ferret_id, he.event_date DESC
+    `);
+
+    // Also pull exam_note weights as secondary series
+    const [examWts] = await pool.query(`
+      SELECT en.ferret_id, en.weight_grams AS weight, en.exam_date AS event_date
+      FROM exam_note en
+      JOIN ferret_qr005 f ON en.ferret_id = f.Ferret_QR005_id
+      WHERE en.weight_grams IS NOT NULL
+        AND (f.dead IS NULL OR f.dead = '0' OR f.dead = 0)
+        AND (f.distributed IS NULL OR f.distributed = 0)
+      ORDER BY en.ferret_id, en.exam_date DESC
+    `);
+
+    // Merge weight points per ferret (prefer health_event, then exam_note)
+    const byFerret = new Map();
+    for (const e of events) {
+      if (!byFerret.has(e.ferret_id)) byFerret.set(e.ferret_id, []);
+      byFerret.get(e.ferret_id).push({ weight: parseFloat(e.weight), date: e.event_date });
+    }
+    for (const e of examWts) {
+      if (!byFerret.has(e.ferret_id)) byFerret.set(e.ferret_id, []);
+      // Avoid exact date duplicates
+      const list = byFerret.get(e.ferret_id);
+      const d = String(e.event_date).slice(0, 10);
+      if (!list.some(x => String(x.date).slice(0, 10) === d)) {
+        list.push({ weight: parseFloat(e.weight), date: e.event_date });
+      }
+    }
+    // Sort each series newest-first
+    for (const list of byFerret.values()) {
+      list.sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+
+    const alerts = [];
+    const ferretMap = new Map(ferrets.map(f => [f.id, f]));
+
+    for (const [fid, series] of byFerret) {
+      if (series.length < 2) continue;
+      const f = ferretMap.get(fid);
+      if (!f) continue;
+
+      const newest = series[0];
+      // Sudden: look for any pair within suddenDays where |Δ| >= suddenPct
+      let sudden = null;
+      for (let i = 0; i < series.length; i++) {
+        for (let j = i + 1; j < series.length; j++) {
+          const days = Math.abs((new Date(series[i].date) - new Date(series[j].date)) / 864e5);
+          if (days > suddenDays) break;
+          const older = series[j].weight, newer = series[i].weight;
+          if (!older || older <= 0) continue;
+          const pct = ((newer - older) / older) * 100;
+          if (Math.abs(pct) >= suddenPct) {
+            if (!sudden || Math.abs(pct) > Math.abs(sudden.pct)) {
+              sudden = { pct: Math.round(pct * 10) / 10, days: Math.round(days), from: older, to: newer, type: pct < 0 ? 'sudden_drop' : 'sudden_gain' };
+            }
+          }
+        }
+      }
+
+      // Gradual: compare newest vs oldest within gradualDays window
+      let gradual = null;
+      const window = series.filter(s => (new Date(newest.date) - new Date(s.date)) / 864e5 <= gradualDays);
+      if (window.length >= 2) {
+        const oldest = window[window.length - 1];
+        const days = Math.abs((new Date(newest.date) - new Date(oldest.date)) / 864e5);
+        if (days >= Math.min(14, gradualDays / 2) && oldest.weight > 0) {
+          const pct = ((newest.weight - oldest.weight) / oldest.weight) * 100;
+          if (pct <= -gradualPct) {
+            gradual = { pct: Math.round(pct * 10) / 10, days: Math.round(days), from: oldest.weight, to: newest.weight, type: 'gradual_decline' };
+          }
+        }
+      }
+
+      if (sudden) {
+        alerts.push({
+          id: f.id, animal_id: f.animal_id, name: f.name, sex: f.sex,
+          alert: sudden.type, delta_pct: sudden.pct, window_days: sudden.days,
+          from_weight: sudden.from, to_weight: sudden.to, current_weight: f.weight
+        });
+      } else if (gradual) {
+        alerts.push({
+          id: f.id, animal_id: f.animal_id, name: f.name, sex: f.sex,
+          alert: gradual.type, delta_pct: gradual.pct, window_days: gradual.days,
+          from_weight: gradual.from, to_weight: gradual.to, current_weight: f.weight
+        });
+      }
+    }
+
+    // Prefer sudden over gradual; sort by absolute delta
+    alerts.sort((a, b) => Math.abs(b.delta_pct) - Math.abs(a.delta_pct));
+
+    res.json({
+      thresholds: { sudden_pct: suddenPct, sudden_days: suddenDays, gradual_pct: gradualPct, gradual_days: gradualDays },
+      count: alerts.length,
+      alerts
+    });
+  } catch (err) {
+    console.error('stats/weight-alerts', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Reproduction extras: top jills/hobs, age at first litter ──────────────────
+app.get('/api/stats/reproduction', authenticate, admin_or_research, async (req, res) => {
+  try {
+    // Offspring counts via mother_id / father_id
+    const [mothers] = await pool.query(`
+      SELECT m.Ferret_QR005_id AS id, m.animal_id, m.ferret_name AS name,
+             COUNT(c.Ferret_QR005_id) AS offspring
+      FROM ferret_qr005 m
+      JOIN ferret_qr005 c ON c.mother_id = m.Ferret_QR005_id
+      WHERE m.sex = 'female'
+      GROUP BY m.Ferret_QR005_id, m.animal_id, m.ferret_name
+      ORDER BY offspring DESC
+      LIMIT 15
+    `);
+    const [fathers] = await pool.query(`
+      SELECT f.Ferret_QR005_id AS id, f.animal_id, f.ferret_name AS name,
+             COUNT(c.Ferret_QR005_id) AS offspring
+      FROM ferret_qr005 f
+      JOIN ferret_qr005 c ON c.father_id = f.Ferret_QR005_id
+      WHERE f.sex = 'male'
+      GROUP BY f.Ferret_QR005_id, f.animal_id, f.ferret_name
+      ORDER BY offspring DESC
+      LIMIT 15
+    `);
+
+    // Age at first litter (females with at least one litter_log or offspring)
+    const [firstLitter] = await pool.query(`
+      SELECT f.Ferret_QR005_id AS id, f.animal_id, f.ferret_name AS name, f.birth_date,
+             MIN(ll.litter_date) AS first_litter_date
+      FROM ferret_qr005 f
+      JOIN litter_log ll ON ll.Ferret_QR005_id = f.Ferret_QR005_id
+      WHERE f.sex = 'female' AND f.birth_date IS NOT NULL AND ll.litter_date IS NOT NULL
+      GROUP BY f.Ferret_QR005_id, f.animal_id, f.ferret_name, f.birth_date
+    `);
+    const firstLitterAges = [];
+    for (const r of firstLitter) {
+      const age = statsAgeWeeks(r.birth_date, r.first_litter_date);
+      if (age != null) firstLitterAges.push(age);
+    }
+    function avg(arr) {
+      if (!arr.length) return null;
+      return Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 10) / 10;
+    }
+    function median(arr) {
+      if (!arr.length) return null;
+      const s = [...arr].sort((a, b) => a - b);
+      const m = Math.floor(s.length / 2);
+      return s.length % 2 ? s[m] : Math.round(((s[m - 1] + s[m]) / 2) * 10) / 10;
+    }
+
+    // Simple litter size stats
+    const [[litterStats]] = await pool.query(`
+      SELECT COUNT(*) AS litter_count,
+             AVG(kit_count) AS avg_kits,
+             AVG(surviving_litter_count) AS avg_surviving,
+             AVG(stillborn) AS avg_stillborn
+      FROM litter_log
+      WHERE kit_count IS NOT NULL
+    `);
+
+    res.json({
+      top_jills: mothers,
+      top_hobs: fathers,
+      age_at_first_litter: {
+        count: firstLitterAges.length,
+        avg_weeks: avg(firstLitterAges),
+        median_weeks: median(firstLitterAges)
+      },
+      litter_stats: {
+        litter_count: litterStats.litter_count || 0,
+        avg_kits_born: litterStats.avg_kits != null ? Math.round(litterStats.avg_kits * 10) / 10 : null,
+        avg_surviving: litterStats.avg_surviving != null ? Math.round(litterStats.avg_surviving * 10) / 10 : null,
+        avg_stillborn: litterStats.avg_stillborn != null ? Math.round(litterStats.avg_stillborn * 10) / 10 : null
+      }
+    });
+  } catch (err) {
+    console.error('stats/reproduction', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Statistics — Genetics (CoI / CoR)  |  v2.1-beta.0
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Simple in-memory pedigree cache (rebuilds when older than 5 minutes or missing)
+let _pedigreeCache = { graph: null, builtAt: 0 };
+const PEDIGREE_TTL_MS = 5 * 60 * 1000;
+
+async function getPedigreeGraph() {
+  const now = Date.now();
+  if (_pedigreeCache.graph && (now - _pedigreeCache.builtAt) < PEDIGREE_TTL_MS) {
+    return _pedigreeCache.graph;
+  }
+  const graph = await genetics.buildPedigree(pool);
+  _pedigreeCache = { graph, builtAt: now };
+  return graph;
+}
+
+// Pedigree completeness summary
+app.get('/api/stats/genetics/completeness', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const graph = await getPedigreeGraph();
+    res.json(genetics.completenessStats(graph));
+  } catch (err) {
+    console.error('genetics/completeness', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Individual Coefficient of Inbreeding
+app.get('/api/stats/genetics/coi/:id', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+    const graph = await getPedigreeGraph();
+    const node = graph.byId.get(id);
+    if (!node) return res.status(404).json({ error: 'Ferret not found' });
+    const F = genetics.inbreedingCoefficient(graph, id);
+    const interp = genetics.interpretCoi(F);
+    res.json({
+      id: node.id,
+      animal_id: node.animal_id,
+      name: node.name,
+      sex: node.sex,
+      birth_date: node.birth_date,
+      mother_id: node.mother_id,
+      father_id: node.father_id,
+      parents_known: (node.mother_id ? 1 : 0) + (node.father_id ? 1 : 0),
+      coi: +F.toFixed(6),
+      coi_pct: +(F * 100).toFixed(2),
+      interpretation: interp,
+    });
+  } catch (err) {
+    console.error('genetics/coi', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Pairwise Coefficient of Relationship
+app.get('/api/stats/genetics/relatedness', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const a = parseInt(req.query.a, 10);
+    const b = parseInt(req.query.b, 10);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) {
+      return res.status(400).json({ error: 'Query params a and b (ferret ids) are required' });
+    }
+    const graph = await getPedigreeGraph();
+    const nodeA = graph.byId.get(a);
+    const nodeB = graph.byId.get(b);
+    if (!nodeA || !nodeB) return res.status(404).json({ error: 'One or both ferrets not found' });
+    const R = genetics.relationshipCoefficient(graph, a, b);
+    const Fa = genetics.inbreedingCoefficient(graph, a);
+    const Fb = genetics.inbreedingCoefficient(graph, b);
+    res.json({
+      a: { id: nodeA.id, animal_id: nodeA.animal_id, name: nodeA.name, coi: +Fa.toFixed(6), coi_pct: +(Fa * 100).toFixed(2) },
+      b: { id: nodeB.id, animal_id: nodeB.animal_id, name: nodeB.name, coi: +Fb.toFixed(6), coi_pct: +(Fb * 100).toFixed(2) },
+      relatedness: +R.toFixed(6),
+      relatedness_pct: +(R * 100).toFixed(2),
+      interpretation: genetics.interpretRelationship(R),
+    });
+  } catch (err) {
+    console.error('genetics/relatedness', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Animals above a CoI threshold (default 6.25%)
+app.get('/api/stats/genetics/high-coi', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const threshold = req.query.threshold != null ? parseFloat(req.query.threshold) : 0.0625;
+    const liveOnly = req.query.live_only === '1' || req.query.live_only === 'true';
+    const graph = await getPedigreeGraph();
+    const rows = genetics.allCoi(graph, { threshold, liveOnly });
+    res.json({ threshold, live_only: liveOnly, count: rows.length, animals: rows });
+  } catch (err) {
+    console.error('genetics/high-coi', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// CSV export of CoI values
+app.get('/api/stats/genetics/export-coi', authenticate, require_perm('read'), async (req, res) => {
+  try {
+    const threshold = req.query.threshold != null ? parseFloat(req.query.threshold) : 0;
+    const liveOnly = req.query.live_only === '1' || req.query.live_only === 'true';
+    const graph = await getPedigreeGraph();
+    const rows = genetics.allCoi(graph, { threshold, liveOnly });
+    const header = ['animal_id', 'name', 'sex', 'birth_date', 'coi', 'coi_pct', 'interpretation', 'mother_id', 'father_id', 'acquisition_class'];
+    const lines = [header.join(',')];
+    for (const r of rows) {
+      lines.push([
+        r.animal_id ?? '',
+        JSON.stringify(r.name ?? ''), // safe CSV quoting
+        r.sex ?? '',
+        r.birth_date ? String(r.birth_date).slice(0, 10) : '',
+        r.coi,
+        r.coi_pct,
+        JSON.stringify(r.interpretation ?? ''),
+        r.mother_id ?? '',
+        r.father_id ?? '',
+        r.acquisition_class ?? '',
+      ].join(','));
+    }
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="sanusbio_coi_export.csv"');
+    res.send(lines.join('\n'));
+  } catch (err) {
+    console.error('genetics/export-coi', err);
+    res.status(500).json({ error: err.message });
+  }
 });

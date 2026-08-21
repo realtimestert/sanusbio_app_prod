@@ -1,4 +1,4 @@
-<!-- SanusBio v2.0-beta.6 | 2026-08-20 | index.html -->
+<!-- SanusBio v2.1-beta.0 | 2026-08-21 | index.html -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -51,6 +51,7 @@
         <a class="nav-link admin-research-only" href="#" data-page="users"><i class="bi bi-people"></i>Users</a>
         <a class="nav-link admin-only" href="#" data-page="activity"><i class="bi bi-journal-text"></i>Activity Log</a>
         <a class="nav-link admin-research-only" href="#" data-page="reports"><i class="bi bi-file-earmark-bar-graph"></i>Reports</a>
+        <a class="nav-link admin-research-only" href="#" data-page="statistics"><i class="bi bi-bar-chart-line"></i>Statistics</a>
         <a class="nav-link" href="#" data-page="cleaning-reports"><i class="bi bi-check2-square"></i>Cleaning
           Reports</a>
       </nav>
@@ -465,14 +466,17 @@
         <div class="page-header">
           <h2 class="h4"><i class="bi bi-box-arrow-right me-2"></i>Distribution</h2>
           <div class="ms-auto d-flex gap-2">
-            <button id="btnAddDistributor" class="btn btn-outline-secondary d-none" onclick="openDistributorModal()">
+            <button id="btnAddDistributor" class="btn btn-outline-secondary d-none no-print" onclick="openDistributorModal()">
               <i class="bi bi-plus-lg me-1"></i>Add Distributor
+            </button>
+            <button class="btn btn-outline-secondary no-print" onclick="window.print()" title="Print current filtered view">
+              <i class="bi bi-printer me-1"></i>Print
             </button>
           </div>
         </div>
 
         <!-- Distributor filter bar -->
-        <div class="card mb-3 p-3">
+        <div class="card mb-3 p-3 no-print">
           <div class="d-flex align-items-center gap-3 flex-wrap">
             <span class="fw-semibold text-muted small">Filter by Distributor:</span>
             <div id="distFilterBtns" class="d-flex flex-wrap gap-2"></div>
@@ -540,6 +544,271 @@
         </div>
 
         <div id="reportContent"></div>
+      </div>
+
+
+      <!-- Statistics -->
+      <div id="page-statistics" class="page admin-research-only">
+        <div class="page-header">
+          <h2 class="h4"><i class="bi bi-bar-chart-line me-2"></i>Statistics</h2>
+        </div>
+
+        <ul class="nav nav-tabs mb-3" id="statsTabs">
+          <li class="nav-item"><button class="nav-link active" data-stats-tab="overview" onclick="switchStatsTab('overview')">Overview</button></li>
+          <li class="nav-item"><button class="nav-link" data-stats-tab="age" onclick="switchStatsTab('age')">Age Lists</button></li>
+          <li class="nav-item"><button class="nav-link" data-stats-tab="population" onclick="switchStatsTab('population')">Population</button></li>
+          <li class="nav-item"><button class="nav-link" data-stats-tab="health" onclick="switchStatsTab('health')">Health</button></li>
+          <li class="nav-item"><button class="nav-link" data-stats-tab="genetics" onclick="switchStatsTab('genetics')">Genetics</button></li>
+          <li class="nav-item"><button class="nav-link" data-stats-tab="reproduction" onclick="switchStatsTab('reproduction')">Reproduction</button></li>
+        </ul>
+
+        <!-- Overview -->
+        <div id="stats-overview" class="stats-panel">
+          <div class="row g-3 mb-4" id="statsOverviewCards">
+            <div class="col-md-3"><div class="card"><div class="card-body text-center text-muted py-4">Loading…</div></div></div>
+          </div>
+          <div class="card">
+            <div class="card-header bg-white py-2 fw-semibold">Quick Notes</div>
+            <div class="card-body small text-muted">
+              <p class="mb-1">Life stages used for age-at-death: <strong>Kit</strong> < 8 weeks · <strong>Juvenile</strong> 8–52 weeks · <strong>Adult</strong> > 52 weeks.</p>
+              <p class="mb-0">Pyramid final bin is <strong>256+ weeks</strong>. Weight-change thresholds are configurable on the Health tab.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Age Lists -->
+        <div id="stats-age" class="stats-panel" style="display:none">
+          <div class="card mb-3">
+            <div class="card-body">
+              <div class="row g-2 align-items-end">
+                <div class="col-auto">
+                  <label class="form-label small fw-semibold mb-1">Min Age</label>
+                  <input type="number" id="statsAgeMin" class="form-control form-control-sm" style="width:6rem" min="0" step="1" placeholder="0">
+                </div>
+                <div class="col-auto">
+                  <label class="form-label small fw-semibold mb-1">Max Age</label>
+                  <input type="number" id="statsAgeMax" class="form-control form-control-sm" style="width:6rem" min="0" step="1" placeholder="—">
+                </div>
+                <div class="col-auto">
+                  <label class="form-label small fw-semibold mb-1">Unit</label>
+                  <select id="statsAgeUnit" class="form-select form-select-sm">
+                    <option value="weeks">Weeks</option>
+                    <option value="months">Months</option>
+                  </select>
+                </div>
+                <div class="col-auto">
+                  <label class="form-label small fw-semibold mb-1">Sex</label>
+                  <select id="statsAgeSex" class="form-select form-select-sm">
+                    <option value="">Any</option>
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                  </select>
+                </div>
+                <div class="col-auto">
+                  <label class="form-label small fw-semibold mb-1">Status</label>
+                  <select id="statsAgeStatus" class="form-select form-select-sm">
+                    <option value="active">Active</option>
+                    <option value="deceased">Deceased</option>
+                    <option value="distributed">Distributed</option>
+                    <option value="all">All</option>
+                  </select>
+                </div>
+                <div class="col-auto">
+                  <label class="form-label small fw-semibold mb-1">Acquisition</label>
+                  <select id="statsAgeAcq" class="form-select form-select-sm">
+                    <option value="">Any</option>
+                    <option value="Littered">Littered</option>
+                    <option value="Sourced">Sourced</option>
+                  </select>
+                </div>
+                <div class="col-auto">
+                  <button class="btn btn-sm btn-primary" onclick="loadStatsAgeList()"><i class="bi bi-search me-1"></i>Apply</button>
+                  <button class="btn btn-sm btn-outline-secondary" onclick="exportStatsAgeCsv()" title="Export current results"><i class="bi bi-download"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header bg-white py-2 d-flex align-items-center">
+              <span class="fw-semibold">Matching Ferrets</span>
+              <span id="statsAgeCount" class="badge bg-secondary ms-2">0</span>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-hover table-sm mb-0">
+                <thead>
+                  <tr>
+                    <th>AID</th><th>Name</th><th>Sex</th><th>Age (wk)</th><th>Age (mo)</th>
+                    <th>Status</th><th>Weight</th><th>Room</th><th></th>
+                  </tr>
+                </thead>
+                <tbody id="statsAgeTable">
+                  <tr><td colspan="9" class="text-muted text-center py-4">Set filters and click Apply.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Population -->
+        <div id="stats-population" class="stats-panel" style="display:none">
+          <div class="row g-3 mb-3" id="statsPopCards"></div>
+          <div class="card">
+            <div class="card-header bg-white py-2 d-flex align-items-center">
+              <span class="fw-semibold">Population Pyramid</span>
+              <span class="text-muted small ms-2">8-week bins · final bin 256+</span>
+            </div>
+            <div class="card-body" style="height:520px;position:relative">
+              <canvas id="pyramidChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Health -->
+        <div id="stats-health" class="stats-panel" style="display:none">
+          <div class="row g-3 mb-3">
+            <div class="col-lg-6">
+              <div class="card h-100">
+                <div class="card-header bg-white py-2 fw-semibold">Age at Death</div>
+                <div class="card-body" id="statsDeathSummary">
+                  <div class="text-muted text-center py-3">Loading…</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="card h-100">
+                <div class="card-header bg-white py-2 fw-semibold">Causes of Death</div>
+                <div class="card-body" id="statsCodSummary">
+                  <div class="text-muted text-center py-3">Loading…</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card mb-3">
+            <div class="card-header bg-white py-2 d-flex align-items-center flex-wrap gap-2">
+              <span class="fw-semibold">Weight Change Alerts</span>
+              <div class="ms-auto d-flex gap-2 align-items-end flex-wrap">
+                <div>
+                  <label class="form-label small mb-0">Sudden % / days</label>
+                  <div class="input-group input-group-sm" style="width:9rem">
+                    <input type="number" id="statsSuddenPct" class="form-control" value="10" min="1" step="1">
+                    <span class="input-group-text">%</span>
+                    <input type="number" id="statsSuddenDays" class="form-control" value="14" min="1">
+                  </div>
+                </div>
+                <div>
+                  <label class="form-label small mb-0">Gradual % / days</label>
+                  <div class="input-group input-group-sm" style="width:9rem">
+                    <input type="number" id="statsGradualPct" class="form-control" value="5" min="1" step="1">
+                    <span class="input-group-text">%</span>
+                    <input type="number" id="statsGradualDays" class="form-control" value="28" min="1">
+                  </div>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="loadStatsWeightAlerts()">Apply</button>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-hover table-sm mb-0">
+                <thead><tr><th>AID</th><th>Name</th><th>Alert</th><th>Δ %</th><th>Window</th><th>Current Wt</th><th></th></tr></thead>
+                <tbody id="statsWeightTable">
+                  <tr><td colspan="7" class="text-muted text-center py-3">Click Apply to load alerts.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Genetics -->
+        <div id="stats-genetics" class="stats-panel" style="display:none">
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <div class="card h-100">
+                <div class="card-header bg-white py-2 fw-semibold">Individual CoI</div>
+                <div class="card-body">
+                  <div class="input-group input-group-sm mb-2">
+                    <input type="text" id="statsCoiAid" class="form-control" placeholder="Animal ID or name">
+                    <button class="btn btn-primary" onclick="loadStatsCoi()">Calculate</button>
+                  </div>
+                  <div id="statsCoiResult" class="small text-muted">Enter an AID or name to compute Coefficient of Inbreeding.</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card h-100">
+                <div class="card-header bg-white py-2 fw-semibold">Pairwise Relatedness</div>
+                <div class="card-body">
+                  <div class="row g-2 mb-2">
+                    <div class="col"><input type="text" id="statsRelA" class="form-control form-control-sm" placeholder="Animal A"></div>
+                    <div class="col"><input type="text" id="statsRelB" class="form-control form-control-sm" placeholder="Animal B"></div>
+                    <div class="col-auto"><button class="btn btn-sm btn-primary" onclick="loadStatsRelatedness()">Compare</button></div>
+                  </div>
+                  <div id="statsRelResult" class="small text-muted">Select two animals to compute Coefficient of Relationship.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header bg-white py-2 d-flex align-items-center">
+              <span class="fw-semibold">High CoI Animals</span>
+              <div class="ms-auto d-flex gap-2 align-items-center">
+                <label class="small mb-0">Threshold</label>
+                <select id="statsCoiThreshold" class="form-select form-select-sm" style="width:7rem" onchange="loadStatsHighCoi()">
+                  <option value="0.0625">6.25%</option>
+                  <option value="0.125" selected>12.5%</option>
+                  <option value="0.25">25%</option>
+                </select>
+                <button class="btn btn-sm btn-outline-secondary" onclick="exportStatsCoiCsv()"><i class="bi bi-download"></i></button>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-hover table-sm mb-0">
+                <thead><tr><th>AID</th><th>Name</th><th>Sex</th><th>CoI</th><th>Interpretation</th><th>Parents</th></tr></thead>
+                <tbody id="statsHighCoiTable">
+                  <tr><td colspan="6" class="text-muted text-center py-3">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card mt-3">
+            <div class="card-header bg-white py-2 fw-semibold">Reference Values</div>
+            <div class="card-body small">
+              <ul class="mb-0">
+                <li>Parent–offspring / full siblings ≈ <strong>50%</strong></li>
+                <li>Half-siblings / uncle–niece / grandparent–grandchild ≈ <strong>25%</strong></li>
+                <li>First cousins ≈ <strong>12.5%</strong></li>
+                <li>Second cousins ≈ <strong>3.125%</strong></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reproduction -->
+        <div id="stats-reproduction" class="stats-panel" style="display:none">
+          <div class="row g-3 mb-3" id="statsReproCards"></div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-header bg-white py-2 fw-semibold">Top Jills (by offspring)</div>
+                <div class="table-responsive">
+                  <table class="table table-sm table-hover mb-0">
+                    <thead><tr><th>#</th><th>AID</th><th>Name</th><th>Offspring</th></tr></thead>
+                    <tbody id="statsTopJills"><tr><td colspan="4" class="text-muted text-center py-3">Loading…</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-header bg-white py-2 fw-semibold">Top Hobs (by offspring)</div>
+                <div class="table-responsive">
+                  <table class="table table-sm table-hover mb-0">
+                    <thead><tr><th>#</th><th>AID</th><th>Name</th><th>Offspring</th></tr></thead>
+                    <tbody id="statsTopHobs"><tr><td colspan="4" class="text-muted text-center py-3">Loading…</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Users -->
@@ -1938,6 +2207,7 @@
   <script src="/app-admin.js"></script>
   <script src="/app-cleaning.js"></script>
   <script src="/app-reports.js"></script>
+  <script src="/app-stats.js"></script>
 </body>
 
 </html>
